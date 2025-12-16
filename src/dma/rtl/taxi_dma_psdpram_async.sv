@@ -38,6 +38,7 @@ module taxi_dma_psdpram_async #
     taxi_dma_ram_if.rd_slv  dma_ram_rd
 );
 
+// extract parameters
 localparam SEGS = dma_ram_wr.SEGS;
 localparam SEG_ADDR_W = dma_ram_wr.SEG_ADDR_W;
 localparam SEG_DATA_W = dma_ram_wr.SEG_DATA_W;
@@ -46,8 +47,14 @@ localparam SEG_BE_W = dma_ram_wr.SEG_BE_W;
 localparam INT_ADDR_W = $clog2(SIZE/(SEGS*SEG_BE_W));
 
 // check configuration
-if (SEG_ADDR_W < INT_ADDR_W)
-    $fatal(0, "Error: SEG_ADDR_W not sufficient for requested size (min %d for size %d) (instance %m)", INT_ADDR_W, SIZE);
+if (dma_ram_wr.SEG_ADDR_W < INT_ADDR_W)
+    $fatal(0, "Error: dma_ram_wr.SEG_ADDR_W not sufficient for requested size (min %d for size %d) (instance %m)", INT_ADDR_W, SIZE);
+
+if (dma_ram_rd.SEG_ADDR_W < INT_ADDR_W)
+    $fatal(0, "Error: dma_ram_wr.SEG_ADDR_W not sufficient for requested size (min %d for size %d) (instance %m)", INT_ADDR_W, SIZE);
+
+if (SEGS != dma_ram_rd.SEGS || SEG_DATA_W != dma_ram_rd.SEG_DATA_W)
+    $fatal(0, "Error: Interface segment configuration mismatch (instance %m)");
 
 for (genvar n = 0; n < SEGS; n = n + 1) begin
 

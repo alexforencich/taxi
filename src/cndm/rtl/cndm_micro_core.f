@@ -1,0 +1,16 @@
+cndm_micro_core.sv
+cndm_micro_port.sv
+cndm_micro_rx.sv
+cndm_micro_tx.sv
+cndm_micro_desc_rd.sv
+cndm_micro_cpl_wr.sv
+../lib/taxi/src/dma/rtl/taxi_dma_client_axis_source.sv
+../lib/taxi/src/dma/rtl/taxi_dma_client_axis_sink.sv
+../lib/taxi/src/dma/rtl/taxi_dma_if_mux.f
+../lib/taxi/src/dma/rtl/taxi_dma_psdpram.sv
+../lib/taxi/src/axi/rtl/taxi_axil_interconnect_1s.f
+../lib/taxi/src/axis/rtl/taxi_axis_async_fifo.f
+../lib/taxi/src/axis/rtl/taxi_axis_arb_mux.f
+../lib/taxi/src/axis/rtl/taxi_axis_demux.sv
+../lib/taxi/src/ptp/rtl/taxi_ptp_td_phc.sv
+../lib/taxi/src/ptp/rtl/taxi_ptp_td_leaf.sv

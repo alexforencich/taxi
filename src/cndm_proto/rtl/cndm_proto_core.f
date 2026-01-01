@@ -1,0 +1,14 @@
+cndm_proto_core.sv
+cndm_proto_port.sv
+cndm_proto_rx.sv
+cndm_proto_tx.sv
+cndm_proto_desc_rd.sv
+cndm_proto_cpl_wr.sv
+../lib/taxi/src/dma/rtl/taxi_dma_client_axis_source.sv
+../lib/taxi/src/dma/rtl/taxi_dma_client_axis_sink.sv
+../lib/taxi/src/dma/rtl/taxi_dma_if_mux.f
+../lib/taxi/src/dma/rtl/taxi_dma_psdpram.sv
+../lib/taxi/src/axi/rtl/taxi_axil_interconnect_1s.f
+../lib/taxi/src/axis/rtl/taxi_axis_async_fifo.f
+../lib/taxi/src/axis/rtl/taxi_axis_arb_mux.f
+../lib/taxi/src/axis/rtl/taxi_axis_demux.sv

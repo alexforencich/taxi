@@ -1,5 +1,12 @@
 // SPDX-License-Identifier: GPL
-// Copyright (c) 2025 FPGA Ninja
+/*
+
+Copyright (c) 2025 FPGA Ninja, LLC
+
+Authors:
+- Alex Forencich
+
+*/
 
 #include "cndm_proto.h"
 

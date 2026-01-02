@@ -151,7 +151,7 @@ async def run_test(dut, gbx_cfg=None, payload_lengths=None, payload_data=None, i
         tb.log.info("RX frame SFD sim time: %f ns", rx_frame_sfd_ns)
         tb.log.info("Difference: %f ns", abs(rx_frame_sfd_ns - ptp_ts_ns))
 
-        assert rx_frame.get_payload() == test_data
+        assert rx_frame.get_payload() == test_data.ljust(60, b'\x00')
         assert rx_frame.check_fcs()
         assert rx_frame.ctrl is None
         if gbx_cfg is None:
@@ -497,7 +497,7 @@ async def run_test_oversize(dut, gbx_cfg=None, ifg=12):
 
 
 def size_list():
-    return list(range(60, 128)) + [512, 1514, 9214] + [60]*10 + [i for i in range(64, 73) for k in range(8)]
+    return list(range(16, 128)) + [512, 1514, 9214] + [60]*10 + [i for i in range(64, 73) for k in range(8)]
 
 
 def incrementing_payload(length):

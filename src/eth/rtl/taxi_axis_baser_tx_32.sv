@@ -462,7 +462,7 @@ always_comb begin
                 // idle state - wait for data
                 frame_error_next = 1'b0;
                 frame_oversize_next = 1'b0;
-                frame_min_count_next = MIN_LEN_W'(MIN_FRAME_LEN-4-KEEP_W);
+                frame_min_count_next = MIN_LEN_W'(MIN_FRAME_LEN-4);
                 hdr_ptr_next = 0;
                 frame_len_next = 0;
                 {frame_len_lim_cyc_next, frame_len_lim_last_next} = cfg_tx_max_pkt_len-1;

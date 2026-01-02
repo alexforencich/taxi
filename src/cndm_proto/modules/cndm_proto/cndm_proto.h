@@ -16,7 +16,6 @@ Authors:
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 
-#define DRIVER_NAME "cndm_proto"
 #define DRIVER_VERSION "0.1"
 
 struct cndm_proto_dev {

@@ -24,10 +24,10 @@ static int cndm_proto_pci_probe(struct pci_dev *pdev, const struct pci_device_id
 	int ret = 0;
 	int k;
 
-	dev_info(dev, DRIVER_NAME " PCI probe");
+	dev_info(dev, KBUILD_MODNAME " PCI probe");
 	dev_info(dev, "Corundum-proto device driver");
 	dev_info(dev, "Version " DRIVER_VERSION);
-	dev_info(dev, "Copyright (c) 2025 FPGA Ninja");
+	dev_info(dev, "Copyright (c) 2025 FPGA Ninja, LLC");
 	dev_info(dev, "https://fpga.ninja/");
 
 	pcie_print_link_status(pdev);
@@ -48,7 +48,7 @@ static int cndm_proto_pci_probe(struct pci_dev *pdev, const struct pci_device_id
 
 	pci_set_master(pdev);
 
-	ret = pci_request_regions(pdev, DRIVER_NAME);
+	ret = pci_request_regions(pdev, KBUILD_MODNAME);
 	if (ret) {
 		dev_err(dev, "Failed to reserve regions");
 		goto fail_regions;
@@ -93,7 +93,7 @@ static int cndm_proto_pci_probe(struct pci_dev *pdev, const struct pci_device_id
 			goto fail_netdev;
 		}
 
-		ret = pci_request_irq(pdev, k, cndm_proto_irq, 0, ndev, DRIVER_NAME);
+		ret = pci_request_irq(pdev, k, cndm_proto_irq, 0, ndev, KBUILD_MODNAME);
 		if (ret < 0) {
 			dev_err(dev, "Failed to request IRQ");
 			cndm_proto_destroy_netdev(ndev);
@@ -131,7 +131,7 @@ static void cndm_proto_pci_remove(struct pci_dev *pdev)
 	struct cndm_proto_dev *cdev = pci_get_drvdata(pdev);
 	int k;
 
-	dev_info(dev, DRIVER_NAME " PCI remove");
+	dev_info(dev, KBUILD_MODNAME " PCI remove");
 
 	for (k = 0; k < 32; k++) {
 		if (cdev->ndev[k]) {
@@ -155,7 +155,7 @@ static const struct pci_device_id cndm_proto_pci_id_table[] = {
 };
 
 static struct pci_driver cndm_proto_driver = {
-	.name = DRIVER_NAME,
+	.name = KBUILD_MODNAME,
 	.id_table = cndm_proto_pci_id_table,
 	.probe = cndm_proto_pci_probe,
 	.remove = cndm_proto_pci_remove

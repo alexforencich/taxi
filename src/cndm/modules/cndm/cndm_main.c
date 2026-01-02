@@ -60,6 +60,9 @@ static int cndm_common_probe(struct cndm_dev *cdev)
 	dev_info(dev, "Port offset: 0x%x", cdev->port_offset);
 	dev_info(dev, "Port stride: 0x%x", cdev->port_stride);
 
+	if (cdev->port_count > ARRAY_SIZE(cdev->ndev))
+		cdev->port_count = ARRAY_SIZE(cdev->ndev);
+
 	for (k = 0; k < cdev->port_count; k++) {
 		struct net_device *ndev;
 
@@ -103,7 +106,7 @@ static void cndm_common_remove(struct cndm_dev *cdev)
 	if (cdev->misc_dev.this_device)
 		misc_deregister(&cdev->misc_dev);
 
-	for (k = 0; k < 32; k++) {
+	for (k = 0; k < ARRAY_SIZE(cdev->ndev); k++) {
 		if (cdev->ndev[k]) {
 			cndm_destroy_netdev(cdev->ndev[k]);
 			cdev->ndev[k] = NULL;

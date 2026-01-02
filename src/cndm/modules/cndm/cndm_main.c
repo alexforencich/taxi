@@ -27,7 +27,7 @@ static int cndm_assign_id(struct cndm_dev *cdev)
 		return ret;
 
 	cdev->id = ret;
-	snprintf(cdev->name, sizeof(cdev->name), DRIVER_NAME "%d", cdev->id);
+	snprintf(cdev->name, sizeof(cdev->name), KBUILD_MODNAME "%d", cdev->id);
 
 	return 0;
 }
@@ -121,7 +121,7 @@ static int cndm_pci_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	struct pci_dev *bridge = pci_upstream_bridge(pdev);
 	int ret = 0;
 
-	dev_info(dev, DRIVER_NAME " PCI probe");
+	dev_info(dev, KBUILD_MODNAME " PCI probe");
 	dev_info(dev, "Corundum device driver");
 	dev_info(dev, "Version " DRIVER_VERSION);
 	dev_info(dev, "Copyright (c) 2025 FPGA Ninja, LLC");
@@ -264,7 +264,7 @@ static void cndm_pci_remove(struct pci_dev *pdev)
 	struct cndm_dev *cdev = pci_get_drvdata(pdev);
 	struct devlink *devlink = priv_to_devlink(cdev);
 
-	dev_info(dev, DRIVER_NAME " PCI remove");
+	dev_info(dev, KBUILD_MODNAME " PCI remove");
 
 	cndm_common_remove(cdev);
 
@@ -284,7 +284,7 @@ static const struct pci_device_id cndm_pci_id_table[] = {
 };
 
 static struct pci_driver cndm_driver = {
-	.name = DRIVER_NAME,
+	.name = KBUILD_MODNAME,
 	.id_table = cndm_pci_id_table,
 	.probe = cndm_pci_probe,
 	.remove = cndm_pci_remove

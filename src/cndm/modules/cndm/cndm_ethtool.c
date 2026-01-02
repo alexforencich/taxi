@@ -18,7 +18,7 @@ static void cndm_get_drvinfo(struct net_device *ndev,
 	struct cndm_priv *priv = netdev_priv(ndev);
 	struct cndm_dev *cdev = priv->cdev;
 
-	strscpy(drvinfo->driver, DRIVER_NAME, sizeof(drvinfo->driver));
+	strscpy(drvinfo->driver, KBUILD_MODNAME, sizeof(drvinfo->driver));
 	strscpy(drvinfo->version, DRIVER_VERSION, sizeof(drvinfo->version));
 	snprintf(drvinfo->fw_version, sizeof(drvinfo->fw_version), "TODO"); // TODO
 	strscpy(drvinfo->bus_info, dev_name(cdev->dev), sizeof(drvinfo->bus_info));

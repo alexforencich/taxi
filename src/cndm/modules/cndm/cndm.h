@@ -19,7 +19,6 @@ Authors:
 #include <linux/ptp_clock_kernel.h>
 #include <net/devlink.h>
 
-#define DRIVER_NAME "cndm"
 #define DRIVER_VERSION "0.1"
 
 #define CNDM_MAX_IRQ 256

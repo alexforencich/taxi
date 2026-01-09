@@ -27,6 +27,9 @@ module cndm_proto_cpl_wr
     taxi_dma_desc_if.sts_snk  dma_wr_desc_sts,
     taxi_dma_ram_if.rd_slv    dma_ram_rd,
 
+    /*
+     * Control signals from port-level control registers
+     */
     input  wire logic         txcq_en,
     input  wire logic [3:0]   txcq_size,
     input  wire logic [63:0]  txcq_base_addr,
@@ -36,10 +39,18 @@ module cndm_proto_cpl_wr
     input  wire logic [63:0]  rxcq_base_addr,
     output wire logic [15:0]  rxcq_prod,
 
+    /*
+     * Completion inputs from TX and RX datapaths
+     */
     taxi_axis_if.snk          axis_cpl[2],
+
+    /*
+     * Interrupt request output
+     */
     output wire logic         irq
 );
 
+// Combined completion bus - carries both RX and TX completions, identified by tid
 taxi_axis_if #(
     .DATA_W(axis_cpl[0].DATA_W),
     .KEEP_EN(axis_cpl[0].KEEP_EN),
@@ -54,6 +65,7 @@ taxi_axis_if #(
     .USER_W(axis_cpl[0].USER_W)
 ) cpl_comb();
 
+// Completion write control state machine
 localparam [2:0]
     STATE_IDLE = 0,
     STATE_RX_CPL = 1,
@@ -76,6 +88,7 @@ assign irq = irq_reg;
 always_ff @(posedge clk) begin
     cpl_comb.tready <= 1'b0;
 
+    // Host DMA control descriptor to manage transferring completions to host memory
     dma_wr_desc_req.req_src_sel <= '0;
     dma_wr_desc_req.req_src_asid <= '0;
     dma_wr_desc_req.req_dst_sel <= '0;
@@ -89,6 +102,7 @@ always_ff @(posedge clk) begin
     dma_wr_desc_req.req_user <= '0;
     dma_wr_desc_req.req_valid <= dma_wr_desc_req.req_valid && !dma_wr_desc_req.req_ready;
 
+    // reset pointers when disabled
     if (!txcq_en) begin
         txcq_prod_ptr_reg <= '0;
     end
@@ -101,12 +115,19 @@ always_ff @(posedge clk) begin
 
     case (state_reg)
         STATE_IDLE: begin
+            // idle state - wait for completion
+
             dma_wr_desc_req.req_src_addr <= '0;
 
+            // arbitrate between TX and RX completions
             if (cpl_comb.tid == 0) begin
+                // compute host address - base address plus producer pointer, modulo queue size
                 dma_wr_desc_req.req_dst_addr <= txcq_base_addr + 64'(16'(txcq_prod_ptr_reg & ({16{1'b1}} >> (16 - txcq_size))) * 16);
+                // phase tag is the inverted version of the extended producer pointer
+                // each "pass" over the queue elements will invert the phase tag
                 phase_tag_reg <= !txcq_prod_ptr_reg[txcq_size];
                 if (cpl_comb.tvalid && !cpl_comb.tready) begin
+                    // increment pointer and start transfer operation, if the queue is enabled
                     txcq_prod_ptr_reg <= txcq_prod_ptr_reg + 1;
                     if (txcq_en) begin
                         dma_wr_desc_req.req_valid <= 1'b1;
@@ -116,9 +137,13 @@ always_ff @(posedge clk) begin
                     end
                 end
             end else begin
+                // compute host address - base address plus producer pointer, modulo queue size
                 dma_wr_desc_req.req_dst_addr <= rxcq_base_addr + 64'(16'(rxcq_prod_ptr_reg & ({16{1'b1}} >> (16 - rxcq_size))) * 16);
+                // phase tag is the inverted version of the extended producer pointer
+                // each "pass" over the queue elements will invert the phase tag
                 phase_tag_reg <= !rxcq_prod_ptr_reg[rxcq_size];
                 if (cpl_comb.tvalid && !cpl_comb.tready) begin
+                    // increment pointer and start transfer operation, if the queue is enabled
                     rxcq_prod_ptr_reg <= rxcq_prod_ptr_reg + 1;
                     if (rxcq_en) begin
                         dma_wr_desc_req.req_valid <= 1'b1;
@@ -130,6 +155,7 @@ always_ff @(posedge clk) begin
             end
         end
         STATE_WRITE_DATA: begin
+            // write data state - wait for host DMA write to complete, issue IRQ to host
             if (dma_wr_desc_sts.sts_valid) begin
                 cpl_comb.tready <= 1'b1;
                 irq_reg <= 1'b1;
@@ -149,6 +175,7 @@ always_ff @(posedge clk) begin
     end
 end
 
+// mux for completions
 taxi_axis_arb_mux #(
     .S_COUNT(2),
     .UPDATE_TID(1),
@@ -170,7 +197,7 @@ mux_inst (
     .m_axis(cpl_comb)
 );
 
-// extract parameters
+// "emulate" DMA RAM - pass completion data to host DMA engine along with phase tag bit
 localparam SEGS = dma_ram_rd.SEGS;
 localparam SEG_ADDR_W = dma_ram_rd.SEG_ADDR_W;
 localparam SEG_DATA_W = dma_ram_rd.SEG_DATA_W;

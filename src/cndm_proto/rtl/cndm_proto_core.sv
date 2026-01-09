@@ -66,6 +66,7 @@ localparam RAM_SEL_W = dma_ram_wr.SEL_W;
 
 localparam PORT_OFFSET = 1;
 
+// Interface array for control registers - common registers plus per-port registers
 taxi_axil_if #(
     .DATA_W(s_axil_wr.DATA_W),
     .ADDR_W(16),
@@ -83,6 +84,7 @@ taxi_axil_if #(
 )
 s_axil_ctrl[PORTS+PORT_OFFSET]();
 
+// Interconnect to map common and per-port registers into linear address space
 taxi_axil_interconnect_1s #(
     .M_COUNT($size(s_axil_ctrl)),
     .ADDR_W(s_axil_wr.ADDR_W),
@@ -108,6 +110,7 @@ port_intercon_inst (
     .m_axil_rd(s_axil_ctrl)
 );
 
+// Common control registers
 logic s_axil_awready_reg = 1'b0;
 logic s_axil_wready_reg = 1'b0;
 logic s_axil_bvalid_reg = 1'b0;
@@ -171,6 +174,7 @@ always_ff @(posedge clk) begin
     end
 end
 
+// DMA interface multiplexing across ports, enabling ports to share the host DMA engine
 taxi_dma_desc_if #(
     .SRC_ADDR_W(dma_rd_desc_req.SRC_ADDR_W),
     .SRC_SEL_EN(dma_rd_desc_req.SRC_SEL_EN),
@@ -254,6 +258,7 @@ dma_mux_inst (
 
 for (genvar p = 0; p < PORTS; p = p + 1) begin : port
 
+    // Per-port datapath instance
     cndm_proto_port #(
         .PORTS(PORTS)
     )

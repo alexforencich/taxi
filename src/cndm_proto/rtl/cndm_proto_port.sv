@@ -53,6 +53,7 @@ module cndm_proto_port #(
     taxi_axis_if.snk          mac_axis_rx
 );
 
+// Port-level control registers
 localparam AXIL_ADDR_W = s_axil_wr.ADDR_W;
 localparam AXIL_DATA_W = s_axil_wr.DATA_W;
 
@@ -207,6 +208,7 @@ always_ff @(posedge clk) begin
     end
 end
 
+// DMA mux logic to share host DMA engine between descriptor read and transmit logic
 taxi_dma_desc_if #(
     .SRC_ADDR_W(dma_rd_desc_req.SRC_ADDR_W),
     .SRC_SEL_EN(dma_rd_desc_req.SRC_SEL_EN),
@@ -264,6 +266,7 @@ rd_dma_mux_inst (
     .client_ram_wr(dma_ram_wr_int)
 );
 
+// DMA mux logic to share host DMA engine between completion write and receive logic
 taxi_dma_desc_if #(
     .SRC_ADDR_W(dma_wr_desc_req.SRC_ADDR_W),
     .SRC_SEL_EN(dma_wr_desc_req.SRC_SEL_EN),
@@ -322,6 +325,7 @@ wr_dma_mux_inst (
     .client_ram_rd(dma_ram_rd_int)
 );
 
+// Descriptor read logic
 wire [1:0] desc_req;
 
 taxi_axis_if #(
@@ -333,15 +337,6 @@ taxi_axis_if #(
     .USER_EN(1),
     .USER_W(1)
 ) axis_desc[2]();
-
-taxi_axis_if #(
-    .DATA_W(16*8),
-    .KEEP_EN(1),
-    .LAST_EN(1),
-    .ID_EN(1), // TODO
-    .DEST_EN(0),
-    .USER_EN(0)
-) axis_cpl[2]();
 
 cndm_proto_desc_rd
 desc_rd_inst (
@@ -355,6 +350,9 @@ desc_rd_inst (
     .dma_rd_desc_sts(dma_rd_desc_int[0]),
     .dma_ram_wr(dma_ram_wr_int[0]),
 
+    /*
+     * Control signals from port-level control registers
+     */
     .txq_en(txq_en_reg),
     .txq_size(txq_size_reg),
     .txq_base_addr(txq_base_addr_reg),
@@ -366,9 +364,22 @@ desc_rd_inst (
     .rxq_prod(rxq_prod_reg),
     .rxq_cons(rxq_cons),
 
+    /*
+     * Descriptor request interface
+     */
     .desc_req(desc_req),
     .axis_desc(axis_desc)
 );
+
+// Completion write logic
+taxi_axis_if #(
+    .DATA_W(16*8),
+    .KEEP_EN(1),
+    .LAST_EN(1),
+    .ID_EN(1), // TODO
+    .DEST_EN(0),
+    .USER_EN(0)
+) axis_cpl[2]();
 
 cndm_proto_cpl_wr
 cpl_wr_inst (
@@ -382,6 +393,9 @@ cpl_wr_inst (
     .dma_wr_desc_sts(dma_wr_desc_int[0]),
     .dma_ram_rd(dma_ram_rd_int[0]),
 
+    /*
+     * Control signals from port-level control registers
+     */
     .txcq_en(txcq_en_reg),
     .txcq_size(txcq_size_reg),
     .txcq_base_addr(txcq_base_addr_reg),
@@ -391,10 +405,18 @@ cpl_wr_inst (
     .rxcq_base_addr(rxcq_base_addr_reg),
     .rxcq_prod(rxcq_prod),
 
+    /*
+     * Completion inputs from TX and RX datapaths
+     */
     .axis_cpl(axis_cpl),
+
+    /*
+     * Interrupt request output
+     */
     .irq(irq)
 );
 
+// Transmit datapath and async FIFO
 taxi_axis_if #(
     .DATA_W(mac_axis_tx.DATA_W),
     .USER_EN(1),
@@ -461,12 +483,24 @@ tx_inst (
     .dma_rd_desc_sts(dma_rd_desc_int[1]),
     .dma_ram_wr(dma_ram_wr_int[1]),
 
+    /*
+     * Descriptor request
+     */
     .desc_req(desc_req[0]),
     .axis_desc(axis_desc[0]),
+
+    /*
+     * Transmit data output
+     */
     .tx_data(mac_tx_int),
+
+    /*
+     * Completion output
+     */
     .axis_cpl(axis_cpl[0])
 );
 
+// Receive datapath and async FIFO
 taxi_axis_if #(
     .DATA_W(mac_axis_rx.DATA_W),
     .USER_EN(1),
@@ -533,9 +567,20 @@ rx_inst (
     .dma_wr_desc_sts(dma_wr_desc_int[1]),
     .dma_ram_rd(dma_ram_rd_int[1]),
 
+    /*
+     * Receive data input
+     */
     .rx_data(mac_rx_int),
+
+    /*
+     * Descriptor request
+     */
     .desc_req(desc_req[1]),
     .axis_desc(axis_desc[1]),
+
+    /*
+     * Completion output
+     */
     .axis_cpl(axis_cpl[1])
 );
 

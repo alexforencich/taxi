@@ -27,12 +27,24 @@ module cndm_proto_tx
     taxi_dma_desc_if.sts_snk  dma_rd_desc_sts,
     taxi_dma_ram_if.wr_slv    dma_ram_wr,
 
+    /*
+     * Descriptor request
+     */
     output wire logic         desc_req,
     taxi_axis_if.snk          axis_desc,
+
+    /*
+     * Transmit data output
+     */
     taxi_axis_if.src          tx_data,
+
+    /*
+     * Completion output
+     */
     taxi_axis_if.src          axis_cpl
 );
 
+// Control for internal streaming DMA engine
 localparam RAM_ADDR_W = 16;
 
 taxi_dma_desc_if #(
@@ -51,6 +63,7 @@ taxi_dma_desc_if #(
     .USER_W(1)
 ) dma_desc();
 
+// Transmit datapath control state machine
 localparam [2:0]
     STATE_IDLE = 0,
     STATE_READ_DESC = 1,
@@ -68,6 +81,7 @@ always_ff @(posedge clk) begin
 
     axis_desc.tready <= 1'b0;
 
+    // Host DMA control descriptor to manage transferring packet data from host memory
     dma_rd_desc_req.req_src_sel <= '0;
     dma_rd_desc_req.req_src_asid <= '0;
     dma_rd_desc_req.req_dst_sel <= '0;
@@ -80,6 +94,7 @@ always_ff @(posedge clk) begin
     dma_rd_desc_req.req_user <= '0;
     dma_rd_desc_req.req_valid <= dma_rd_desc_req.req_valid && !dma_rd_desc_req.req_ready;
 
+    // Streaming DMA control descriptor to transfer packet data
     dma_desc.req_src_sel <= '0;
     dma_desc.req_src_asid <= '0;
     dma_desc.req_dst_addr <= '0;
@@ -102,10 +117,12 @@ always_ff @(posedge clk) begin
 
     case (state_reg)
         STATE_IDLE: begin
+            // idle state - start descriptor read operation
             desc_req_reg <= 1'b1;
             state_reg <= STATE_READ_DESC;
         end
         STATE_READ_DESC: begin
+            // read descriptor state - wait for descriptor, start host DMA read
             axis_desc.tready <= 1'b1;
 
             dma_rd_desc_req.req_src_addr <= axis_desc.tdata[127:64];
@@ -126,12 +143,14 @@ always_ff @(posedge clk) begin
             end
         end
         STATE_READ_DATA: begin
+            // read data state - wait for host DMA read, start streaming DMA read
             if (dma_rd_desc_sts.sts_valid) begin
                 dma_desc.req_valid <= 1'b1;
                 state_reg <= STATE_TX_DATA;
             end
         end
         STATE_TX_DATA: begin
+            // transmit data state - wait for streaming DMA read
             if (dma_desc.sts_valid) begin
                 axis_cpl.tvalid <= 1'b1;
                 state_reg <= STATE_IDLE;
@@ -147,6 +166,7 @@ always_ff @(posedge clk) begin
     end
 end
 
+// local RAM to store the packet data temporarily
 taxi_dma_ram_if #(
     .SEGS(dma_ram_wr.SEGS),
     .SEG_ADDR_W(dma_ram_wr.SEG_ADDR_W),
@@ -173,6 +193,7 @@ ram_inst (
     .dma_ram_rd(dma_ram_rd)
 );
 
+// streaming DMA engine to read packet data from local RAM
 taxi_dma_client_axis_source
 dma_inst (
     .clk(clk),

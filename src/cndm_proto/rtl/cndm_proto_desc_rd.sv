@@ -27,6 +27,9 @@ module cndm_proto_desc_rd
     taxi_dma_desc_if.sts_snk  dma_rd_desc_sts,
     taxi_dma_ram_if.wr_slv    dma_ram_wr,
 
+    /*
+     * Control signals from port-level control registers
+     */
     input  wire logic         txq_en,
     input  wire logic [3:0]   txq_size,
     input  wire logic [63:0]  txq_base_addr,
@@ -38,10 +41,14 @@ module cndm_proto_desc_rd
     input  wire logic [15:0]  rxq_prod,
     output wire logic [15:0]  rxq_cons,
 
+    /*
+     * Descriptor request interface
+     */
     input  wire logic [1:0]   desc_req,
     taxi_axis_if.src          axis_desc[2]
 );
 
+// Control for internal streaming DMA engine
 localparam RAM_ADDR_W = 16;
 
 taxi_dma_desc_if #(
@@ -61,6 +68,7 @@ taxi_dma_desc_if #(
     .USER_W(1)
 ) dma_desc();
 
+// Descriptor read control state machine
 localparam [2:0]
     STATE_IDLE = 0,
     STATE_READ_DESC = 1,
@@ -78,8 +86,7 @@ assign txq_cons = txq_cons_ptr_reg;
 assign rxq_cons = rxq_cons_ptr_reg;
 
 always_ff @(posedge clk) begin
-    // axis_desc.tready <= 1'b0;
-
+    // Host DMA control descriptor to manage transferring descriptors from host memory
     dma_rd_desc_req.req_src_sel <= '0;
     dma_rd_desc_req.req_src_asid <= '0;
     dma_rd_desc_req.req_dst_sel <= '0;
@@ -93,6 +100,7 @@ always_ff @(posedge clk) begin
     dma_rd_desc_req.req_user <= '0;
     dma_rd_desc_req.req_valid <= dma_rd_desc_req.req_valid && !dma_rd_desc_req.req_ready;
 
+    // Streaming DMA control descriptor to manage reading descriptors
     dma_desc.req_src_sel <= '0;
     dma_desc.req_src_asid <= '0;
     dma_desc.req_dst_addr <= '0;
@@ -106,8 +114,10 @@ always_ff @(posedge clk) begin
     dma_desc.req_user <= '0;
     dma_desc.req_valid <= dma_desc.req_valid && !dma_desc.req_ready;
 
+    // Latch descriptor request pulses
     desc_req_reg <= desc_req_reg | desc_req;
 
+    // reset pointers when queues are disabled
     if (!txq_en) begin
         txq_cons_ptr_reg <= '0;
     end
@@ -118,29 +128,37 @@ always_ff @(posedge clk) begin
 
     case (state_reg)
         STATE_IDLE: begin
+            // idle state - wait for descriptor request
+            // favor RX over TX
             if (desc_req_reg[1]) begin
+                // compute host address - base address plus producer pointer, modulo queue size
                 dma_rd_desc_req.req_src_addr <= rxq_base_addr + 64'(16'(rxq_cons_ptr_reg & ({16{1'b1}} >> (16 - rxq_size))) * 16);
                 dma_desc.req_dest <= 1'b1;
                 desc_req_reg[1] <= 1'b0;
                 if (rxq_cons_ptr_reg == rxq_prod || !rxq_en) begin
+                    // queue is empty or disabled, generate invalid descriptor
                     dma_desc.req_user <= 1'b1;
                     dma_desc.req_valid <= 1'b1;
                     state_reg <= STATE_TX_DESC;
                 end else begin
+                    // increment pointer and start transfer operation
                     dma_desc.req_user <= 1'b0;
                     dma_rd_desc_req.req_valid <= 1'b1;
                     rxq_cons_ptr_reg <= rxq_cons_ptr_reg + 1;
                     state_reg <= STATE_READ_DESC;
                 end
             end else if (desc_req_reg[0]) begin
+                // compute host address - base address plus producer pointer, modulo queue size
                 dma_rd_desc_req.req_src_addr <= txq_base_addr + 64'(16'(txq_cons_ptr_reg & ({16{1'b1}} >> (16 - txq_size))) * 16);
                 dma_desc.req_dest <= 1'b0;
                 desc_req_reg[0] <= 1'b0;
                 if (txq_cons_ptr_reg == txq_prod || !txq_en) begin
+                    // queue is empty or disabled, generate invalid descriptor
                     dma_desc.req_user <= 1'b1;
                     dma_desc.req_valid <= 1'b1;
                     state_reg <= STATE_TX_DESC;
                 end else begin
+                    // increment pointer and start transfer operation
                     dma_desc.req_user <= 1'b0;
                     dma_rd_desc_req.req_valid <= 1'b1;
                     txq_cons_ptr_reg <= txq_cons_ptr_reg + 1;
@@ -149,12 +167,14 @@ always_ff @(posedge clk) begin
             end
         end
         STATE_READ_DESC: begin
+            // read descriptor state - wait for host DMA read, start streaming DMA read
             if (dma_rd_desc_sts.sts_valid) begin
                 dma_desc.req_valid <= 1'b1;
                 state_reg <= STATE_TX_DESC;
             end
         end
         STATE_TX_DESC: begin
+            // transmit descriptor state - wait for streaming DMA read
             if (dma_desc.sts_valid) begin
                 state_reg <= STATE_IDLE;
             end
@@ -169,6 +189,7 @@ always_ff @(posedge clk) begin
     end
 end
 
+// local RAM to store the descriptor temporarily
 taxi_dma_ram_if #(
     .SEGS(dma_ram_wr.SEGS),
     .SEG_ADDR_W(dma_ram_wr.SEG_ADDR_W),
@@ -195,6 +216,7 @@ ram_inst (
     .dma_ram_rd(dma_ram_rd)
 );
 
+// streaming DMA engine to read descriptor from local RAM
 taxi_axis_if #(
     .DATA_W(axis_desc[0].DATA_W),
     .KEEP_EN(axis_desc[0].KEEP_EN),
@@ -235,6 +257,7 @@ dma_inst (
     .enable(1'b1)
 );
 
+// demux module to route descriptor appropriately
 taxi_axis_demux #(
     .M_COUNT(2),
     .TDEST_ROUTE(1)

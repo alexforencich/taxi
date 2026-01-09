@@ -95,6 +95,7 @@ module cndm_proto_pcie_us #(
 
 localparam CL_PORTS = $clog2(PORTS);
 
+// PCIe BAR for device control
 localparam AXIL_DATA_W = 32;
 localparam AXIL_ADDR_W = BAR0_APERTURE;
 
@@ -138,6 +139,7 @@ pcie_axil_master_inst (
     .stat_err_uncor()
 );
 
+// Host PCIe DMA engine
 localparam AXIS_PCIE_DATA_W = m_axis_pcie_rq.DATA_W;
 
 localparam PCIE_ADDR_W = 64;
@@ -383,6 +385,7 @@ dma_if_inst (
     .stat_wr_tx_stall(stat_wr_tx_stall)
 );
 
+// MSI interrupts
 wire [PORTS-1:0] irq;
 wire [31:0] msi_irq = 32'(irq);
 

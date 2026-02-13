@@ -108,7 +108,7 @@ class PtpTdSource(Reset):
         self.ts_fns = int(ts_fns)
         self.ts_tod_updated = True
 
-    def set_ts_tod_64(self, ts):
+    def set_ts_tod_96(self, ts):
         ts = int(ts)
         self.set_ts_tod(ts >> 48, (ts >> 32) & 0x3fffffff, (ts & 0xffff) << 16)
 

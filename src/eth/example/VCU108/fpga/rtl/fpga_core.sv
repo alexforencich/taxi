@@ -402,8 +402,10 @@ taxi_eth_mac_25g_us #(
     .DIC_EN(1'b1),
     .MIN_FRAME_LEN(64),
     .PTP_TS_EN(1'b0),
+    .PTP_TD_EN(1'b0),
     .PTP_TS_FMT_TOD(1'b1),
     .PTP_TS_W(96),
+    .PTP_TD_SDI_PIPELINE(2),
     .PRBS31_EN(1'b0),
     .TX_SERDES_PIPELINE(1),
     .RX_SERDES_PIPELINE(1),
@@ -461,7 +463,6 @@ qsfp_mac_inst (
     .tx_clk(qsfp_tx_clk),
     .tx_rst_in('{4{1'b0}}),
     .tx_rst_out(qsfp_tx_rst),
-    .ptp_sample_clk('{4{1'b0}}),
 
     /*
      * Transmit interface (AXI stream)
@@ -477,10 +478,18 @@ qsfp_mac_inst (
     /*
      * PTP clock
      */
-    .tx_ptp_ts('{4{'0}}),
-    .tx_ptp_ts_step('{4{1'b0}}),
-    .rx_ptp_ts('{4{'0}}),
-    .rx_ptp_ts_step('{4{1'b0}}),
+    .ptp_clk(1'b0),
+    .ptp_rst(1'b0),
+    .ptp_sample_clk(1'b0),
+    .ptp_td_sdi(1'b0),
+    .tx_ptp_ts_in('{4{'0}}),
+    .tx_ptp_ts_out(),
+    .tx_ptp_ts_step_out(),
+    .tx_ptp_locked(),
+    .rx_ptp_ts_in('{4{'0}}),
+    .rx_ptp_ts_out(),
+    .rx_ptp_ts_step_out(),
+    .rx_ptp_locked(),
 
     /*
      * Link-level Flow Control (LFC) (IEEE 802.3 annex 31B PAUSE)

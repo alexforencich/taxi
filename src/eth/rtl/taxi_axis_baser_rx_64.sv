@@ -584,10 +584,13 @@ always_ff @(posedge clk) begin
 
         if (PTP_TS_EN && PTP_TS_FMT_TOD) begin
             // ns field rollover
+            // workaround for verilator lint bug: unreachable by parameter value
+            /* verilator lint_off SELRANGE */
             ptp_ts_adj_reg[15:0] <= ptp_ts_reg[15:0];
             {ptp_ts_borrow_reg, ptp_ts_adj_reg[45:16]} <= $signed({1'b0, ptp_ts_reg[45:16]}) - $signed(31'd1000000000);
             ptp_ts_adj_reg[47:46] <= 0;
             ptp_ts_adj_reg[95:48] <= ptp_ts_reg[95:48] + 1;
+            /* verilator lint_on SELRANGE */
         end
 
         // lane swapping and termination character detection
@@ -807,8 +810,11 @@ always_ff @(posedge clk) begin
         if (input_start_swap_reg) begin
             start_packet_reg <= 2'b10;
             if (PTP_TS_FMT_TOD) begin
+                // workaround for verilator lint bug: unreachable by parameter value
+                /* verilator lint_off SELRANGE */
                 ptp_ts_reg[45:0] <= ptp_ts[45:0] + 46'(ts_inc_reg >> 1);
                 ptp_ts_reg[95:48] <= ptp_ts[95:48];
+                /* verilator lint_on SELRANGE */
             end else begin
                 ptp_ts_reg <= ptp_ts + PTP_TS_W'(ts_inc_reg >> 1);
             end

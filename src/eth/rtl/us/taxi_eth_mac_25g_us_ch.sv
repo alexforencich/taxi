@@ -57,8 +57,10 @@ module taxi_eth_mac_25g_us_ch #
     parameter logic DIC_EN = 1'b1,
     parameter MIN_FRAME_LEN = 64,
     parameter logic PTP_TS_EN = 1'b0,
+    parameter logic PTP_TD_EN = PTP_TS_EN,
     parameter logic PTP_TS_FMT_TOD = 1'b1,
     parameter PTP_TS_W = PTP_TS_FMT_TOD ? 96 : 64,
+    parameter PTP_TD_SDI_PIPELINE = 2,
     parameter logic PRBS31_EN = 1'b0,
     parameter TX_SERDES_PIPELINE = 1,
     parameter RX_SERDES_PIPELINE = 1,
@@ -134,7 +136,6 @@ module taxi_eth_mac_25g_us_ch #
     output wire logic                 tx_clk,
     input  wire logic                 tx_rst_in = 1'b0,
     output wire logic                 tx_rst_out,
-    input  wire logic                 ptp_sample_clk = 1'b0,
 
     /*
      * Transmit interface (AXI stream)
@@ -150,10 +151,18 @@ module taxi_eth_mac_25g_us_ch #
     /*
      * PTP clock
      */
-    input  wire logic [PTP_TS_W-1:0]  tx_ptp_ts = '0,
-    input  wire logic                 tx_ptp_ts_step = 1'b0,
-    input  wire logic [PTP_TS_W-1:0]  rx_ptp_ts = '0,
-    input  wire logic                 rx_ptp_ts_step = 1'b0,
+    input  wire logic                 ptp_clk = 1'b0,
+    input  wire logic                 ptp_rst = 1'b0,
+    input  wire logic                 ptp_sample_clk = 1'b0,
+    input  wire logic                 ptp_td_sdi = 1'b0,
+    input  wire logic [PTP_TS_W-1:0]  tx_ptp_ts_in = '0,
+    output wire logic [PTP_TS_W-1:0]  tx_ptp_ts_out,
+    output wire logic                 tx_ptp_ts_step_out,
+    output wire logic                 tx_ptp_locked,
+    input  wire logic [PTP_TS_W-1:0]  rx_ptp_ts_in = '0,
+    output wire logic [PTP_TS_W-1:0]  rx_ptp_ts_out,
+    output wire logic                 rx_ptp_ts_step_out,
+    output wire logic                 rx_ptp_locked,
 
     /*
      * Link-level Flow Control (LFC) (IEEE 802.3 annex 31B PAUSE)
@@ -878,8 +887,10 @@ if (COMBINED_MAC_PCS) begin : mac
         .DIC_EN(DIC_EN),
         .MIN_FRAME_LEN(MIN_FRAME_LEN),
         .PTP_TS_EN(PTP_TS_EN),
+        .PTP_TD_EN(PTP_TD_EN),
         .PTP_TS_FMT_TOD(PTP_TS_FMT_TOD),
         .PTP_TS_W(PTP_TS_W),
+        .PTP_TD_SDI_PIPELINE(PTP_TD_SDI_PIPELINE),
         .BIT_REVERSE(1'b1),
         .SCRAMBLER_DISABLE(1'b0),
         .PRBS31_EN(PRBS31_EN),
@@ -935,8 +946,18 @@ if (COMBINED_MAC_PCS) begin : mac
         /*
          * PTP
          */
-        .tx_ptp_ts(tx_ptp_ts),
-        .rx_ptp_ts(rx_ptp_ts),
+        .ptp_clk(ptp_clk),
+        .ptp_rst(ptp_rst),
+        .ptp_sample_clk(ptp_sample_clk),
+        .ptp_td_sdi(ptp_td_sdi),
+        .tx_ptp_ts_in(tx_ptp_ts_in),
+        .tx_ptp_ts_out(tx_ptp_ts_out),
+        .tx_ptp_ts_step_out(tx_ptp_ts_step_out),
+        .tx_ptp_locked(tx_ptp_locked),
+        .rx_ptp_ts_in(rx_ptp_ts_in),
+        .rx_ptp_ts_out(rx_ptp_ts_out),
+        .rx_ptp_ts_step_out(rx_ptp_ts_step_out),
+        .rx_ptp_locked(rx_ptp_locked),
 
         /*
          * Link-level Flow Control (LFC) (IEEE 802.3 annex 31B PAUSE)
@@ -1160,8 +1181,10 @@ end else begin : mac
         .DIC_EN(DIC_EN),
         .MIN_FRAME_LEN(MIN_FRAME_LEN),
         .PTP_TS_EN(PTP_TS_EN),
+        .PTP_TD_EN(PTP_TD_EN),
         .PTP_TS_FMT_TOD(PTP_TS_FMT_TOD),
         .PTP_TS_W(PTP_TS_W),
+        .PTP_TD_SDI_PIPELINE(PTP_TD_SDI_PIPELINE),
         .PFC_EN(PFC_EN),
         .PAUSE_EN(PAUSE_EN),
         .STAT_EN(STAT_EN),
@@ -1205,8 +1228,18 @@ end else begin : mac
         /*
          * PTP
          */
-        .tx_ptp_ts(tx_ptp_ts),
-        .rx_ptp_ts(rx_ptp_ts),
+        .ptp_clk(ptp_clk),
+        .ptp_rst(ptp_rst),
+        .ptp_sample_clk(ptp_sample_clk),
+        .ptp_td_sdi(ptp_td_sdi),
+        .tx_ptp_ts_in(tx_ptp_ts_in),
+        .tx_ptp_ts_out(tx_ptp_ts_out),
+        .tx_ptp_ts_step_out(tx_ptp_ts_step_out),
+        .tx_ptp_locked(tx_ptp_locked),
+        .rx_ptp_ts_in(rx_ptp_ts_in),
+        .rx_ptp_ts_out(rx_ptp_ts_out),
+        .rx_ptp_ts_step_out(rx_ptp_ts_step_out),
+        .rx_ptp_locked(rx_ptp_locked),
 
         /*
          * Link-level Flow Control (LFC) (IEEE 802.3 annex 31B PAUSE)

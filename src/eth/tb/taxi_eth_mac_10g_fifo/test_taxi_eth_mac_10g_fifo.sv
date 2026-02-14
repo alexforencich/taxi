@@ -27,8 +27,10 @@ module test_taxi_eth_mac_10g_fifo #
     parameter logic DIC_EN = 1'b1,
     parameter MIN_FRAME_LEN = 64,
     parameter logic PTP_TS_EN = 1'b0,
+    parameter logic PTP_TD_EN = PTP_TS_EN,
     parameter logic PTP_TS_FMT_TOD = 1'b1,
     parameter PTP_TS_W = PTP_TS_FMT_TOD ? 96 : 64,
+    parameter PTP_TD_SDI_PIPELINE = 2,
     parameter TX_TAG_W = 16,
     parameter logic STAT_EN = 1'b0,
     parameter STAT_TX_LEVEL = 1,
@@ -64,7 +66,6 @@ logic tx_clk;
 logic tx_rst;
 logic logic_clk;
 logic logic_rst;
-logic ptp_sample_clk;
 
 taxi_axis_if #(.DATA_W(AXIS_DATA_W), .USER_EN(1), .USER_W(TX_USER_W), .ID_EN(1), .ID_W(TX_TAG_W)) s_axis_tx();
 taxi_axis_if #(.DATA_W(96), .KEEP_W(1), .ID_EN(1), .ID_W(TX_TAG_W)) m_axis_tx_cpl();
@@ -80,8 +81,18 @@ logic [GBX_CNT-1:0] tx_gbx_req_sync;
 logic tx_gbx_req_stall;
 logic [GBX_CNT-1:0] tx_gbx_sync;
 
-logic [PTP_TS_W-1:0] ptp_ts;
-logic ptp_ts_step;
+logic ptp_clk;
+logic ptp_rst;
+logic ptp_sample_clk;
+logic ptp_td_sdi;
+logic [PTP_TS_W-1:0] ptp_ts_in;
+logic ptp_ts_step_in;
+logic [PTP_TS_W-1:0] tx_ptp_ts_out;
+logic tx_ptp_ts_step_out;
+logic tx_ptp_locked;
+logic [PTP_TS_W-1:0] rx_ptp_ts_out;
+logic rx_ptp_ts_step_out;
+logic rx_ptp_locked;
 
 logic stat_clk;
 logic stat_rst;
@@ -113,8 +124,10 @@ taxi_eth_mac_10g_fifo #(
     .DIC_EN(DIC_EN),
     .MIN_FRAME_LEN(MIN_FRAME_LEN),
     .PTP_TS_EN(PTP_TS_EN),
+    .PTP_TD_EN(PTP_TD_EN),
     .PTP_TS_FMT_TOD(PTP_TS_FMT_TOD),
     .PTP_TS_W(PTP_TS_W),
+    .PTP_TD_SDI_PIPELINE(PTP_TD_SDI_PIPELINE),
     .STAT_EN(STAT_EN),
     .STAT_TX_LEVEL(STAT_TX_LEVEL),
     .STAT_RX_LEVEL(STAT_RX_LEVEL),
@@ -143,7 +156,6 @@ uut (
     .tx_rst(tx_rst),
     .logic_clk(logic_clk),
     .logic_rst(logic_rst),
-    .ptp_sample_clk(ptp_sample_clk),
 
     /*
      * Transmit interface (AXI stream)
@@ -172,8 +184,18 @@ uut (
     /*
      * PTP clock
      */
-    .ptp_ts(ptp_ts),
-    .ptp_ts_step(ptp_ts_step),
+    .ptp_clk(ptp_clk),
+    .ptp_rst(ptp_rst),
+    .ptp_sample_clk(ptp_sample_clk),
+    .ptp_td_sdi(ptp_td_sdi),
+    .ptp_ts_in(ptp_ts_in),
+    .ptp_ts_step_in(ptp_ts_step_in),
+    .tx_ptp_ts_out(tx_ptp_ts_out),
+    .tx_ptp_ts_step_out(tx_ptp_ts_step_out),
+    .tx_ptp_locked(tx_ptp_locked),
+    .rx_ptp_ts_out(rx_ptp_ts_out),
+    .rx_ptp_ts_step_out(rx_ptp_ts_step_out),
+    .rx_ptp_locked(rx_ptp_locked),
 
     /*
      * Statistics

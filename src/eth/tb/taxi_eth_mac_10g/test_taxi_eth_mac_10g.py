@@ -13,6 +13,7 @@ import itertools
 import logging
 import os
 import struct
+import sys
 
 from scapy.layers.l2 import Ether
 
@@ -27,6 +28,16 @@ from cocotb.regression import TestFactory
 
 from cocotbext.eth import XgmiiFrame, XgmiiSource, XgmiiSink, PtpClockSimTime
 from cocotbext.axi import AxiStreamBus, AxiStreamSource, AxiStreamSink, AxiStreamFrame
+
+try:
+    from ptp_td import PtpTdSource
+except ImportError:
+    # attempt import from current directory
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__)))
+    try:
+        from ptp_td import PtpTdSource
+    finally:
+        del sys.path[0]
 
 
 class TB:
@@ -54,8 +65,20 @@ class TB:
 
         self.stat_sink = AxiStreamSink(AxiStreamBus.from_entity(dut.m_axis_stat), dut.stat_clk, dut.stat_rst)
 
-        self.rx_ptp_clock = PtpClockSimTime(ts_tod=dut.rx_ptp_ts, clock=dut.rx_clk)
-        self.tx_ptp_clock = PtpClockSimTime(ts_tod=dut.tx_ptp_ts, clock=dut.tx_clk)
+        self.rx_ptp_clock = PtpClockSimTime(ts_tod=dut.rx_ptp_ts_in, clock=dut.rx_clk)
+        self.tx_ptp_clock = PtpClockSimTime(ts_tod=dut.tx_ptp_ts_in, clock=dut.tx_clk)
+
+        self.ptp_clk_period = self.clk_period
+
+        cocotb.start_soon(Clock(dut.ptp_clk, self.ptp_clk_period, units="ns").start())
+        cocotb.start_soon(Clock(dut.ptp_sample_clk, 8, units="ns").start())
+
+        self.ptp_td_source = PtpTdSource(
+            data=dut.ptp_td_sdi,
+            clock=dut.ptp_clk,
+            reset=dut.ptp_rst,
+            period_ns=self.ptp_clk_period
+        )
 
         dut.tx_lfc_req.setimmediatevalue(0)
         dut.tx_lfc_resend.setimmediatevalue(0)
@@ -112,19 +135,25 @@ class TB:
     async def reset(self):
         self.dut.rx_rst.setimmediatevalue(0)
         self.dut.tx_rst.setimmediatevalue(0)
+        self.dut.ptp_rst.setimmediatevalue(0)
         self.dut.stat_rst.setimmediatevalue(0)
         await RisingEdge(self.dut.rx_clk)
         await RisingEdge(self.dut.rx_clk)
         self.dut.rx_rst.value = 1
         self.dut.tx_rst.value = 1
+        self.dut.ptp_rst.value = 1
         self.dut.stat_rst.value = 1
         await RisingEdge(self.dut.rx_clk)
         await RisingEdge(self.dut.rx_clk)
         self.dut.rx_rst.value = 0
         self.dut.tx_rst.value = 0
+        self.dut.ptp_rst.value = 0
         self.dut.stat_rst.value = 0
         await RisingEdge(self.dut.rx_clk)
         await RisingEdge(self.dut.rx_clk)
+
+        self.ptp_td_source.set_ts_tod_sim_time()
+        self.ptp_td_source.set_ts_rel_sim_time()
 
 
 async def run_test_rx(dut, payload_lengths=None, payload_data=None, ifg=12):
@@ -137,6 +166,13 @@ async def run_test_rx(dut, payload_lengths=None, payload_data=None, ifg=12):
     tb.dut.cfg_rx_enable.value = 1
 
     await tb.reset()
+
+    if dut.PTP_TD_EN.value:
+        tb.log.info("Wait for PTP CDC lock")
+        while not int(dut.rx_ptp_locked.value):
+            await RisingEdge(dut.rx_clk)
+        for k in range(2000):
+            await RisingEdge(dut.rx_clk)
 
     test_frames = [payload_data(x) for x in payload_lengths()]
     tx_frames = []
@@ -165,7 +201,10 @@ async def run_test_rx(dut, payload_lengths=None, payload_data=None, ifg=12):
 
         assert rx_frame.tdata == test_data
         assert frame_error == 0
-        assert abs(ptp_ts_ns - tx_frame_sfd_ns - tb.clk_period) < 0.01
+        if dut.PTP_TD_EN.value:
+            assert abs(ptp_ts_ns - tx_frame_sfd_ns - tb.clk_period) < tb.clk_period*5
+        else:
+            assert abs(ptp_ts_ns - tx_frame_sfd_ns - tb.clk_period) < 0.01
 
     assert tb.axis_sink.empty()
 
@@ -183,6 +222,13 @@ async def run_test_tx(dut, payload_lengths=None, payload_data=None, ifg=12):
     tb.dut.cfg_tx_enable.value = 1
 
     await tb.reset()
+
+    if dut.PTP_TD_EN.value:
+        tb.log.info("Wait for PTP CDC lock")
+        while not int(dut.tx_ptp_locked.value):
+            await RisingEdge(dut.tx_clk)
+        for k in range(2000):
+            await RisingEdge(dut.tx_clk)
 
     test_frames = [payload_data(x) for x in payload_lengths()]
 
@@ -208,7 +254,10 @@ async def run_test_tx(dut, payload_lengths=None, payload_data=None, ifg=12):
         assert rx_frame.get_payload() == test_data
         assert rx_frame.check_fcs()
         assert rx_frame.ctrl is None
-        assert abs(rx_frame_sfd_ns - ptp_ts_ns - tb.clk_period) < 0.01
+        if dut.PTP_TD_EN.value:
+            assert abs(rx_frame_sfd_ns - ptp_ts_ns - tb.clk_period) < tb.clk_period*5
+        else:
+            assert abs(rx_frame_sfd_ns - ptp_ts_ns - tb.clk_period) < 0.01
 
     assert tb.xgmii_sink.empty()
 
@@ -230,6 +279,13 @@ async def run_test_tx_alignment(dut, payload_data=None, ifg=12):
     tb.dut.cfg_tx_enable.value = 1
 
     await tb.reset()
+
+    if dut.PTP_TD_EN.value:
+        tb.log.info("Wait for PTP CDC lock")
+        while not int(dut.tx_ptp_locked.value):
+            await RisingEdge(dut.tx_clk)
+        for k in range(2000):
+            await RisingEdge(dut.tx_clk)
 
     for length in range(60, 92):
 
@@ -261,7 +317,10 @@ async def run_test_tx_alignment(dut, payload_data=None, ifg=12):
             assert rx_frame.get_payload() == test_data
             assert rx_frame.check_fcs()
             assert rx_frame.ctrl is None
-            assert abs(rx_frame_sfd_ns - ptp_ts_ns - tb.clk_period) < 0.01
+            if dut.PTP_TD_EN.value:
+                assert abs(rx_frame_sfd_ns - ptp_ts_ns - tb.clk_period) < tb.clk_period*5
+            else:
+                assert abs(rx_frame_sfd_ns - ptp_ts_ns - tb.clk_period) < 0.01
 
             start_lane.append(rx_frame.start_lane)
 
@@ -731,8 +790,9 @@ def process_f_files(files):
 
 
 @pytest.mark.parametrize(("dic_en", "pfc_en"), [(1, 1), (1, 0), (0, 0)])
+@pytest.mark.parametrize("ptp_td_en", [1, 0])
 @pytest.mark.parametrize("data_w", [32, 64])
-def test_taxi_eth_mac_10g(request, data_w, dic_en, pfc_en):
+def test_taxi_eth_mac_10g(request, data_w, ptp_td_en, dic_en, pfc_en):
     dut = "taxi_eth_mac_10g"
     module = os.path.splitext(os.path.basename(__file__))[0]
     toplevel = module
@@ -754,8 +814,10 @@ def test_taxi_eth_mac_10g(request, data_w, dic_en, pfc_en):
     parameters['DIC_EN'] = dic_en
     parameters['MIN_FRAME_LEN'] = 64
     parameters['PTP_TS_EN'] = 1
+    parameters['PTP_TD_EN'] = ptp_td_en
     parameters['PTP_TS_FMT_TOD'] = 1
     parameters['PTP_TS_W'] = 96 if parameters['PTP_TS_FMT_TOD'] else 64
+    parameters['PTP_TD_SDI_PIPELINE'] = 2
     parameters['TX_TAG_W'] = 16
     parameters['PFC_EN'] = pfc_en
     parameters['PAUSE_EN'] = parameters['PFC_EN']

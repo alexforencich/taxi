@@ -47,8 +47,10 @@ module test_taxi_eth_mac_25g_us #
     parameter logic DIC_EN = 1'b1,
     parameter MIN_FRAME_LEN = 64,
     parameter logic PTP_TS_EN = 1'b0,
+    parameter logic PTP_TD_EN = PTP_TS_EN,
     parameter logic PTP_TS_FMT_TOD = 1'b1,
     parameter PTP_TS_W = PTP_TS_FMT_TOD ? 96 : 64,
+    parameter PTP_TD_SDI_PIPELINE = 2,
     parameter TX_TAG_W = 16,
     parameter logic PRBS31_EN = 1'b0,
     parameter TX_SERDES_PIPELINE = 1,
@@ -108,16 +110,23 @@ logic rx_rst_out[CNT];
 logic tx_clk[CNT];
 logic tx_rst_in[CNT];
 logic tx_rst_out[CNT];
-logic ptp_sample_clk[CNT];
 
 taxi_axis_if #(.DATA_W(DATA_W), .USER_EN(1), .USER_W(TX_USER_W), .ID_EN(1), .ID_W(TX_TAG_W)) s_axis_tx[CNT]();
 taxi_axis_if #(.DATA_W(PTP_TS_W), .KEEP_W(1), .ID_EN(1), .ID_W(TX_TAG_W)) m_axis_tx_cpl[CNT]();
 taxi_axis_if #(.DATA_W(DATA_W), .USER_EN(1), .USER_W(RX_USER_W)) m_axis_rx[CNT]();
 
-logic [PTP_TS_W-1:0] tx_ptp_ts[CNT];
-logic tx_ptp_ts_step[CNT];
-logic [PTP_TS_W-1:0] rx_ptp_ts[CNT];
-logic rx_ptp_ts_step[CNT];
+logic ptp_clk;
+logic ptp_rst;
+logic ptp_sample_clk;
+logic ptp_td_sdi;
+logic [PTP_TS_W-1:0] tx_ptp_ts_in[CNT];
+logic [PTP_TS_W-1:0] tx_ptp_ts_out[CNT];
+logic tx_ptp_ts_step_out[CNT];
+logic tx_ptp_locked[CNT];
+logic [PTP_TS_W-1:0] rx_ptp_ts_in[CNT];
+logic [PTP_TS_W-1:0] rx_ptp_ts_out[CNT];
+logic rx_ptp_ts_step_out[CNT];
+logic rx_ptp_locked[CNT];
 
 logic tx_lfc_req[CNT];
 logic tx_lfc_resend[CNT];
@@ -260,8 +269,10 @@ taxi_eth_mac_25g_us #(
     .DIC_EN(DIC_EN),
     .MIN_FRAME_LEN(MIN_FRAME_LEN),
     .PTP_TS_EN(PTP_TS_EN),
+    .PTP_TD_EN(PTP_TD_EN),
     .PTP_TS_FMT_TOD(PTP_TS_FMT_TOD),
     .PTP_TS_W(PTP_TS_W),
+    .PTP_TD_SDI_PIPELINE(PTP_TD_SDI_PIPELINE),
     .PRBS31_EN(PRBS31_EN),
     .TX_SERDES_PIPELINE(TX_SERDES_PIPELINE),
     .RX_SERDES_PIPELINE(RX_SERDES_PIPELINE),
@@ -323,7 +334,6 @@ uut (
     .tx_clk(tx_clk),
     .tx_rst_in(tx_rst_in),
     .tx_rst_out(tx_rst_out),
-    .ptp_sample_clk(ptp_sample_clk),
 
     /*
      * Transmit interface (AXI stream)
@@ -339,10 +349,18 @@ uut (
     /*
      * PTP
      */
-    .tx_ptp_ts(tx_ptp_ts),
-    .tx_ptp_ts_step(tx_ptp_ts_step),
-    .rx_ptp_ts(rx_ptp_ts),
-    .rx_ptp_ts_step(rx_ptp_ts_step),
+    .ptp_clk(ptp_clk),
+    .ptp_rst(ptp_rst),
+    .ptp_sample_clk(ptp_sample_clk),
+    .ptp_td_sdi(ptp_td_sdi),
+    .tx_ptp_ts_in(tx_ptp_ts_in),
+    .tx_ptp_ts_out(tx_ptp_ts_out),
+    .tx_ptp_ts_step_out(tx_ptp_ts_step_out),
+    .tx_ptp_locked(tx_ptp_locked),
+    .rx_ptp_ts_in(rx_ptp_ts_in),
+    .rx_ptp_ts_out(rx_ptp_ts_out),
+    .rx_ptp_ts_step_out(rx_ptp_ts_step_out),
+    .rx_ptp_locked(rx_ptp_locked),
 
     /*
      * Link-level Flow Control (LFC) (IEEE 802.3 annex 31B PAUSE)

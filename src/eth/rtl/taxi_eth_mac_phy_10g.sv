@@ -25,8 +25,10 @@ module taxi_eth_mac_phy_10g #
     parameter logic DIC_EN = 1'b1,
     parameter MIN_FRAME_LEN = 64,
     parameter logic PTP_TS_EN = 1'b0,
+    parameter logic PTP_TD_EN = PTP_TS_EN,
     parameter logic PTP_TS_FMT_TOD = 1'b1,
     parameter PTP_TS_W = PTP_TS_FMT_TOD ? 96 : 64,
+    parameter PTP_TD_SDI_PIPELINE = 2,
     parameter logic BIT_REVERSE = 1'b0,
     parameter logic SCRAMBLER_DISABLE = 1'b0,
     parameter logic PRBS31_EN = 1'b0,
@@ -82,8 +84,18 @@ module taxi_eth_mac_phy_10g #
     /*
      * PTP
      */
-    input  wire logic [PTP_TS_W-1:0]  tx_ptp_ts,
-    input  wire logic [PTP_TS_W-1:0]  rx_ptp_ts,
+    input  wire logic                 ptp_clk = 1'b0,
+    input  wire logic                 ptp_rst = 1'b0,
+    input  wire logic                 ptp_sample_clk = 1'b0,
+    input  wire logic                 ptp_td_sdi = 1'b0,
+    input  wire logic [PTP_TS_W-1:0]  tx_ptp_ts_in = '0,
+    output wire logic [PTP_TS_W-1:0]  tx_ptp_ts_out,
+    output wire logic                 tx_ptp_ts_step_out,
+    output wire logic                 tx_ptp_locked,
+    input  wire logic [PTP_TS_W-1:0]  rx_ptp_ts_in = '0,
+    output wire logic [PTP_TS_W-1:0]  rx_ptp_ts_out,
+    output wire logic                 rx_ptp_ts_step_out,
+    output wire logic                 rx_ptp_locked,
 
     /*
      * Link-level Flow Control (LFC) (IEEE 802.3 annex 31B PAUSE)
@@ -226,6 +238,123 @@ localparam TX_USER_W_INT = (MAC_CTRL_EN ? 1 : 0) + TX_USER_W;
 taxi_axis_if #(.DATA_W(DATA_W), .USER_EN(1), .USER_W(TX_USER_W_INT), .ID_EN(1), .ID_W(TX_TAG_W)) axis_tx_int();
 taxi_axis_if #(.DATA_W(DATA_W), .USER_EN(1), .USER_W(RX_USER_W)) axis_rx_int();
 
+// PTP timestamping
+if (PTP_TS_EN && PTP_TD_EN) begin : ptp
+
+    // TX
+    wire [PTP_TS_W-1:0] tx_ptp_ts_rel;
+    wire tx_ptp_ts_rel_step;
+    wire [PTP_TS_W-1:0] tx_ptp_ts_tod;
+    wire tx_ptp_ts_tod_step;
+
+    taxi_ptp_td_leaf #(
+        .TS_REL_EN(!PTP_TS_FMT_TOD),
+        .TS_TOD_EN(PTP_TS_FMT_TOD),
+        .TS_FNS_W(16),
+        .TS_REL_NS_W(PTP_TS_FMT_TOD ? 48 : PTP_TS_W-16),
+        .TS_TOD_S_W(PTP_TS_FMT_TOD ? PTP_TS_W-32-16 : 48),
+        .TS_REL_W(PTP_TS_W),
+        .TS_TOD_W(PTP_TS_W),
+        .TD_SDI_PIPELINE(PTP_TD_SDI_PIPELINE)
+    )
+    tx_leaf_inst (
+        .clk(tx_clk),
+        .rst(tx_rst),
+        .sample_clk(ptp_sample_clk),
+
+        /*
+         * PTP clock interface
+         */
+        .ptp_clk(ptp_clk),
+        .ptp_rst(ptp_rst),
+        .ptp_td_sdi(ptp_td_sdi),
+
+        /*
+         * Timestamp output
+         */
+        .output_ts_rel(tx_ptp_ts_rel),
+        .output_ts_rel_step(tx_ptp_ts_rel_step),
+        .output_ts_tod(tx_ptp_ts_tod),
+        .output_ts_tod_step(tx_ptp_ts_tod_step),
+
+        /*
+         * PPS output (ToD format only)
+         */
+        .output_pps(),
+        .output_pps_str(),
+
+        /*
+         * Status
+         */
+        .locked(tx_ptp_locked)
+    );
+
+    assign tx_ptp_ts_out = PTP_TS_FMT_TOD ? tx_ptp_ts_tod : tx_ptp_ts_rel;
+    assign tx_ptp_ts_step_out = PTP_TS_FMT_TOD ? tx_ptp_ts_tod_step : tx_ptp_ts_rel_step;
+
+    // RX
+    wire [PTP_TS_W-1:0] rx_ptp_ts_rel;
+    wire rx_ptp_ts_rel_step;
+    wire [PTP_TS_W-1:0] rx_ptp_ts_tod;
+    wire rx_ptp_ts_tod_step;
+
+    taxi_ptp_td_leaf #(
+        .TS_REL_EN(!PTP_TS_FMT_TOD),
+        .TS_TOD_EN(PTP_TS_FMT_TOD),
+        .TS_FNS_W(16),
+        .TS_REL_NS_W(PTP_TS_FMT_TOD ? 48 : PTP_TS_W-16),
+        .TS_TOD_S_W(PTP_TS_FMT_TOD ? PTP_TS_W-32-16 : 48),
+        .TS_REL_W(PTP_TS_W),
+        .TS_TOD_W(PTP_TS_W),
+        .TD_SDI_PIPELINE(PTP_TD_SDI_PIPELINE)
+    )
+    rx_leaf_inst (
+        .clk(rx_clk),
+        .rst(rx_rst),
+        .sample_clk(ptp_sample_clk),
+
+        /*
+         * PTP clock interface
+         */
+        .ptp_clk(ptp_clk),
+        .ptp_rst(ptp_rst),
+        .ptp_td_sdi(ptp_td_sdi),
+
+        /*
+         * Timestamp output
+         */
+        .output_ts_rel(rx_ptp_ts_rel),
+        .output_ts_rel_step(rx_ptp_ts_rel_step),
+        .output_ts_tod(rx_ptp_ts_tod),
+        .output_ts_tod_step(rx_ptp_ts_tod_step),
+
+        /*
+         * PPS output (ToD format only)
+         */
+        .output_pps(),
+        .output_pps_str(),
+
+        /*
+         * Status
+         */
+        .locked(rx_ptp_locked)
+    );
+
+    assign rx_ptp_ts_out = PTP_TS_FMT_TOD ? rx_ptp_ts_tod : rx_ptp_ts_rel;
+    assign rx_ptp_ts_step_out = PTP_TS_FMT_TOD ? rx_ptp_ts_tod_step : rx_ptp_ts_rel_step;
+
+end else begin
+
+    assign tx_ptp_ts_out = tx_ptp_ts_in;
+    assign tx_ptp_ts_step_out = 1'b0;
+    assign rx_ptp_ts_out = rx_ptp_ts_in;
+    assign rx_ptp_ts_step_out = 1'b0;
+
+    assign tx_ptp_locked = 1'b0;
+    assign rx_ptp_locked = 1'b0;
+
+end
+
 taxi_eth_mac_phy_10g_rx #(
     .DATA_W(DATA_W),
     .HDR_W(HDR_W),
@@ -263,7 +392,7 @@ eth_mac_phy_10g_rx_inst (
     /*
      * PTP
      */
-    .ptp_ts(rx_ptp_ts),
+    .ptp_ts(rx_ptp_ts_out),
 
     /*
      * Status
@@ -337,7 +466,7 @@ eth_mac_phy_10g_tx_inst (
     /*
      * PTP
      */
-    .ptp_ts(tx_ptp_ts),
+    .ptp_ts(tx_ptp_ts_out),
 
     /*
      * Status

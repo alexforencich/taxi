@@ -32,11 +32,13 @@ from cocotbext.axi import ApbBus, ApbMaster
 
 try:
     from baser import BaseRSerdesSource, BaseRSerdesSink
+    from ptp_td import PtpTdSource
 except ImportError:
     # attempt import from current directory
     sys.path.insert(0, os.path.join(os.path.dirname(__file__)))
     try:
         from baser import BaseRSerdesSource, BaseRSerdesSink
+        from ptp_td import PtpTdSource
     finally:
         del sys.path[0]
 
@@ -118,8 +120,20 @@ class TB:
         self.tx_ptp_clocks = []
 
         for k in range(4):
-            self.rx_ptp_clocks.append(PtpClockSimTime(ts_tod=dut.rx_ptp_ts[k], clock=dut.uut.ch[k].ch_inst.gt.gt_inst.rx_clk))
-            self.tx_ptp_clocks.append(PtpClockSimTime(ts_tod=dut.tx_ptp_ts[k], clock=dut.uut.ch[k].ch_inst.gt.gt_inst.tx_clk))
+            self.rx_ptp_clocks.append(PtpClockSimTime(ts_tod=dut.rx_ptp_ts_in[k], clock=dut.uut.ch[k].ch_inst.gt.gt_inst.rx_clk))
+            self.tx_ptp_clocks.append(PtpClockSimTime(ts_tod=dut.tx_ptp_ts_in[k], clock=dut.uut.ch[k].ch_inst.gt.gt_inst.tx_clk))
+
+        self.ptp_clk_period = self.clk_period[0]
+
+        cocotb.start_soon(Clock(dut.ptp_clk, self.ptp_clk_period, units="ns").start())
+        cocotb.start_soon(Clock(dut.ptp_sample_clk, 8, units="ns").start())
+
+        self.ptp_td_source = PtpTdSource(
+            data=dut.ptp_td_sdi,
+            clock=dut.ptp_clk,
+            reset=dut.ptp_rst,
+            period_ns=self.ptp_clk_period
+        )
 
         dut.rx_rst_in.setimmediatevalue([0]*4)
         dut.tx_rst_in.setimmediatevalue([0]*4)
@@ -169,17 +183,23 @@ class TB:
 
     async def reset(self):
         self.dut.xcvr_ctrl_rst.setimmediatevalue(0)
+        self.dut.ptp_rst.setimmediatevalue(0)
         self.dut.stat_rst.setimmediatevalue(0)
         await RisingEdge(self.dut.xcvr_ctrl_clk)
         await RisingEdge(self.dut.xcvr_ctrl_clk)
         self.dut.xcvr_ctrl_rst.value = 1
+        self.dut.ptp_rst.value = 1
         self.dut.stat_rst.value = 1
         await RisingEdge(self.dut.xcvr_ctrl_clk)
         await RisingEdge(self.dut.xcvr_ctrl_clk)
         self.dut.xcvr_ctrl_rst.value = 0
+        self.dut.ptp_rst.value = 0
         self.dut.stat_rst.value = 0
         await RisingEdge(self.dut.xcvr_ctrl_clk)
         await RisingEdge(self.dut.xcvr_ctrl_clk)
+
+        self.ptp_td_source.set_ts_tod_sim_time()
+        self.ptp_td_source.set_ts_rel_sim_time()
 
 
 async def run_test_regs(dut):
@@ -231,6 +251,12 @@ async def run_test_rx(dut, port=0, payload_lengths=None, payload_data=None, ifg=
     while not int(dut.rx_block_lock[port].value):
         await RisingEdge(dut.xcvr_ctrl_clk)
 
+    tb.log.info("Wait for PTP CDC lock")
+    while not int(dut.rx_ptp_locked[port].value):
+        await RisingEdge(dut.xcvr_ctrl_clk)
+    for k in range(2000):
+        await RisingEdge(dut.xcvr_ctrl_clk)
+
     tb.dut.cfg_rx_enable[port].value = 1
 
     test_frames = [payload_data(x) for x in payload_lengths()]
@@ -267,7 +293,10 @@ async def run_test_rx(dut, port=0, payload_lengths=None, payload_data=None, ifg=
         assert rx_frame.tdata == test_data
         assert frame_error == 0
         if not tb.serdes_sources[port].gbx_seq_len:
-            assert abs(ptp_ts_ns - tx_frame_sfd_ns - tb.clk_period[port]*pipe_delay) < 0.01
+            if dut.PTP_TD_EN.value:
+                assert abs(ptp_ts_ns - tx_frame_sfd_ns - tb.clk_period[port]*pipe_delay) < tb.clk_period[port]*3
+            else:
+                assert abs(ptp_ts_ns - tx_frame_sfd_ns - tb.clk_period[port]*pipe_delay) < 0.01
 
     assert tb.axis_sinks[port].empty()
 
@@ -300,7 +329,10 @@ async def run_test_tx(dut, port=0, payload_lengths=None, payload_data=None, ifg=
     while int(dut.tx_rst_out[port].value):
         await RisingEdge(dut.xcvr_ctrl_clk)
 
-    for k in range(100):
+    tb.log.info("Wait for PTP CDC lock")
+    while not int(dut.tx_ptp_locked[port].value):
+        await RisingEdge(dut.xcvr_ctrl_clk)
+    for k in range(2000):
         await RisingEdge(dut.xcvr_ctrl_clk)
 
     tb.dut.cfg_tx_enable[port].value = 1
@@ -337,7 +369,10 @@ async def run_test_tx(dut, port=0, payload_lengths=None, payload_data=None, ifg=
         assert rx_frame.check_fcs()
         assert rx_frame.ctrl is None
         if not tb.serdes_sinks[port].gbx_seq_len:
-            assert abs(rx_frame_sfd_ns - ptp_ts_ns - tb.clk_period[port]*pipe_delay) < 0.01
+            if dut.PTP_TD_EN.value:
+                assert abs(rx_frame_sfd_ns - ptp_ts_ns - tb.clk_period[port]*pipe_delay) < tb.clk_period[port]*3
+            else:
+                assert abs(rx_frame_sfd_ns - ptp_ts_ns - tb.clk_period[port]*pipe_delay) < 0.01
 
     assert tb.serdes_sinks[port].empty()
 
@@ -374,7 +409,10 @@ async def run_test_tx_alignment(dut, port=0, payload_data=None, ifg=12):
     while int(dut.tx_rst_out[port].value):
         await RisingEdge(dut.xcvr_ctrl_clk)
 
-    for k in range(100):
+    tb.log.info("Wait for PTP CDC lock")
+    while not int(dut.tx_ptp_locked[port].value):
+        await RisingEdge(dut.xcvr_ctrl_clk)
+    for k in range(2000):
         await RisingEdge(dut.xcvr_ctrl_clk)
 
     tb.dut.cfg_tx_enable[port].value = 1
@@ -416,7 +454,10 @@ async def run_test_tx_alignment(dut, port=0, payload_data=None, ifg=12):
             assert rx_frame.check_fcs()
             assert rx_frame.ctrl is None
             if not tb.serdes_sinks[port].gbx_seq_len:
-                assert abs(rx_frame_sfd_ns - ptp_ts_ns - tb.clk_period[port]*pipe_delay) < 0.01
+                if dut.PTP_TD_EN.value:
+                    assert abs(rx_frame_sfd_ns - ptp_ts_ns - tb.clk_period[port]*pipe_delay) < tb.clk_period[port]*3
+                else:
+                    assert abs(rx_frame_sfd_ns - ptp_ts_ns - tb.clk_period[port]*pipe_delay) < 0.01
 
             start_lane.append(rx_frame.start_lane)
 
@@ -1024,8 +1065,10 @@ def test_taxi_eth_mac_25g_us(request, data_w, combined_mac_pcs, low_latency, dic
     parameters['DIC_EN'] = dic_en
     parameters['MIN_FRAME_LEN'] = 64
     parameters['PTP_TS_EN'] = 1
+    parameters['PTP_TD_EN'] = parameters['PTP_TS_EN']
     parameters['PTP_TS_FMT_TOD'] = 1
     parameters['PTP_TS_W'] = 96 if parameters['PTP_TS_FMT_TOD'] else 64
+    parameters['PTP_TD_SDI_PIPELINE'] = 2
     parameters['TX_TAG_W'] = 16
     parameters['PRBS31_EN'] = 1
     parameters['TX_SERDES_PIPELINE'] = 2

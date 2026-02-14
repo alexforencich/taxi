@@ -788,10 +788,13 @@ always_ff @(posedge clk) begin
 
     if (PTP_TS_EN && PTP_TS_FMT_TOD) begin
         m_axis_tx_cpl_valid_reg <= m_axis_tx_cpl_valid_int_reg;
+        // workaround for verilator lint bug: unreachable by parameter value
+        /* verilator lint_off SELRANGE */
         m_axis_tx_cpl_ts_adj_reg[15:0] <= m_axis_tx_cpl_ts_reg[15:0];
         {m_axis_tx_cpl_ts_borrow_reg, m_axis_tx_cpl_ts_adj_reg[45:16]} <= $signed({1'b0, m_axis_tx_cpl_ts_reg[45:16]}) - $signed(31'd1000000000);
         m_axis_tx_cpl_ts_adj_reg[47:46] <= 0;
         m_axis_tx_cpl_ts_adj_reg[95:48] <= m_axis_tx_cpl_ts_reg[95:48] + 1;
+        /* verilator lint_on SELRANGE */
     end
 
     if (GBX_IF_EN && tx_gbx_req_stall) begin
@@ -810,8 +813,11 @@ always_ff @(posedge clk) begin
             if (swap_lanes_reg) begin
                 if (PTP_TS_EN) begin
                     if (PTP_TS_FMT_TOD) begin
+                        // workaround for verilator lint bug: unreachable by parameter value
+                        /* verilator lint_off SELRANGE */
                         m_axis_tx_cpl_ts_reg[45:0] <= ptp_ts[45:0] + 46'(ts_inc_reg >> 1);
                         m_axis_tx_cpl_ts_reg[95:48] <= ptp_ts[95:48];
+                        /* verilator lint_on SELRANGE */
                     end else begin
                         m_axis_tx_cpl_ts_reg <= ptp_ts + PTP_TS_W'(ts_inc_reg >> 1);
                     end

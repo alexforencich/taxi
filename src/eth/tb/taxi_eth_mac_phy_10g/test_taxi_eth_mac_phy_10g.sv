@@ -26,8 +26,10 @@ module test_taxi_eth_mac_phy_10g #
     parameter logic DIC_EN = 1'b1,
     parameter MIN_FRAME_LEN = 64,
     parameter logic PTP_TS_EN = 1'b0,
+    parameter logic PTP_TD_EN = PTP_TS_EN,
     parameter logic PTP_TS_FMT_TOD = 1'b1,
     parameter PTP_TS_W = PTP_TS_FMT_TOD ? 96 : 64,
+    parameter PTP_TD_SDI_PIPELINE = 2,
     parameter TX_TAG_W = 16,
     parameter logic BIT_REVERSE = 1'b0,
     parameter logic SCRAMBLER_DISABLE = 1'b0,
@@ -76,8 +78,18 @@ logic serdes_rx_hdr_valid;
 logic serdes_rx_bitslip;
 logic serdes_rx_reset_req;
 
-logic [PTP_TS_W-1:0] tx_ptp_ts;
-logic [PTP_TS_W-1:0] rx_ptp_ts;
+logic ptp_clk;
+logic ptp_rst;
+logic ptp_sample_clk;
+logic ptp_td_sdi;
+logic [PTP_TS_W-1:0] tx_ptp_ts_in;
+logic [PTP_TS_W-1:0] tx_ptp_ts_out;
+logic tx_ptp_ts_step_out;
+logic tx_ptp_locked;
+logic [PTP_TS_W-1:0] rx_ptp_ts_in;
+logic [PTP_TS_W-1:0] rx_ptp_ts_out;
+logic rx_ptp_ts_step_out;
+logic rx_ptp_locked;
 
 logic tx_lfc_req;
 logic tx_lfc_resend;
@@ -199,8 +211,10 @@ taxi_eth_mac_phy_10g #(
     .DIC_EN(DIC_EN),
     .MIN_FRAME_LEN(MIN_FRAME_LEN),
     .PTP_TS_EN(PTP_TS_EN),
+    .PTP_TD_EN(PTP_TD_EN),
     .PTP_TS_FMT_TOD(PTP_TS_FMT_TOD),
     .PTP_TS_W(PTP_TS_W),
+    .PTP_TD_SDI_PIPELINE(PTP_TD_SDI_PIPELINE),
     .BIT_REVERSE(BIT_REVERSE),
     .SCRAMBLER_DISABLE(SCRAMBLER_DISABLE),
     .PRBS31_EN(PRBS31_EN),
@@ -256,8 +270,18 @@ uut (
     /*
      * PTP
      */
-    .tx_ptp_ts(tx_ptp_ts),
-    .rx_ptp_ts(rx_ptp_ts),
+    .ptp_clk(ptp_clk),
+    .ptp_rst(ptp_rst),
+    .ptp_sample_clk(ptp_sample_clk),
+    .ptp_td_sdi(ptp_td_sdi),
+    .tx_ptp_ts_in(tx_ptp_ts_in),
+    .tx_ptp_ts_out(tx_ptp_ts_out),
+    .tx_ptp_ts_step_out(tx_ptp_ts_step_out),
+    .tx_ptp_locked(tx_ptp_locked),
+    .rx_ptp_ts_in(rx_ptp_ts_in),
+    .rx_ptp_ts_out(rx_ptp_ts_out),
+    .rx_ptp_ts_step_out(rx_ptp_ts_step_out),
+    .rx_ptp_locked(rx_ptp_locked),
 
     /*
      * Link-level Flow Control (LFC) (IEEE 802.3 annex 31B PAUSE)

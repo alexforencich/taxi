@@ -58,8 +58,10 @@ module taxi_eth_mac_25g_us #
     parameter logic DIC_EN = 1'b1,
     parameter MIN_FRAME_LEN = 64,
     parameter logic PTP_TS_EN = 1'b0,
+    parameter logic PTP_TD_EN = PTP_TS_EN,
     parameter logic PTP_TS_FMT_TOD = 1'b1,
     parameter PTP_TS_W = PTP_TS_FMT_TOD ? 96 : 64,
+    parameter PTP_TD_SDI_PIPELINE = 2,
     parameter logic PRBS31_EN = 1'b0,
     parameter TX_SERDES_PIPELINE = 1,
     parameter RX_SERDES_PIPELINE = 1,
@@ -121,7 +123,6 @@ module taxi_eth_mac_25g_us #
     output wire logic                 tx_clk[CNT],
     input  wire logic                 tx_rst_in[CNT] = '{CNT{1'b0}},
     output wire logic                 tx_rst_out[CNT],
-    input  wire logic                 ptp_sample_clk[CNT] = '{CNT{1'b0}},
 
     /*
      * Transmit interface (AXI stream)
@@ -137,10 +138,18 @@ module taxi_eth_mac_25g_us #
     /*
      * PTP clock
      */
-    input  wire logic [PTP_TS_W-1:0]  tx_ptp_ts[CNT] = '{CNT{'0}},
-    input  wire logic                 tx_ptp_ts_step[CNT] = '{CNT{1'b0}},
-    input  wire logic [PTP_TS_W-1:0]  rx_ptp_ts[CNT] = '{CNT{'0}},
-    input  wire logic                 rx_ptp_ts_step[CNT] = '{CNT{1'b0}},
+    input  wire logic                 ptp_clk = 1'b0,
+    input  wire logic                 ptp_rst = 1'b0,
+    input  wire logic                 ptp_sample_clk = 1'b0,
+    input  wire logic                 ptp_td_sdi = 1'b0,
+    input  wire logic [PTP_TS_W-1:0]  tx_ptp_ts_in[CNT] = '{CNT{'0}},
+    output wire logic [PTP_TS_W-1:0]  tx_ptp_ts_out[CNT],
+    output wire logic                 tx_ptp_ts_step_out[CNT],
+    output wire logic                 tx_ptp_locked[CNT],
+    input  wire logic [PTP_TS_W-1:0]  rx_ptp_ts_in[CNT] = '{CNT{'0}},
+    output wire logic [PTP_TS_W-1:0]  rx_ptp_ts_out[CNT],
+    output wire logic                 rx_ptp_ts_step_out[CNT],
+    output wire logic                 rx_ptp_locked[CNT],
 
     /*
      * Link-level Flow Control (LFC) (IEEE 802.3 annex 31B PAUSE)
@@ -420,8 +429,10 @@ for (genvar n = 0; n < CNT; n = n + 1) begin : ch
         .DIC_EN(DIC_EN),
         .MIN_FRAME_LEN(MIN_FRAME_LEN),
         .PTP_TS_EN(PTP_TS_EN),
+        .PTP_TD_EN(PTP_TD_EN),
         .PTP_TS_FMT_TOD(PTP_TS_FMT_TOD),
         .PTP_TS_W(PTP_TS_W),
+        .PTP_TD_SDI_PIPELINE(PTP_TD_SDI_PIPELINE),
         .PRBS31_EN(PRBS31_EN),
         .TX_SERDES_PIPELINE(TX_SERDES_PIPELINE),
         .RX_SERDES_PIPELINE(RX_SERDES_PIPELINE),
@@ -497,7 +508,6 @@ for (genvar n = 0; n < CNT; n = n + 1) begin : ch
         .tx_clk(tx_clk[n]),
         .tx_rst_in(tx_rst_in[n]),
         .tx_rst_out(tx_rst_out[n]),
-        .ptp_sample_clk(ptp_sample_clk[n]),
 
         /*
          * Transmit interface (AXI stream)
@@ -513,10 +523,18 @@ for (genvar n = 0; n < CNT; n = n + 1) begin : ch
         /*
          * PTP clock
          */
-        .tx_ptp_ts(tx_ptp_ts[n]),
-        .tx_ptp_ts_step(tx_ptp_ts_step[n]),
-        .rx_ptp_ts(rx_ptp_ts[n]),
-        .rx_ptp_ts_step(rx_ptp_ts_step[n]),
+        .ptp_clk(ptp_clk),
+        .ptp_rst(ptp_rst),
+        .ptp_sample_clk(ptp_sample_clk),
+        .ptp_td_sdi(ptp_td_sdi),
+        .tx_ptp_ts_in(tx_ptp_ts_in[n]),
+        .tx_ptp_ts_out(tx_ptp_ts_out[n]),
+        .tx_ptp_ts_step_out(tx_ptp_ts_step_out[n]),
+        .tx_ptp_locked(tx_ptp_locked[n]),
+        .rx_ptp_ts_in(rx_ptp_ts_in[n]),
+        .rx_ptp_ts_out(rx_ptp_ts_out[n]),
+        .rx_ptp_ts_step_out(rx_ptp_ts_step_out[n]),
+        .rx_ptp_locked(rx_ptp_locked[n]),
 
         /*
          * Link-level Flow Control (LFC) (IEEE 802.3 annex 31B PAUSE)

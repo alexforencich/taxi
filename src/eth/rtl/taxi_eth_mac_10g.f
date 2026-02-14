@@ -12,4 +12,5 @@ taxi_mac_pause_ctrl_rx.sv
 ../lib/taxi/src/axis/rtl/taxi_axis_if.sv
 ../lib/taxi/src/axis/rtl/taxi_axis_null_src.sv
 ../lib/taxi/src/axis/rtl/taxi_axis_tie.sv
+../lib/taxi/src/ptp/rtl/taxi_ptp_td_leaf.sv
 ../lib/taxi/src/sync/rtl/taxi_sync_signal.sv

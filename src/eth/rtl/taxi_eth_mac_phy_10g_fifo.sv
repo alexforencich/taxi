@@ -25,8 +25,10 @@ module taxi_eth_mac_phy_10g_fifo #
     parameter logic DIC_EN = 1'b1,
     parameter MIN_FRAME_LEN = 64,
     parameter logic PTP_TS_EN = 1'b0,
+    parameter logic PTP_TD_EN = PTP_TS_EN,
     parameter logic PTP_TS_FMT_TOD = 1'b1,
     parameter PTP_TS_W = PTP_TS_FMT_TOD ? 96 : 64,
+    parameter PTP_TD_SDI_PIPELINE = 2,
     parameter logic BIT_REVERSE = 1'b0,
     parameter logic SCRAMBLER_DISABLE = 1'b0,
     parameter logic PRBS31_EN = 1'b0,
@@ -63,7 +65,6 @@ module taxi_eth_mac_phy_10g_fifo #
     input  wire logic                 tx_rst,
     input  wire logic                 logic_clk,
     input  wire logic                 logic_rst,
-    input  wire logic                 ptp_sample_clk,
 
     /*
      * Transmit interface (AXI stream)
@@ -96,8 +97,18 @@ module taxi_eth_mac_phy_10g_fifo #
     /*
      * PTP clock
      */
-    input  wire logic [PTP_TS_W-1:0]  ptp_ts = '0,
-    input  wire logic                 ptp_ts_step = 1'b0,
+    input  wire logic                 ptp_clk = 1'b0,
+    input  wire logic                 ptp_rst = 1'b0,
+    input  wire logic                 ptp_sample_clk = 1'b0,
+    input  wire logic                 ptp_td_sdi = 1'b0,
+    input  wire logic [PTP_TS_W-1:0]  ptp_ts_in = '0,
+    input  wire logic                 ptp_ts_step_in = 1'b0,
+    output wire logic [PTP_TS_W-1:0]  tx_ptp_ts_out,
+    output wire logic                 tx_ptp_ts_step_out,
+    output wire logic                 tx_ptp_locked,
+    output wire logic [PTP_TS_W-1:0]  rx_ptp_ts_out,
+    output wire logic                 rx_ptp_ts_step_out,
+    output wire logic                 rx_ptp_locked,
 
     /*
      * Statistics
@@ -144,12 +155,6 @@ localparam TX_TAG_W = s_axis_tx.ID_W;
 taxi_axis_if #(.DATA_W(DATA_W), .KEEP_W(KEEP_W), .USER_EN(1), .USER_W(TX_USER_W), .ID_EN(1), .ID_W(TX_TAG_W)) axis_tx_int();
 taxi_axis_if #(.DATA_W(PTP_TS_W), .KEEP_W(1), .ID_EN(1), .ID_W(TX_TAG_W)) axis_tx_cpl_int();
 taxi_axis_if #(.DATA_W(DATA_W), .KEEP_W(KEEP_W), .USER_EN(1), .USER_W(RX_USER_W)) axis_rx_int();
-
-wire [PTP_TS_W-1:0] tx_ptp_ts;
-wire [PTP_TS_W-1:0] rx_ptp_ts;
-
-wire tx_ptp_locked;
-wire rx_ptp_locked;
 
 // synchronize MAC status signals into logic clock domain
 wire tx_error_underflow_int;
@@ -229,8 +234,15 @@ always_ff @(posedge logic_clk or posedge logic_rst) begin
 end
 
 // PTP timestamping
-if (PTP_TS_EN) begin : ptp
-    
+wire [PTP_TS_W-1:0]  tx_ptp_ts_int;
+wire                 tx_ptp_ts_step_int;
+wire                 tx_ptp_locked_int;
+wire [PTP_TS_W-1:0]  rx_ptp_ts_int;
+wire                 rx_ptp_ts_step_int;
+wire                 rx_ptp_locked_int;
+
+if (PTP_TS_EN && !PTP_TD_EN) begin : ptp
+
     taxi_ptp_clock_cdc #(
         .TS_W(PTP_TS_W),
         .NS_W(6)
@@ -241,10 +253,10 @@ if (PTP_TS_EN) begin : ptp
         .output_clk(tx_clk),
         .output_rst(tx_rst),
         .sample_clk(ptp_sample_clk),
-        .input_ts(ptp_ts),
-        .input_ts_step(ptp_ts_step),
-        .output_ts(tx_ptp_ts),
-        .output_ts_step(),
+        .input_ts(ptp_ts_in),
+        .input_ts_step(ptp_ts_step_in),
+        .output_ts(tx_ptp_ts_int),
+        .output_ts_step(tx_ptp_ts_step_out),
         .output_pps(),
         .output_pps_str(),
         .locked(tx_ptp_locked)
@@ -260,10 +272,10 @@ if (PTP_TS_EN) begin : ptp
         .output_clk(rx_clk),
         .output_rst(rx_rst),
         .sample_clk(ptp_sample_clk),
-        .input_ts(ptp_ts),
-        .input_ts_step(ptp_ts_step),
-        .output_ts(rx_ptp_ts),
-        .output_ts_step(),
+        .input_ts(ptp_ts_in),
+        .input_ts_step(ptp_ts_step_in),
+        .output_ts(rx_ptp_ts_int),
+        .output_ts_step(rx_ptp_ts_step_out),
         .output_pps(),
         .output_pps_str(),
         .locked(rx_ptp_locked)
@@ -271,11 +283,13 @@ if (PTP_TS_EN) begin : ptp
 
 end else begin
 
-    assign tx_ptp_ts = '0;
-    assign rx_ptp_ts = '0;
+    assign tx_ptp_ts_int = '0;
+    assign tx_ptp_ts_step_out = tx_ptp_ts_step_int;
+    assign rx_ptp_ts_int = '0;
+    assign rx_ptp_ts_step_out = rx_ptp_ts_step_int;
 
-    assign tx_ptp_locked = 1'b0;
-    assign rx_ptp_locked = 1'b0;
+    assign tx_ptp_locked = tx_ptp_locked_int;
+    assign rx_ptp_locked = rx_ptp_locked_int;
 
 end
 
@@ -290,8 +304,10 @@ taxi_eth_mac_phy_10g #(
     .DIC_EN(DIC_EN),
     .MIN_FRAME_LEN(MIN_FRAME_LEN),
     .PTP_TS_EN(PTP_TS_EN),
+    .PTP_TD_EN(PTP_TD_EN),
     .PTP_TS_FMT_TOD(PTP_TS_FMT_TOD),
     .PTP_TS_W(PTP_TS_W),
+    .PTP_TD_SDI_PIPELINE(PTP_TD_SDI_PIPELINE),
     .BIT_REVERSE(BIT_REVERSE),
     .SCRAMBLER_DISABLE(SCRAMBLER_DISABLE),
     .PRBS31_EN(PRBS31_EN),
@@ -345,8 +361,18 @@ eth_mac_phy_10g_inst (
     /*
      * PTP
      */
-    .tx_ptp_ts(tx_ptp_ts),
-    .rx_ptp_ts(rx_ptp_ts),
+    .ptp_clk(ptp_clk),
+    .ptp_rst(ptp_rst),
+    .ptp_sample_clk(ptp_sample_clk),
+    .ptp_td_sdi(ptp_td_sdi),
+    .tx_ptp_ts_in(tx_ptp_ts_int),
+    .tx_ptp_ts_out(tx_ptp_ts_out),
+    .tx_ptp_ts_step_out(tx_ptp_ts_step_int),
+    .tx_ptp_locked(tx_ptp_locked_int),
+    .rx_ptp_ts_in(rx_ptp_ts_int),
+    .rx_ptp_ts_out(rx_ptp_ts_out),
+    .rx_ptp_ts_step_out(rx_ptp_ts_step_int),
+    .rx_ptp_locked(rx_ptp_locked_int),
 
     /*
      * Link-level Flow Control (LFC) (IEEE 802.3 annex 31B PAUSE)

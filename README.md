@@ -77,6 +77,7 @@ The Taxi transport library contains many smaller components that can be composed
 
 *  APB
     *  SV interface for APB
+    *  APB to AXI lite adapter
     *  Interconnect
     *  Width converter
     *  Single-port RAM

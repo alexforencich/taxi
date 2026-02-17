@@ -271,7 +271,7 @@ logic [APB_DATA_W-1:0] s_apb_prdata_reg = '0;
 assign s_apb.pready = s_apb_pready_reg;
 assign s_apb.prdata = s_apb_prdata_reg;
 assign s_apb.pslverr = 1'b0;
-assign s_apb.prresp = '0;
+assign s_apb.pruser = '0;
 assign s_apb.pbuser = '0;
 
 always_ff @(posedge clk) begin

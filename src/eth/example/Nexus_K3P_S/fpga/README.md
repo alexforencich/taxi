@@ -1,4 +1,4 @@
-# Taxi Example Design for Nexus K35-S/K3P-S (ExaNIC X10/X25)
+# Taxi Example Design for Cisco Nexus K35-S/K3P-S (ExaNIC X10/X25)
 
 ## Introduction
 
@@ -13,7 +13,7 @@ The design places looped-back MACs on the SFP+ cages.
 
 * FPGA:
   * K35-S/X10: xcku035-fbva676-2-e
-  * K3P-S/X235: xcku3p-ffvb676-2-e
+  * K3P-S/X25: xcku3p-ffvb676-2-e
 * 25GBASE-R PHY: Soft PCS with GTH or GTY transceiver
 
 ## Licensing

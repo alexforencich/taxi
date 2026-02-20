@@ -47,8 +47,8 @@ set_output_delay 0 [get_ports {sfp_led[*][*] sma_led[*]}]
 #set_property -dict {LOC B19  IOSTANDARD LVCMOS18 SLEW SLOW DRIVE 12} [get_ports {sma_out_en}]
 #set_property -dict {LOC C16  IOSTANDARD LVCMOS18 SLEW SLOW DRIVE 12} [get_ports {sma_term_en}]
 
-#set_false_path -to [get_ports {sma_out sma_term sma_term_en}]
-#set_output_delay 0 [get_ports {sma_out sma_term sma_term_en}]
+#set_false_path -to [get_ports {sma_out sma_out_en sma_term_en}]
+#set_output_delay 0 [get_ports {sma_out sma_out_en sma_term_en}]
 #set_false_path -from [get_ports {sma_in}]
 #set_input_delay 0 [get_ports {sma_in}]
 

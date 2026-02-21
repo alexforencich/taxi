@@ -220,6 +220,7 @@ Example designs are provided for several different FPGA boards, showcasing many 
 *  Cisco Nexus K3P-S/ExaNIC X25 (Xilinx Kintex UltraScale+ XCKU3P)
 *  Cisco Nexus K3P-Q/ExaNIC X100 (Xilinx Kintex UltraScale+ XCKU3P)
 *  Alibaba AS02MC04 (Xilinx Kintex UltraScale+ XCKU3P)
+*  RK-XCKU5P-F (Xilinx Kintex UltraScale+ XCKU5P)
 *  Digilent Arty A7 (Xilinx Artix 7 XC7A35T)
 *  Digilent NetFPGA SUME (Xilinx Virtex 7 XC7V690T)
 *  HiTech Global HTG-940 (Xilinx Virtex UltraScale+ XCVU9P/XCVU13P)

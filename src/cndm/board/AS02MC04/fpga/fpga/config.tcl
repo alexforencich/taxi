@@ -43,7 +43,7 @@ set release_info [expr 0x00000000]
 
 # PCIe IDs
 set pcie_vendor_id [expr 0x1234]
-set pcie_device_id [expr 0x1001]
+set pcie_device_id [expr 0xC001]
 set pcie_class_code [expr 0x020000]
 set pcie_revision_id [expr 0x00]
 set pcie_subsystem_device_id $board_device_id

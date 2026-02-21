@@ -241,10 +241,10 @@ always_ff @(posedge clk) begin
             8'h48: vpd_apb_prdata_reg <= 0;               // BPI flash ctrl: Next header
             8'h4C: begin
                 // BPI flash ctrl: format
-                vpd_apb_prdata_reg[3:0]   <= FLASH_SEG_COUNT;        // configuration (two segments)
-                vpd_apb_prdata_reg[7:4]   <= FLASH_SEG_DEFAULT;      // default segment
-                vpd_apb_prdata_reg[11:8]  <= FLASH_SEG_FALLBACK;     // fallback segment
-                vpd_apb_prdata_reg[31:12] <= FLASH_SEG0_SIZE >> 12;  // first segment size (even split)
+                vpd_apb_prdata_reg[3:0]   <= FLASH_SEG_COUNT;     // configuration
+                vpd_apb_prdata_reg[7:4]   <= FLASH_SEG_DEFAULT;   // default segment
+                vpd_apb_prdata_reg[11:8]  <= FLASH_SEG_FALLBACK;  // fallback segment
+                vpd_apb_prdata_reg[31:12] <= 20'(FLASH_SEG0_SIZE >> 12);  // first segment size
             end
             8'h50: begin
                 // BPI flash ctrl: control

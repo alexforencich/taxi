@@ -56,6 +56,8 @@ module fpga #
     output wire logic        phy_tx_clk,
     output wire logic [3:0]  phy_txd,
     output wire logic        phy_tx_ctl,
+    // output wire logic        phy_mdc,
+    // inout  wire logic        phy_mdio,
 
     /*
      * Ethernet: QSFP28

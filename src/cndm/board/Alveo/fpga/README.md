@@ -11,6 +11,18 @@ This design targets the Xilinx Alveo series.
 
 ## Board details
 
+*  AU55C
+    *  FPGA: xcu55c-fsvh2892-2L-e
+    *  USB UART: FTDI FT4232H (2 onboard, all 3 via DMB-1)
+    *  PCIe: gen 3 x16 (~128 Gbps) or dual bifurcated gen 4 x8 (~256 Gbps)
+    *  Reference oscillator: 161.1328125 MHz from Si5394
+    *  25GBASE-R PHY: Soft PCS with GTY transceivers
+*  AU55N/C1100
+    *  FPGA: xcu55n-fsvh2892-2L-e
+    *  USB UART: FTDI FT4232H (2 onboard, all 3 via DMB-1)
+    *  PCIe: gen 3 x16 (~128 Gbps) or dual bifurcated gen 4 x8 (~256 Gbps)
+    *  Reference oscillator: 161.1328125 MHz from Si5394
+    *  25GBASE-R PHY: Soft PCS with GTY transceivers
 *  AU200
     *  FPGA: xcu200-fsgd2104-2-e
     *  USB UART: FTDI FT4232H

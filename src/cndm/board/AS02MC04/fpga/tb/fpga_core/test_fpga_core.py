@@ -45,6 +45,9 @@ class TB:
         self.log = logging.getLogger("cocotb.tb")
         self.log.setLevel(logging.DEBUG)
 
+        # Clocks
+        cocotb.start_soon(Clock(dut.clk_125mhz, 8, units="ns").start())
+
         # PCIe
         self.rc = RootComplex()
 
@@ -274,7 +277,6 @@ class TB:
         self.dev.functions[0].configure_bar(0, 2**int(dut.uut.cndm_inst.axil_ctrl_bar.ADDR_W))
 
         # Ethernet
-        cocotb.start_soon(Clock(dut.clk_125mhz, 8, units="ns").start())
         cocotb.start_soon(Clock(dut.sfp_mgt_refclk_p, 6.4, units="ns").start())
 
         self.sfp_sources = []

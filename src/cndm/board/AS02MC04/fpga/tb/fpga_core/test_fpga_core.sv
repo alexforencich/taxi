@@ -280,10 +280,10 @@ uut (
     /*
      * Ethernet: SFP+
      */
-    .sfp_rx_p(),
-    .sfp_rx_n(),
-    .sfp_tx_p('{2{1'b0}}),
-    .sfp_tx_n('{2{1'b0}}),
+    .sfp_rx_p('{2{1'b0}}),
+    .sfp_rx_n('{2{1'b0}}),
+    .sfp_tx_p(),
+    .sfp_tx_n(),
     .sfp_mgt_refclk_p(sfp_mgt_refclk_p),
     .sfp_mgt_refclk_n(sfp_mgt_refclk_n),
     .sfp_mgt_refclk_out(sfp_mgt_refclk_out),

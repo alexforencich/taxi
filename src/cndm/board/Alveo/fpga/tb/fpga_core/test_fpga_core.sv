@@ -192,6 +192,16 @@ fpga_core #(
     .VENDOR(VENDOR),
     .FAMILY(FAMILY),
 
+    // Board configuration
+    .SW_CNT(SW_CNT),
+    .LED_CNT(LED_CNT),
+    .UART_CNT(UART_CNT),
+    .PORT_CNT(PORT_CNT),
+    .PORT_LED_CNT(PORT_LED_CNT),
+    .GTY_QUAD_CNT(GTY_QUAD_CNT),
+    .GTY_CNT(GTY_CNT),
+    .GTY_CLK_CNT(GTY_CLK_CNT),
+
     // FW ID
     .FPGA_ID(FPGA_ID),
     .FW_ID(FW_ID),

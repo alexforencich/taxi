@@ -146,7 +146,7 @@ always_comb begin
             end
         end else if (cfg_ext_register_number == 10'(EXT_CAP_OFFSET >> 2)+3) begin
             data_next = DATA_W'(cfg_ext_write_data);
-            strb_next = DATA_W'(cfg_ext_write_byte_enable);
+            strb_next = STRB_W'(cfg_ext_write_byte_enable);
         end
     end
 end

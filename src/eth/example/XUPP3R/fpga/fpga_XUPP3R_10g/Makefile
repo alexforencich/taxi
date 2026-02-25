@@ -61,7 +61,7 @@ include ../common/vivado.mk
 	echo "Output: rev/$*_fallback_rev$$COUNT.$$EXT";
 
 program: $(FPGA_TOP).bit
-	echo "open_hw" > program.tcl
+	echo "open_hw_manager" > program.tcl
 	echo "connect_hw_server" >> program.tcl
 	echo "open_hw_target" >> program.tcl
 	echo "current_hw_device [lindex [get_hw_devices] 0]" >> program.tcl
@@ -111,7 +111,7 @@ program: $(FPGA_TOP).bit
 	echo "Output: rev/$*_full_rev$$COUNT$$x"; done;
 
 flash: $(FPGA_TOP).mcs $(FPGA_TOP).prm
-	echo "open_hw" > flash.tcl
+	echo "open_hw_manager" > flash.tcl
 	echo "connect_hw_server" >> flash.tcl
 	echo "open_hw_target" >> flash.tcl
 	echo "current_hw_device [lindex [get_hw_devices] 0]" >> flash.tcl
@@ -135,7 +135,7 @@ flash: $(FPGA_TOP).mcs $(FPGA_TOP).prm
 	vivado -nojournal -nolog -mode batch -source flash.tcl
 
 flash%: $(FPGA_TOP)%.mcs $(FPGA_TOP)%.prm
-	echo "open_hw" > flash$*.tcl
+	echo "open_hw_manager" > flash$*.tcl
 	echo "connect_hw_server" >> flash$*.tcl
 	echo "open_hw_target" >> flash$*.tcl
 	echo "current_hw_device [lindex [get_hw_devices] 0]" >> flash$*.tcl

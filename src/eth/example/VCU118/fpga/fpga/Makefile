@@ -46,7 +46,7 @@ CONFIG_TCL_FILES = ./config.tcl
 include ../common/vivado.mk
 
 program: $(PROJECT).bit
-	echo "open_hw" > program.tcl
+	echo "open_hw_manager" > program.tcl
 	echo "connect_hw_server" >> program.tcl
 	echo "open_hw_target" >> program.tcl
 	echo "current_hw_device [lindex [get_hw_devices] 0]" >> program.tcl
@@ -70,7 +70,7 @@ $(PROJECT)_primary.mcs $(PROJECT)_secondary.mcs $(PROJECT)_primary.prm $(PROJECT
 	echo "Output: rev/$*_rev$$COUNT$$x"; done;
 
 flash: $(PROJECT)_primary.mcs $(PROJECT)_secondary.mcs $(PROJECT)_primary.prm $(PROJECT)_secondary.prm
-	echo "open_hw" > flash.tcl
+	echo "open_hw_manager" > flash.tcl
 	echo "connect_hw_server" >> flash.tcl
 	echo "open_hw_target" >> flash.tcl
 	echo "current_hw_device [lindex [get_hw_devices] 0]" >> flash.tcl

@@ -588,6 +588,21 @@ int spi_flash_write(struct flash_device *fdev, size_t addr, size_t len, const vo
 	}
 
 	while (len > 0) {
+		// check alignment
+		if ((addr & (SPI_PAGE_SIZE-1)) != 0) {
+			fprintf(stderr, "Invalid write request\n");
+			spi_flash_deselect(fdev);
+			return -1;
+		}
+
+		// set extended address
+		// note: some devices do not support 4B address program operations (e.g. N25Q256Ax1E)
+		// so we always use 3B operations
+		if (fdev->size > 0x1000000) {
+			spi_flash_write_ext_addr_reg(fdev, addr >> 24, SPI_PROTO_STR);
+		}
+
+		// enable writing
 		spi_flash_write_enable(fdev, SPI_PROTO_STR);
 
 		if (!(spi_flash_read_status_reg(fdev, SPI_PROTO_STR) & 0x02)) {
@@ -596,22 +611,13 @@ int spi_flash_write(struct flash_device *fdev, size_t addr, size_t len, const vo
 			return -1;
 		}
 
-		if (fdev->size > 0x1000000) {
-			// four byte address page program
-			if (protocol == SPI_PROTO_QUAD_STR) {
-				spi_flash_write_byte(fdev, SPI_CMD_4B_PAGE_PROGRAM_QUAD_IN_EXT, SPI_PROTO_STR);
-			} else {
-				spi_flash_write_byte(fdev, SPI_CMD_4B_PAGE_PROGRAM, SPI_PROTO_STR);
-			}
-			spi_flash_write_addr_4b(fdev, addr, protocol);
+		// write page
+		if (protocol == SPI_PROTO_QUAD_STR) {
+			spi_flash_write_byte(fdev, SPI_CMD_PAGE_PROGRAM_QUAD_IN, SPI_PROTO_STR);
+			spi_flash_write_addr(fdev, addr, SPI_PROTO_STR);
 		} else {
-			// normal page program
-			if (protocol == SPI_PROTO_QUAD_STR) {
-				spi_flash_write_byte(fdev, SPI_CMD_PAGE_PROGRAM_QUAD_IN_EXT, SPI_PROTO_STR);
-			} else {
-				spi_flash_write_byte(fdev, SPI_CMD_PAGE_PROGRAM, SPI_PROTO_STR);
-			}
-			spi_flash_write_addr(fdev, addr, protocol);
+			spi_flash_write_byte(fdev, SPI_CMD_PAGE_PROGRAM, SPI_PROTO_STR);
+			spi_flash_write_addr(fdev, addr, SPI_PROTO_STR);
 		}
 
 		while (len > 0) {
@@ -620,8 +626,8 @@ int spi_flash_write(struct flash_device *fdev, size_t addr, size_t len, const vo
 			s++;
 			len--;
 
-			if ((addr & 0xff) == 0)
-			break;
+			if ((addr & (SPI_PAGE_SIZE-1)) == 0)
+				break;
 		}
 
 		spi_flash_deselect(fdev);
@@ -640,7 +646,7 @@ int spi_flash_erase(struct flash_device *fdev, size_t addr, size_t len)
 	size_t erase_block_size = fdev->erase_block_size;
 
 	while (len > 0) {
-		// determine sector size
+		// determine sector size and check alignment
 		erase_block_size = 0;
 
 		if ((addr & (SPI_SECTOR_SIZE-1)) == 0 && len >= SPI_SECTOR_SIZE) {
@@ -649,11 +655,17 @@ int spi_flash_erase(struct flash_device *fdev, size_t addr, size_t len)
 			erase_block_size = SPI_SUBSECTOR_SIZE;
 		}
 
-		// check size and alignment
 		if (!erase_block_size) {
 			fprintf(stderr, "Invalid erase request\n");
 			spi_flash_deselect(fdev);
 			return -1;
+		}
+
+		// set extended address
+		// note: some devices do not support 4B address program operations (e.g. N25Q256Ax1E)
+		// so we always use 3B operations
+		if (fdev->size > 0x1000000) {
+			spi_flash_write_ext_addr_reg(fdev, addr >> 24, SPI_PROTO_STR);
 		}
 
 		// enable writing
@@ -666,26 +678,14 @@ int spi_flash_erase(struct flash_device *fdev, size_t addr, size_t len)
 		}
 
 		// block erase
-		if (fdev->size > 0x1000000) {
-			if (erase_block_size == SPI_SECTOR_SIZE) {
-				// four byte address sector erase
-				spi_flash_write_byte(fdev, SPI_CMD_4B_SECTOR_ERASE, SPI_PROTO_STR);
-				spi_flash_write_addr_4b(fdev, addr, SPI_PROTO_STR);
-			} else if (erase_block_size == SPI_SUBSECTOR_SIZE) {
-				// normal 4KB subsector erase
-				spi_flash_write_byte(fdev, SPI_CMD_4B_4KB_SUBSECTOR_ERASE, SPI_PROTO_STR);
-				spi_flash_write_addr_4b(fdev, addr, SPI_PROTO_STR);
-			}
-		} else {
-			if (erase_block_size == SPI_SECTOR_SIZE) {
-				// normal sector erase
-				spi_flash_write_byte(fdev, SPI_CMD_SECTOR_ERASE, SPI_PROTO_STR);
-				spi_flash_write_addr(fdev, addr, SPI_PROTO_STR);
-			} else if (erase_block_size == SPI_SUBSECTOR_SIZE) {
-				// normal 4KB subsector erase
-				spi_flash_write_byte(fdev, SPI_CMD_4KB_SUBSECTOR_ERASE, SPI_PROTO_STR);
-				spi_flash_write_addr(fdev, addr, SPI_PROTO_STR);
-			}
+		if (erase_block_size == SPI_SECTOR_SIZE) {
+			// normal sector erase
+			spi_flash_write_byte(fdev, SPI_CMD_SECTOR_ERASE, SPI_PROTO_STR);
+			spi_flash_write_addr(fdev, addr, SPI_PROTO_STR);
+		} else if (erase_block_size == SPI_SUBSECTOR_SIZE) {
+			// normal 4KB subsector erase
+			spi_flash_write_byte(fdev, SPI_CMD_4KB_SUBSECTOR_ERASE, SPI_PROTO_STR);
+			spi_flash_write_addr(fdev, addr, SPI_PROTO_STR);
 		}
 
 		spi_flash_deselect(fdev);

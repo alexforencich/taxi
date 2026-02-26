@@ -323,6 +323,16 @@ void spi_flash_clear_flag_status_reg(struct flash_device *fdev, int protocol)
 	spi_flash_deselect(fdev);
 }
 
+uint16_t spi_flash_read_nv_cfg_reg(struct flash_device *fdev, int protocol)
+{
+	uint8_t val;
+	spi_flash_write_byte(fdev, SPI_CMD_READ_NV_CONFIG_REG, protocol);
+	val = spi_flash_read_byte(fdev, protocol);
+	val |= (uint16_t)spi_flash_read_byte(fdev, protocol) << 8;
+	spi_flash_deselect(fdev);
+	return val;
+}
+
 uint8_t spi_flash_read_volatile_cfg_reg(struct flash_device *fdev, int protocol)
 {
 	uint8_t val;
@@ -335,6 +345,38 @@ uint8_t spi_flash_read_volatile_cfg_reg(struct flash_device *fdev, int protocol)
 void spi_flash_write_volatile_config_reg(struct flash_device *fdev, uint8_t val, int protocol)
 {
 	spi_flash_write_byte(fdev, SPI_CMD_WRITE_V_CONFIG_REG, protocol);
+	spi_flash_write_byte(fdev, val, protocol);
+	spi_flash_deselect(fdev);
+}
+
+uint8_t spi_flash_read_ev_cfg_reg(struct flash_device *fdev, int protocol)
+{
+	uint8_t val;
+	spi_flash_write_byte(fdev, SPI_CMD_READ_EV_CONFIG_REG, protocol);
+	val = spi_flash_read_byte(fdev, protocol);
+	spi_flash_deselect(fdev);
+	return val;
+}
+
+void spi_flash_write_ev_cfg_reg(struct flash_device *fdev, uint8_t val, int protocol)
+{
+	spi_flash_write_byte(fdev, SPI_CMD_WRITE_EV_CONFIG_REG, protocol);
+	spi_flash_write_byte(fdev, val, protocol);
+	spi_flash_deselect(fdev);
+}
+
+uint8_t spi_flash_read_ext_addr_reg(struct flash_device *fdev, int protocol)
+{
+	uint8_t val;
+	spi_flash_write_byte(fdev, SPI_CMD_READ_EXT_ADDR_REG, protocol);
+	val = spi_flash_read_byte(fdev, protocol);
+	spi_flash_deselect(fdev);
+	return val;
+}
+
+void spi_flash_write_ext_addr_reg(struct flash_device *fdev, uint8_t val, int protocol)
+{
+	spi_flash_write_byte(fdev, SPI_CMD_WRITE_EXT_ADDR_REG, protocol);
 	spi_flash_write_byte(fdev, val, protocol);
 	spi_flash_deselect(fdev);
 }
@@ -456,7 +498,9 @@ int spi_flash_init(struct flash_device *fdev)
 	case 0x20:
 		// Micron
 		printf("Flag status register: 0x%02x\n", spi_flash_read_flag_status_reg(fdev, SPI_PROTO_STR));
+		printf("Nonvolatile config register: 0x%04x\n", spi_flash_read_nv_cfg_reg(fdev, SPI_PROTO_STR));
 		printf("Volatile config register: 0x%02x\n", spi_flash_read_volatile_cfg_reg(fdev, SPI_PROTO_STR));
+		printf("Enhanced volatile config register: 0x%02x\n", spi_flash_read_ev_cfg_reg(fdev, SPI_PROTO_STR));
 		printf("Global freeze bit: 0x%02x\n", spi_flash_read_global_freeze_bit(fdev, SPI_PROTO_STR));
 		printf("Sector protection register: 0x%04x\n", spi_flash_read_sector_protection_reg(fdev, SPI_PROTO_STR));
 

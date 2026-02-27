@@ -103,13 +103,15 @@ reset_sync_inst (
     .out(tx_reset_sync)
 );
 
-localparam [1:0]
-    STATE_RESET = 2'd0,
-    STATE_WAIT_LOCK = 2'd1,
-    STATE_WAIT_USRCLK = 2'd2,
-    STATE_DONE = 2'd3;
+typedef enum logic [1:0] {
+    STATE_RESET,
+    STATE_WAIT_LOCK,
+    STATE_WAIT_USRCLK,
+    STATE_DONE
+} state_t;
 
-logic [1:0] state_reg = STATE_RESET;
+state_t state_reg = STATE_RESET, state_next;
+
 logic [CNT_W-1:0] tx_reset_cnt_reg = '0;
 logic tx_reset_done_reg = 1'b0;
 

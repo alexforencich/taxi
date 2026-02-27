@@ -116,14 +116,16 @@ reset_sync_inst (
     .out(rx_reset_sync)
 );
 
-localparam [2:0]
-    STATE_RESET = 3'd0,
-    STATE_WAIT_LOCK = 3'd1,
-    STATE_WAIT_CDR = 3'd2,
-    STATE_WAIT_USRCLK = 3'd3,
-    STATE_DONE = 3'd4;
+typedef enum logic [2:0] {
+    STATE_RESET,
+    STATE_WAIT_LOCK,
+    STATE_WAIT_CDR,
+    STATE_WAIT_USRCLK,
+    STATE_DONE
+} state_t;
 
-logic [2:0] state_reg = STATE_RESET;
+state_t state_reg = STATE_RESET, state_next;
+
 logic [CNT_W-1:0] rx_reset_cnt_reg = '0;
 logic [CDR_CNT_W-1:0] rx_reset_cdr_cnt_reg = '0;
 logic rx_reset_done_reg = 1'b0;

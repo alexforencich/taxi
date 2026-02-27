@@ -71,7 +71,8 @@ localparam PBA_ADDR_W_INT = PBA_ADDR_W > 0 ? PBA_ADDR_W : 1;
 
 localparam INDEX_SHIFT = $clog2(64/8);
 localparam WORD_SELECT_SHIFT = $clog2(APB_DATA_W/8);
-localparam WORD_SELECT_W = 64 > APB_DATA_W ? $clog2((64+7)/8) - $clog2(APB_DATA_W/8) : 0;
+localparam WORD_SELECT_W = 64 > APB_DATA_W ? $clog2((64+7)/8) - $clog2(APB_DATA_W/8) : 1;
+localparam RATIO = 64/APB_DATA_W;
 
 // bus width assertions
 if (APB_STRB_W * 8 != APB_DATA_W)
@@ -381,7 +382,7 @@ always_comb begin
     tbl_apb_mem_rd_en = 1'b0;
     tbl_apb_mem_wr_en = 1'b0;
     tbl_apb_mem_wr_be = 8'(s_apb.pstrb << (s_apb_paddr_word * APB_STRB_W));
-    tbl_apb_mem_wr_data = {2**WORD_SELECT_W{s_apb.pwdata}};
+    tbl_apb_mem_wr_data = {RATIO{s_apb.pwdata}};
     pba_apb_mem_rd_en = 1'b0;
 
     tbl_rd_data_valid_next = 1'b0;

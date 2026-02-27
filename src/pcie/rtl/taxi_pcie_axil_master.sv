@@ -89,36 +89,40 @@ if (AXIL_DATA_W != 32)
 if (AXIL_STRB_W * 8 != AXIL_DATA_W)
     $fatal(0, "Error: AXI lite interface requires byte (8-bit) granularity (instance %m)");
 
-localparam [2:0]
+typedef enum logic [2:0] {
     TLP_FMT_3DW = 3'b000,
     TLP_FMT_4DW = 3'b001,
     TLP_FMT_3DW_DATA = 3'b010,
     TLP_FMT_4DW_DATA = 3'b011,
-    TLP_FMT_PREFIX = 3'b100;
+    TLP_FMT_PREFIX = 3'b100
+} tlp_fmt_t;
 
-localparam [2:0]
+typedef enum logic [2:0] {
     CPL_STATUS_SC  = 3'b000, // successful completion
     CPL_STATUS_UR  = 3'b001, // unsupported request
     CPL_STATUS_CRS = 3'b010, // configuration request retry status
-    CPL_STATUS_CA  = 3'b100; // completer abort
+    CPL_STATUS_CA  = 3'b100  // completer abort
+} cpl_status_t;
 
-localparam [2:0]
-    REQ_STATE_IDLE = 3'd0,
-    REQ_STATE_READ_1 = 3'd1,
-    REQ_STATE_READ_2 = 3'd2,
-    REQ_STATE_WRITE_1 = 3'd3,
-    REQ_STATE_WRITE_2 = 3'd4,
-    REQ_STATE_WAIT_END = 3'd5;
+typedef enum logic [2:0] {
+    REQ_STATE_IDLE,
+    REQ_STATE_READ_1,
+    REQ_STATE_READ_2,
+    REQ_STATE_WRITE_1,
+    REQ_STATE_WRITE_2,
+    REQ_STATE_WAIT_END
+} req_state_t;
 
-logic [2:0] req_state_reg = REQ_STATE_IDLE, req_state_next;
+req_state_t req_state_reg = REQ_STATE_IDLE, req_state_next;
 
-localparam [1:0]
-    RESP_STATE_IDLE = 2'd0,
-    RESP_STATE_READ = 2'd1,
-    RESP_STATE_WRITE = 2'd2,
-    RESP_STATE_CPL = 2'd3;
+typedef enum logic [1:0] {
+    RESP_STATE_IDLE,
+    RESP_STATE_READ,
+    RESP_STATE_WRITE,
+    RESP_STATE_CPL
+} resp_state_t;
 
-logic [1:0] resp_state_reg = RESP_STATE_IDLE, resp_state_next;
+resp_state_t resp_state_reg = RESP_STATE_IDLE, resp_state_next;
 
 logic [AXIL_ADDR_W-1:0] req_addr_reg = '0, req_addr_next;
 logic [TLP_DATA_W-1:0] req_data_reg = '0, req_data_next;

@@ -87,20 +87,22 @@ if (APB_ADDR_W < IRQ_INDEX_W+5)
 if (IRQ_INDEX_W > 11)
     $fatal(0, "Error: IRQ index width must be 11 or less (instance %m)");
 
-localparam [2:0]
+typedef enum logic [2:0] {
     TLP_FMT_3DW = 3'b000,
     TLP_FMT_4DW = 3'b001,
     TLP_FMT_3DW_DATA = 3'b010,
     TLP_FMT_4DW_DATA = 3'b011,
-    TLP_FMT_PREFIX = 3'b100;
+    TLP_FMT_PREFIX = 3'b100
+} tlp_fmt_t;
 
-localparam [1:0]
-    STATE_IDLE = 2'd0,
-    STATE_READ_TBL_1 = 2'd1,
-    STATE_READ_TBL_2 = 2'd2,
-    STATE_SEND_TLP = 2'd3;
+typedef enum logic [1:0] {
+    STATE_IDLE,
+    STATE_READ_TBL_1,
+    STATE_READ_TBL_2,
+    STATE_SEND_TLP
+} state_t;
 
-logic [1:0] state_reg = STATE_IDLE, state_next;
+state_t state_reg = STATE_IDLE, state_next;
 
 logic [IRQ_INDEX_W-1:0] irq_index_reg = '0, irq_index_next;
 

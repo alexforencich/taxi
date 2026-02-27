@@ -81,7 +81,7 @@ if (AXIL_DATA_W != 32)
 if (AXIL_STRB_W * 8 != AXIL_DATA_W)
     $fatal(0, "Error: AXI interface requires byte (8-bit) granularity (instance %m)");
 
-localparam [3:0]
+typedef enum logic [3:0] {
     REQ_MEM_READ = 4'b0000,
     REQ_MEM_WRITE = 4'b0001,
     REQ_IO_READ = 4'b0010,
@@ -96,23 +96,26 @@ localparam [3:0]
     REQ_CFG_WRITE_1 = 4'b1011,
     REQ_MSG = 4'b1100,
     REQ_MSG_VENDOR = 4'b1101,
-    REQ_MSG_ATS = 4'b1110;
+    REQ_MSG_ATS = 4'b1110
+} req_type_t;
 
-localparam [2:0]
+typedef enum logic [2:0] {
     CPL_STATUS_SC  = 3'b000, // successful completion
     CPL_STATUS_UR  = 3'b001, // unsupported request
     CPL_STATUS_CRS = 3'b010, // configuration request retry status
-    CPL_STATUS_CA  = 3'b100; // completer abort
+    CPL_STATUS_CA  = 3'b100  // completer abort
+} cpl_status_t;
 
-localparam [2:0]
-    STATE_IDLE = 3'd0,
-    STATE_HEADER = 3'd1,
-    STATE_READ = 3'd2,
-    STATE_WRITE_1 = 3'd3,
-    STATE_WRITE_2 = 3'd4,
-    STATE_WAIT_END = 3'd5,
-    STATE_CPL_1 = 3'd6,
-    STATE_CPL_2 = 3'd7;
+typedef enum logic [2:0] {
+    STATE_IDLE,
+    STATE_HEADER,
+    STATE_READ,
+    STATE_WRITE_1,
+    STATE_WRITE_2,
+    STATE_WAIT_END,
+    STATE_CPL_1,
+    STATE_CPL_2
+} state_t;
 
 wire [63:0] req_tlp_hdr_addr;
 wire [10:0] req_tlp_hdr_length;
@@ -161,7 +164,7 @@ logic [95:0] cpl_tlp_hdr;
 logic [32:0] cpl_tuser_1;
 logic [80:0] cpl_tuser_2;
 
-logic [2:0] state_reg = STATE_IDLE, state_next;
+state_t state_reg = STATE_IDLE, state_next;
 
 logic [10:0] dword_count_reg = '0, dword_count_next;
 logic [3:0] type_reg = '0, type_next;

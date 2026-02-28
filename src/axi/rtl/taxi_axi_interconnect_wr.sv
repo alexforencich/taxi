@@ -186,15 +186,16 @@ initial begin
     end
 end
 
-localparam logic [2:0]
-    STATE_IDLE = 3'd0,
-    STATE_DECODE = 3'd1,
-    STATE_WRITE = 3'd2,
-    STATE_WRITE_RESP = 3'd3,
-    STATE_WRITE_DROP = 3'd4,
-    STATE_WAIT_IDLE = 3'd5;
+typedef enum logic [2:0] {
+    STATE_IDLE,
+    STATE_DECODE,
+    STATE_WRITE,
+    STATE_WRITE_RESP,
+    STATE_WRITE_DROP,
+    STATE_WAIT_IDLE
+} state_t;
 
-logic [2:0] state_reg = STATE_IDLE, state_next;
+state_t state_reg = STATE_IDLE, state_next;
 
 logic match;
 

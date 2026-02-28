@@ -100,11 +100,12 @@ if (FIFO_DELAY) begin
 
     localparam COUNT_W = (FIFO_AW > 8 ? FIFO_AW : 8) + 1;
 
-    localparam [0:0]
-        STATE_IDLE = 1'd0,
-        STATE_WAIT = 1'd1;
+    typedef enum logic [0:0] {
+        STATE_IDLE,
+        STATE_WAIT
+    } state_t;
 
-    logic [0:0] state_reg = STATE_IDLE, state_next;
+    state_t state_reg = STATE_IDLE, state_next;
 
     logic [COUNT_W-1:0] count_reg = 0, count_next;
 

@@ -99,12 +99,13 @@ if (WUSER_EN) assign s_axi_w[WUSER_OFFSET +: WUSER_W] = s_axi_wr.wuser;
 if (FIFO_DELAY) begin
     // store AW channel value until W channel burst is stored in FIFO or FIFO is full
 
-    localparam [1:0]
-        STATE_IDLE = 2'd0,
-        STATE_TRANSFER_IN = 2'd1,
-        STATE_TRANSFER_OUT = 2'd2;
+    typedef enum logic [1:0] {
+        STATE_IDLE,
+        STATE_TRANSFER_IN,
+        STATE_TRANSFER_OUT
+    } state_t;
 
-    logic [1:0] state_reg = STATE_IDLE, state_next;
+    state_t state_reg = STATE_IDLE, state_next;
 
     logic hold_reg = 1'b1, hold_next;
     logic [8:0] count_reg = 9'd0, count_next;

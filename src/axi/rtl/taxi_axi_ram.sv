@@ -56,18 +56,20 @@ if (s_axi_wr.DATA_W != s_axi_rd.DATA_W)
 if (s_axi_wr.ADDR_W < ADDR_W || s_axi_rd.ADDR_W < ADDR_W)
     $fatal(0, "Error: AXI address width is insufficient (instance %m)");
 
-localparam [0:0]
-    READ_STATE_IDLE = 1'd0,
-    READ_STATE_BURST = 1'd1;
+typedef enum logic [0:0] {
+    READ_STATE_IDLE,
+    READ_STATE_BURST
+} read_state_t;
 
-logic [0:0] read_state_reg = READ_STATE_IDLE, read_state_next;
+read_state_t read_state_reg = READ_STATE_IDLE, read_state_next;
 
-localparam [1:0]
-    WRITE_STATE_IDLE = 2'd0,
-    WRITE_STATE_BURST = 2'd1,
-    WRITE_STATE_RESP = 2'd2;
+typedef enum logic [1:0] {
+    WRITE_STATE_IDLE,
+    WRITE_STATE_BURST,
+    WRITE_STATE_RESP
+} write_state_t;
 
-logic [1:0] write_state_reg = WRITE_STATE_IDLE, write_state_next;
+write_state_t write_state_reg = WRITE_STATE_IDLE, write_state_next;
 
 logic mem_wr_en;
 logic mem_rd_en;

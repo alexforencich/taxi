@@ -96,11 +96,12 @@ localparam [1:0]
 if (APB_BYTE_LANES == AXIL_BYTE_LANES) begin : translate
     // same width; translate
 
-    localparam [0:0]
-        STATE_IDLE = 1'd0,
-        STATE_DATA = 1'd1;
+    typedef enum logic [0:0] {
+        STATE_IDLE,
+        STATE_DATA
+    } state_t;
 
-    logic [0:0] state_reg = STATE_IDLE, state_next;
+    state_t state_reg = STATE_IDLE, state_next;
 
     logic last_read_reg = 1'b0, last_read_next;
 
@@ -294,11 +295,12 @@ if (APB_BYTE_LANES == AXIL_BYTE_LANES) begin : translate
 end else if (APB_BYTE_LANES > AXIL_BYTE_LANES) begin : upsize
     // output is wider; upsize
 
-    localparam [0:0]
-        STATE_IDLE = 1'd0,
-        STATE_DATA = 1'd1;
+    typedef enum logic [0:0] {
+        STATE_IDLE,
+        STATE_DATA
+    } state_t;
 
-    logic [0:0] state_reg = STATE_IDLE, state_next;
+    state_t state_reg = STATE_IDLE, state_next;
 
     logic last_read_reg = 1'b0, last_read_next;
 
@@ -503,11 +505,12 @@ end else begin : downsize
     localparam SEG_DATA_W = DATA_W / SEG_COUNT;
     localparam SEG_STRB_W = STRB_W / SEG_COUNT;
 
-    localparam [0:0]
-        STATE_IDLE = 1'd0,
-        STATE_DATA = 1'd1;
+    typedef enum logic [0:0] {
+        STATE_IDLE,
+        STATE_DATA
+    } state_t;
 
-    logic [0:0] state_reg = STATE_IDLE, state_next;
+    state_t state_reg = STATE_IDLE, state_next;
 
     logic last_read_reg = 1'b0, last_read_next;
 

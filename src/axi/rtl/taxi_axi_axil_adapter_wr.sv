@@ -91,12 +91,13 @@ if (AXIL_BYTE_LANES == AXI_BYTE_LANES) begin : translate
     localparam SEG_DATA_W = DATA_W / SEG_COUNT;
     localparam SEG_STRB_W = STRB_W / SEG_COUNT;
 
-    localparam [1:0]
-        STATE_IDLE = 2'd0,
-        STATE_DATA = 2'd1,
-        STATE_RESP = 2'd2;
+    typedef enum logic [1:0] {
+        STATE_IDLE,
+        STATE_DATA,
+        STATE_RESP
+    } state_t;
 
-    logic [1:0] state_reg = STATE_IDLE, state_next;
+    state_t state_reg = STATE_IDLE, state_next;
 
     logic [AXI_ID_W-1:0] id_reg = '0, id_next;
     logic [ADDR_W-1:0] addr_reg = '0, addr_next;
@@ -295,13 +296,14 @@ end else if (AXIL_BYTE_LANES > AXI_BYTE_LANES) begin : upsize
     localparam SEG_DATA_W = DATA_W / SEG_COUNT;
     localparam SEG_STRB_W = STRB_W / SEG_COUNT;
 
-    localparam [1:0]
-        STATE_IDLE = 2'd0,
-        STATE_DATA = 2'd1,
-        STATE_DATA_2 = 2'd2,
-        STATE_RESP = 2'd3;
+    typedef enum logic [1:0] {
+        STATE_IDLE,
+        STATE_DATA,
+        STATE_DATA_2,
+        STATE_RESP
+    } state_t;
 
-    logic [1:0] state_reg = STATE_IDLE, state_next;
+    state_t state_reg = STATE_IDLE, state_next;
 
     logic [AXI_ID_W-1:0] id_reg = '0, id_next;
     logic [ADDR_W-1:0] addr_reg = '0, addr_next;
@@ -547,13 +549,14 @@ end else begin : downsize
     localparam SEG_DATA_W = DATA_W / SEG_COUNT;
     localparam SEG_STRB_W = STRB_W / SEG_COUNT;
 
-    localparam [1:0]
-        STATE_IDLE = 2'd0,
-        STATE_DATA = 2'd1,
-        STATE_DATA_2 = 2'd2,
-        STATE_RESP = 2'd3;
+    typedef enum logic [1:0] {
+        STATE_IDLE,
+        STATE_DATA,
+        STATE_DATA_2,
+        STATE_RESP
+    } state_t;
 
-    logic [1:0] state_reg = STATE_IDLE, state_next;
+    state_t state_reg = STATE_IDLE, state_next;
 
     logic [AXI_ID_W-1:0] id_reg = '0, id_next;
     logic [ADDR_W-1:0] addr_reg = '0, addr_next;

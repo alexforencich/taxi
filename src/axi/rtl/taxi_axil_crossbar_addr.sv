@@ -189,11 +189,12 @@ initial begin
     end
 end
 
-localparam logic [0:0]
-    STATE_IDLE = 1'd0,
-    STATE_DECODE = 1'd1;
+typedef enum logic [0:0] {
+    STATE_IDLE,
+    STATE_DECODE
+} state_t;
 
-logic [0:0] state_reg = STATE_IDLE, state_next;
+state_t state_reg = STATE_IDLE, state_next;
 
 logic s_axil_aready_reg = 1'b0, s_axil_aready_next;
 

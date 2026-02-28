@@ -485,7 +485,7 @@ end else begin : downsize
     localparam SEG_DATA_W = DATA_W / SEG_COUNT;
     localparam SEG_STRB_W = STRB_W / SEG_COUNT;
 
-    typedef enum logic [1:0] {
+    typedef enum logic [0:0] {
         STATE_IDLE,
         STATE_DATA
     } state_t;

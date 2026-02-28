@@ -276,11 +276,12 @@ end else begin
 end
 
 // handle ethertype
-logic [4:0] eth_type_state;
+state_t eth_type_state;
 logic [31:0] eth_type_flags;
 
 always_comb begin
     eth_type_flags = '0;
+    eth_type_state = STATE_FINISH_1;
     if (pkt_data_be[15:0] == ETHERTYPE_VLAN_S) begin
         // S-tag
         eth_type_state = STATE_VLAN_1;
@@ -303,11 +304,12 @@ always_comb begin
 end
 
 // handle next header
-logic [4:0] next_hdr_state;
+state_t next_hdr_state;
 logic [31:0] next_hdr_flags;
 
 always_comb begin
     next_hdr_flags = '0;
+    next_hdr_state = STATE_FINISH_1;
     case (next_hdr_reg)
         PROTO_IPV6_HOPOPT: begin
             next_hdr_flags[FLG_L3_OPT_PRSNT] = 1'b1;

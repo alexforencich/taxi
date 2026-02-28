@@ -144,19 +144,20 @@ initial begin
     end
 end
 
-localparam [3:0]
-    STATE_IDLE = 4'd0,
-    STATE_HEADER_1 = 4'd1,
-    STATE_HEADER_2 = 4'd2,
-    STATE_HEADER_3 = 4'd3,
-    STATE_READ_1 = 4'd4,
-    STATE_READ_2 = 4'd5,
-    STATE_WRITE_1 = 4'd6,
-    STATE_WRITE_2 = 4'd7,
-    STATE_WAIT_LAST = 4'd8,
-    STATE_ID = 4'd9;
+typedef enum logic [3:0] {
+    STATE_IDLE,
+    STATE_HEADER_1,
+    STATE_HEADER_2,
+    STATE_HEADER_3,
+    STATE_READ_1,
+    STATE_READ_2,
+    STATE_WRITE_1,
+    STATE_WRITE_2,
+    STATE_WAIT_LAST,
+    STATE_ID
+} state_t;
 
-logic [3:0] state_reg = STATE_IDLE, state_next;
+state_t state_reg = STATE_IDLE, state_next;
 
 logic [COUNT_SIZE-1:0] ptr_reg = '0, ptr_next;
 logic [7:0] count_reg = 8'd0, count_next;
@@ -621,7 +622,7 @@ always_comb begin
     store_xfcp_usp_us_int_to_output = 1'b0;
     store_xfcp_usp_us_int_to_temp = 1'b0;
     store_xfcp_usp_us_temp_to_output = 1'b0;
-    
+
     if (xfcp_usp_us_tready_int_reg) begin
         // input is ready
         if (xfcp_usp_us.tready || !xfcp_usp_us_tvalid_reg) begin
@@ -667,7 +668,7 @@ always_ff @(posedge clk) begin
         xfcp_usp_us_tvalid_reg <= 1'b0;
         xfcp_usp_us_tready_int_reg <= 1'b0;
         temp_xfcp_usp_us_tvalid_reg <= 1'b0;
-    end 
+    end
 end
 
 endmodule

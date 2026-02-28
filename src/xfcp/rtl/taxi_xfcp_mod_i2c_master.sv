@@ -105,22 +105,23 @@ initial begin
     end
 end
 
-localparam [3:0]
-    STATE_IDLE = 4'd0,
-    STATE_HEADER_1 = 4'd1,
-    STATE_HEADER_2 = 4'd2,
-    STATE_PROCESS = 4'd3,
-    STATE_STATUS = 4'd4,
-    STATE_PRESCALE_L = 4'd5,
-    STATE_PRESCALE_H = 4'd6,
-    STATE_COUNT = 4'd7,
-    STATE_NEXT_CMD= 4'd8,
-    STATE_WRITE_DATA = 4'd9,
-    STATE_READ_DATA = 4'd10,
-    STATE_WAIT_LAST = 4'd11,
-    STATE_ID = 4'd12;
+typedef enum logic [3:0] {
+    STATE_IDLE,
+    STATE_HEADER_1,
+    STATE_HEADER_2,
+    STATE_PROCESS,
+    STATE_STATUS,
+    STATE_PRESCALE_L,
+    STATE_PRESCALE_H,
+    STATE_COUNT,
+    STATE_NEXT_CMD,
+    STATE_WRITE_DATA,
+    STATE_READ_DATA,
+    STATE_WAIT_LAST,
+    STATE_ID
+} state_t;
 
-logic [3:0] state_reg = STATE_IDLE, state_next;
+state_t state_reg = STATE_IDLE, state_next;
 
 logic [7:0] count_reg = 8'd0, count_next;
 
@@ -201,9 +202,9 @@ always_comb begin
     i2c_wr_data_next = i2c_wr_data_reg;
     i2c_wr_data_valid_next = i2c_wr_data_valid_reg && !i2c_wr_data.tready;
     i2c_wr_data_last_next = i2c_wr_data_last_reg;
-    
+
     i2c_rd_data_ready_next = 1'b0;
-    
+
     prescale_next = prescale_reg;
     stop_on_idle_next = stop_on_idle_reg;
 
@@ -726,7 +727,7 @@ always_comb begin
     store_up_xfcp_int_to_output = 1'b0;
     store_up_xfcp_int_to_temp = 1'b0;
     store_up_xfcp_temp_to_output = 1'b0;
-    
+
     if (xfcp_usp_us_tready_int_reg) begin
         // input is ready
         if (xfcp_usp_us.tready || !xfcp_usp_us_tvalid_reg) begin

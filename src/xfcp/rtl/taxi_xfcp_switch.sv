@@ -108,20 +108,22 @@ initial begin
     end
 end
 
-localparam [2:0]
-    DN_STATE_IDLE = 3'd0,
-    DN_STATE_TRANSFER = 3'd1,
-    DN_STATE_HEADER = 3'd2,
-    DN_STATE_PKT = 3'd3,
-    DN_STATE_ID = 3'd4;
+typedef enum logic [2:0] {
+    DN_STATE_IDLE,
+    DN_STATE_TRANSFER,
+    DN_STATE_HEADER,
+    DN_STATE_PKT,
+    DN_STATE_ID
+} dn_state_t;
 
-logic [2:0] dn_state_reg = DN_STATE_IDLE, dn_state_next;
+dn_state_t dn_state_reg = DN_STATE_IDLE, dn_state_next;
 
-localparam [0:0]
-    UP_STATE_IDLE = 1'd0,
-    UP_STATE_TRANSFER = 1'd1;
+typedef enum logic [0:0] {
+    UP_STATE_IDLE,
+    UP_STATE_TRANSFER
+} up_state_t;
 
-logic [0:0] up_state_reg = UP_STATE_IDLE, up_state_next;
+up_state_t up_state_reg = UP_STATE_IDLE, up_state_next;
 
 logic [CL_PORTS-1:0] dn_select_reg = '0, dn_select_next;
 logic dn_frame_reg = 1'b0, dn_frame_next;
@@ -143,14 +145,14 @@ logic       xfcp_usp_us_tvalid_int;
 logic       xfcp_usp_us_tready_int_reg = 1'b0;
 logic       xfcp_usp_us_tlast_int;
 logic       xfcp_usp_us_tuser_int;
-wire      xfcp_usp_us_tready_int_early;
+wire        xfcp_usp_us_tready_int_early;
 
 logic [7:0]       xfcp_dsp_ds_tdata_int;
 logic [PORTS-1:0] xfcp_dsp_ds_tvalid_int;
 logic             xfcp_dsp_ds_tready_int_reg = 1'b0;
 logic             xfcp_dsp_ds_tlast_int;
 logic             xfcp_dsp_ds_tuser_int;
-wire            xfcp_dsp_ds_tready_int_early;
+wire              xfcp_dsp_ds_tready_int_early;
 
 logic [7:0] int_loop_tdata_reg = 8'd0, int_loop_tdata_next;
 logic       int_loop_tvalid_reg = 1'b0, int_loop_tvalid_next;

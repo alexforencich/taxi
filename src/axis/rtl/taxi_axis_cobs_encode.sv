@@ -40,19 +40,21 @@ if (m_axis.DATA_W != 8 || s_axis.DATA_W != 8)
     $fatal(0, "Error: Interface DATA_W parameter mismatch (instance %m)");
 
 // state register
-localparam [1:0]
-    INPUT_STATE_IDLE = 2'd0,
-    INPUT_STATE_SEGMENT = 2'd1,
-    INPUT_STATE_FINAL_ZERO = 2'd2,
-    INPUT_STATE_APPEND_ZERO = 2'd3;
+typedef enum logic [1:0] {
+    INPUT_STATE_IDLE,
+    INPUT_STATE_SEGMENT,
+    INPUT_STATE_FINAL_ZERO,
+    INPUT_STATE_APPEND_ZERO
+} input_state_t;
 
-logic [1:0] input_state_reg = INPUT_STATE_IDLE, input_state_next;
+input_state_t input_state_reg = INPUT_STATE_IDLE, input_state_next;
 
-localparam [0:0]
-    OUTPUT_STATE_IDLE = 1'd0,
-    OUTPUT_STATE_SEGMENT = 1'd1;
+typedef enum logic [0:0] {
+    OUTPUT_STATE_IDLE,
+    OUTPUT_STATE_SEGMENT
+} output_state_t;
 
-logic [0:0] output_state_reg = OUTPUT_STATE_IDLE, output_state_next;
+output_state_t output_state_reg = OUTPUT_STATE_IDLE, output_state_next;
 
 logic [7:0] input_count_reg = 8'd0, input_count_next;
 logic [7:0] output_count_reg = 8'd0, output_count_next;

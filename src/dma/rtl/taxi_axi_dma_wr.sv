@@ -109,13 +109,14 @@ if (AXI_MAX_BURST_LEN < 1 || AXI_MAX_BURST_LEN > 256)
 if (wr_desc_req.DST_ADDR_W < AXI_ADDR_W)
     $fatal(0, "Error: Descriptor address width is not sufficient (instance %m)");
 
-localparam logic [1:0]
+typedef enum logic [1:0] {
     AXI_RESP_OKAY = 2'b00,
     AXI_RESP_EXOKAY = 2'b01,
     AXI_RESP_SLVERR = 2'b10,
-    AXI_RESP_DECERR = 2'b11;
+    AXI_RESP_DECERR = 2'b11
+} axi_resp_t;
 
-localparam logic [3:0]
+typedef enum logic [3:0] {
     DMA_ERROR_NONE = 4'd0,
     DMA_ERROR_TIMEOUT = 4'd1,
     DMA_ERROR_PARITY = 4'd2,
@@ -126,16 +127,18 @@ localparam logic [3:0]
     DMA_ERROR_PCIE_FLR = 4'd8,
     DMA_ERROR_PCIE_CPL_POISONED = 4'd9,
     DMA_ERROR_PCIE_CPL_STATUS_UR = 4'd10,
-    DMA_ERROR_PCIE_CPL_STATUS_CA = 4'd11;
+    DMA_ERROR_PCIE_CPL_STATUS_CA = 4'd11
+} dma_error_t;
 
-localparam logic [2:0]
-    STATE_IDLE = 3'd0,
-    STATE_START = 3'd1,
-    STATE_WRITE = 3'd2,
-    STATE_FINISH_BURST = 3'd3,
-    STATE_DROP_DATA = 3'd4;
+typedef enum logic [2:0] {
+    STATE_IDLE,
+    STATE_START,
+    STATE_WRITE,
+    STATE_FINISH_BURST,
+    STATE_DROP_DATA
+} state_t;
 
-logic [2:0] state_reg = STATE_IDLE, state_next;
+state_t state_reg = STATE_IDLE, state_next;
 
 // datapath control signals
 logic transfer_in_save;

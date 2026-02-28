@@ -110,12 +110,13 @@ if (AXIS_DATA_W*2**$clog2(PART_COUNT) != RAM_SEGS*RAM_SEG_DATA_W)
 if (desc_req.DST_ADDR_W < RAM_ADDR_W)
     $fatal(0, "Error: Descriptor address width is not sufficient (instance %m)");
 
-localparam logic [1:0]
-    STATE_IDLE = 2'd0,
-    STATE_WRITE = 2'd1,
-    STATE_DROP_DATA = 2'd2;
+typedef enum logic [1:0] {
+    STATE_IDLE,
+    STATE_WRITE,
+    STATE_DROP_DATA
+} state_t;
 
-logic [1:0] state_reg = STATE_IDLE, state_next;
+state_t state_reg = STATE_IDLE, state_next;
 
 logic [OFFSET_W:0] cycle_size;
 

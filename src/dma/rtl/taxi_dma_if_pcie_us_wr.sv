@@ -182,7 +182,7 @@ if (2**$clog2(RAM_BYTE_LANES) != RAM_BYTE_LANES)
 if (wr_desc_req.SRC_ADDR_W < RAM_ADDR_W || wr_desc_req.DST_ADDR_W < PCIE_ADDR_W)
     $fatal(0, "Error: Descriptor address width is not sufficient (instance %m)");
 
-localparam logic [3:0]
+typedef enum logic [3:0] {
     REQ_MEM_READ = 4'b0000,
     REQ_MEM_WRITE = 4'b0001,
     REQ_IO_READ = 4'b0010,
@@ -193,44 +193,50 @@ localparam logic [3:0]
     REQ_MEM_READ_LOCKED = 4'b0111,
     REQ_CFG_READ_0 = 4'b1000,
     REQ_CFG_READ_1 = 4'b1001,
-    REQ_CFG_WR_0 = 4'b1010,
-    REQ_CFG_WR_1 = 4'b1011,
+    REQ_CFG_WRITE_0 = 4'b1010,
+    REQ_CFG_WRITE_1 = 4'b1011,
     REQ_MSG = 4'b1100,
     REQ_MSG_VENDOR = 4'b1101,
-    REQ_MSG_ATS = 4'b1110;
+    REQ_MSG_ATS = 4'b1110
+} req_type_t;
 
-localparam logic [2:0]
+typedef enum logic [2:0] {
     CPL_STATUS_SC  = 3'b000, // successful completion
     CPL_STATUS_UR  = 3'b001, // unsupported request
     CPL_STATUS_CRS = 3'b010, // configuration request retry status
-    CPL_STATUS_CA  = 3'b100; // completer abort
+    CPL_STATUS_CA  = 3'b100  // completer abort
+} cpl_status_t;
 
-localparam logic [0:0]
-    REQ_STATE_IDLE = 1'd0,
-    REQ_STATE_START = 1'd1;
+typedef enum logic [0:0] {
+    REQ_STATE_IDLE,
+    REQ_STATE_START
+} req_state_t;
 
-logic [0:0] req_state_reg = REQ_STATE_IDLE, req_state_next;
+req_state_t req_state_reg = REQ_STATE_IDLE, req_state_next;
 
-localparam logic [0:0]
-    READ_STATE_IDLE = 1'd0,
-    READ_STATE_READ = 1'd1;
+typedef enum logic [0:0] {
+    READ_STATE_IDLE,
+    READ_STATE_READ
+} read_state_t;
 
-logic [0:0] read_state_reg = READ_STATE_IDLE, read_state_next;
+read_state_t read_state_reg = READ_STATE_IDLE, read_state_next;
 
-localparam logic [1:0]
-    TLP_STATE_IDLE = 2'd0,
-    TLP_STATE_HEADER = 2'd1,
-    TLP_STATE_TRANSFER = 2'd2;
+typedef enum logic [1:0] {
+    TLP_STATE_IDLE,
+    TLP_STATE_HEADER,
+    TLP_STATE_TRANSFER
+} tlp_state_t;
 
-logic [1:0] tlp_state_reg = TLP_STATE_IDLE, tlp_state_next;
+tlp_state_t tlp_state_reg = TLP_STATE_IDLE, tlp_state_next;
 
-localparam logic [1:0]
-    TLP_OUTPUT_STATE_IDLE = 2'd0,
-    TLP_OUTPUT_STATE_HEADER = 2'd1,
-    TLP_OUTPUT_STATE_PAYLOAD = 2'd2,
-    TLP_OUTPUT_STATE_PASSTHROUGH = 2'd3;
+typedef enum logic [1:0] {
+    TLP_OUTPUT_STATE_IDLE,
+    TLP_OUTPUT_STATE_HEADER,
+    TLP_OUTPUT_STATE_PAYLOAD,
+    TLP_OUTPUT_STATE_PASSTHROUGH
+} tlp_output_state_t;
 
-logic [1:0] tlp_output_state_reg = TLP_OUTPUT_STATE_IDLE, tlp_output_state_next;
+tlp_output_state_t tlp_output_state_reg = TLP_OUTPUT_STATE_IDLE, tlp_output_state_next;
 
 // datapath control signals
 logic mask_fifo_we;

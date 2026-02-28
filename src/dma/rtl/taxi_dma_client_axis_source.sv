@@ -109,17 +109,19 @@ if (AXIS_DATA_W*2**$clog2(PART_COUNT) != RAM_SEGS*RAM_SEG_DATA_W)
 if (desc_req.SRC_ADDR_W < RAM_ADDR_W)
     $fatal(0, "Error: Descriptor address width is not sufficient (instance %m)");
 
-localparam logic [0:0]
-    READ_STATE_IDLE = 1'd0,
-    READ_STATE_READ = 1'd1;
+typedef enum logic [0:0] {
+    READ_STATE_IDLE,
+    READ_STATE_READ
+} read_state_t;
 
-logic [0:0] read_state_reg = READ_STATE_IDLE, read_state_next;
+read_state_t read_state_reg = READ_STATE_IDLE, read_state_next;
 
-localparam logic [0:0]
-    AXIS_STATE_IDLE = 1'd0,
-    AXIS_STATE_READ = 1'd1;
+typedef enum logic [0:0] {
+    AXIS_STATE_IDLE,
+    AXIS_STATE_READ
+} axis_state_t;
 
-logic [0:0] axis_state_reg = AXIS_STATE_IDLE, axis_state_next;
+axis_state_t axis_state_reg = AXIS_STATE_IDLE, axis_state_next;
 
 // datapath control signals
 logic axis_cmd_ready;

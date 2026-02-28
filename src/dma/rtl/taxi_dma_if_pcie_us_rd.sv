@@ -213,7 +213,7 @@ if (PCIE_TAG_CNT < 1 || PCIE_TAG_CNT > 256)
 if (rd_desc_req.SRC_ADDR_W < PCIE_ADDR_W || rd_desc_req.DST_ADDR_W < RAM_ADDR_W)
     $fatal(0, "Error: Descriptor address width is not sufficient (instance %m)");
 
-localparam logic [3:0]
+typedef enum logic [3:0] {
     REQ_MEM_READ = 4'b0000,
     REQ_MEM_WRITE = 4'b0001,
     REQ_IO_READ = 4'b0010,
@@ -221,22 +221,24 @@ localparam logic [3:0]
     REQ_MEM_FETCH_ADD = 4'b0100,
     REQ_MEM_SWAP = 4'b0101,
     REQ_MEM_CAS = 4'b0110,
-    REQ_MEM_RD_LOCKED = 4'b0111,
-    REQ_CFG_RD_0 = 4'b1000,
-    REQ_CFG_RD_1 = 4'b1001,
+    REQ_MEM_READ_LOCKED = 4'b0111,
+    REQ_CFG_READ_0 = 4'b1000,
+    REQ_CFG_READ_1 = 4'b1001,
     REQ_CFG_WRITE_0 = 4'b1010,
     REQ_CFG_WRITE_1 = 4'b1011,
     REQ_MSG = 4'b1100,
     REQ_MSG_VENDOR = 4'b1101,
-    REQ_MSG_ATS = 4'b1110;
+    REQ_MSG_ATS = 4'b1110
+} req_type_t;
 
-localparam logic [2:0]
+typedef enum logic [2:0] {
     CPL_STATUS_SC  = 3'b000, // successful completion
     CPL_STATUS_UR  = 3'b001, // unsupported request
     CPL_STATUS_CRS = 3'b010, // configuration request retry status
-    CPL_STATUS_CA  = 3'b100; // completer abort
+    CPL_STATUS_CA  = 3'b100  // completer abort
+} cpl_status_t;
 
-localparam logic [3:0]
+typedef enum logic [3:0] {
     RC_ERR_NORMAL_TERM = 4'b0000,
     RC_ERR_POISONED = 4'b0001,
     RC_ERR_BAD_STATUS = 4'b0010,
@@ -245,9 +247,10 @@ localparam logic [3:0]
     RC_ERR_INVALID_ADDR = 4'b0101,
     RC_ERR_INVALID_TAG = 4'b0110,
     RC_ERR_TIMEOUT = 4'b1001,
-    RC_ERR_FLR = 4'b1000;
+    RC_ERR_FLR = 4'b1000
+} rc_err_t;
 
-localparam logic [3:0]
+typedef enum logic [3:0] {
     DMA_ERR_NONE = 4'd0,
     DMA_ERR_TIMEOUT = 4'd1,
     DMA_ERR_PARITY = 4'd2,
@@ -258,22 +261,25 @@ localparam logic [3:0]
     DMA_ERR_PCIE_FLR = 4'd8,
     DMA_ERR_PCIE_CPL_POISONED = 4'd9,
     DMA_ERR_PCIE_CPL_STATUS_UR = 4'd10,
-    DMA_ERR_PCIE_CPL_STATUS_CA = 4'd11;
+    DMA_ERR_PCIE_CPL_STATUS_CA = 4'd11
+} dma_err_t;
 
-localparam logic [1:0]
-    REQ_STATE_IDLE = 2'd0,
-    REQ_STATE_START = 2'd1,
-    REQ_STATE_HEADER = 2'd2;
+typedef enum logic [1:0] {
+    REQ_STATE_IDLE,
+    REQ_STATE_START,
+    REQ_STATE_HEADER
+} req_state_t;
 
-logic [1:0] req_state_reg = REQ_STATE_IDLE, req_state_next;
+req_state_t req_state_reg = REQ_STATE_IDLE, req_state_next;
 
-localparam logic [1:0]
+typedef enum logic [1:0] {
     TLP_STATE_IDLE = 2'd0,
     TLP_STATE_HEADER = 2'd1,
     TLP_STATE_WRITE = 2'd2,
-    TLP_STATE_WAIT_END = 2'd3;
+    TLP_STATE_WAIT_END = 2'd3
+} tlp_state_t;
 
-logic [1:0] tlp_state_reg = TLP_STATE_IDLE, tlp_state_next;
+tlp_state_t tlp_state_reg = TLP_STATE_IDLE, tlp_state_next;
 
 // datapath control signals
 logic last_cycle;

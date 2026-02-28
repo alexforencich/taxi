@@ -142,13 +142,14 @@ if (OP_TBL_SIZE > 2**AXI_ID_W)
 if (rd_desc_req.SRC_ADDR_W < AXI_ADDR_W || rd_desc_req.DST_ADDR_W < RAM_ADDR_W)
     $fatal(0, "Error: Descriptor address width is not sufficient (instance %m)");
 
-localparam logic [1:0]
+typedef enum logic [1:0] {
     AXI_RESP_OKAY = 2'b00,
     AXI_RESP_EXOKAY = 2'b01,
     AXI_RESP_SLVERR = 2'b10,
-    AXI_RESP_DECERR = 2'b11;
+    AXI_RESP_DECERR = 2'b11
+} axi_resp_t;
 
-localparam logic [3:0]
+typedef enum logic [3:0] {
     DMA_ERROR_NONE = 4'd0,
     DMA_ERROR_TIMEOUT = 4'd1,
     DMA_ERROR_PARITY = 4'd2,
@@ -159,19 +160,22 @@ localparam logic [3:0]
     DMA_ERROR_PCIE_FLR = 4'd8,
     DMA_ERROR_PCIE_CPL_POISONED = 4'd9,
     DMA_ERROR_PCIE_CPL_STATUS_UR = 4'd10,
-    DMA_ERROR_PCIE_CPL_STATUS_CA = 4'd11;
+    DMA_ERROR_PCIE_CPL_STATUS_CA = 4'd11
+} dma_error_t;
 
-localparam logic [0:0]
-    REQ_STATE_IDLE = 1'd0,
-    REQ_STATE_START = 1'd1;
+typedef enum logic [0:0] {
+    REQ_STATE_IDLE,
+    REQ_STATE_START
+} req_state_t;
 
-logic [0:0] req_state_reg = REQ_STATE_IDLE, req_state_next;
+req_state_t req_state_reg = REQ_STATE_IDLE, req_state_next;
 
-localparam logic [0:0]
-    AXI_STATE_IDLE = 1'd0,
-    AXI_STATE_WRITE = 1'd1;
+typedef enum logic [0:0] {
+    AXI_STATE_IDLE,
+    AXI_STATE_WRITE
+} axi_state_t;
 
-logic [0:0] axi_state_reg = AXI_STATE_IDLE, axi_state_next;
+axi_state_t axi_state_reg = AXI_STATE_IDLE, axi_state_next;
 
 logic [AXI_ADDR_W-1:0] req_axi_addr_reg = '0, req_axi_addr_next;
 logic [RAM_SEL_W-1:0] req_ram_sel_reg = '0, req_ram_sel_next;

@@ -189,14 +189,15 @@ initial begin
     init_data[21] = cmd_halt(); // halt
 end
 
-localparam [2:0]
-    STATE_IDLE = 3'd0,
-    STATE_RUN = 3'd1,
-    STATE_TABLE_1 = 3'd2,
-    STATE_TABLE_2 = 3'd3,
-    STATE_TABLE_3 = 3'd4;
+typedef enum logic [2:0] {
+    STATE_IDLE,
+    STATE_RUN,
+    STATE_TABLE_1,
+    STATE_TABLE_2,
+    STATE_TABLE_3
+} state_t;
 
-logic [2:0] state_reg = STATE_IDLE, state_next;
+state_t state_reg = STATE_IDLE, state_next;
 
 localparam AW = $clog2(INIT_DATA_LEN);
 

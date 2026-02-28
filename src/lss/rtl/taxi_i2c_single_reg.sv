@@ -39,17 +39,18 @@ module taxi_i2c_single_reg #(
     output wire logic [7:0]  data_out
 );
 
-localparam [2:0]
-    STATE_IDLE = 3'd0,
-    STATE_ADDRESS = 3'd1,
-    STATE_ACK = 3'd2,
-    STATE_WRITE_1 = 3'd3,
-    STATE_WRITE_2 = 3'd4,
-    STATE_READ_1 = 3'd5,
-    STATE_READ_2 = 3'd6,
-    STATE_READ_3 = 3'd7;
+typedef enum logic [2:0] {
+    STATE_IDLE,
+    STATE_ADDRESS,
+    STATE_ACK,
+    STATE_WRITE_1,
+    STATE_WRITE_2,
+    STATE_READ_1,
+    STATE_READ_2,
+    STATE_READ_3
+} state_t;
 
-logic [2:0] state_reg = STATE_IDLE;
+state_t state_reg = STATE_IDLE;
 
 logic [7:0] data_reg = '0;
 logic [7:0] shift_reg = '0;

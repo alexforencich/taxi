@@ -44,12 +44,13 @@ module taxi_mdio_master (
     input  wire logic [7:0]  prescale
 );
 
-localparam [1:0]
-    STATE_IDLE = 2'd0,
-    STATE_PREAMBLE = 2'd1,
-    STATE_TRANSFER = 2'd2;
+typedef enum logic [1:0] {
+    STATE_IDLE,
+    STATE_PREAMBLE,
+    STATE_TRANSFER
+} state_t;
 
-logic [1:0] state_reg = STATE_IDLE, state_next;
+state_t state_reg = STATE_IDLE, state_next;
 
 logic [7:0] count_reg = '0, count_next;
 logic [5:0] bit_count_reg = '0, bit_count_next;

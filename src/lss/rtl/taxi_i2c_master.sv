@@ -158,41 +158,43 @@ if (s_axis_cmd.DATA_W < 12)
 if (s_axis_tx.DATA_W != 8 || m_axis_rx.DATA_W != 8)
     $fatal(0, "Data interface width must be 8 bits (instance %m)");
 
-localparam [3:0]
-    STATE_IDLE = 4'd0,
-    STATE_ACTIVE_WRITE = 4'd1,
-    STATE_ACTIVE_READ = 4'd2,
-    STATE_START_WAIT = 4'd3,
-    STATE_START = 4'd4,
-    STATE_ADDRESS_1 = 4'd5,
-    STATE_ADDRESS_2 = 4'd6,
-    STATE_WRITE_1 = 4'd7,
-    STATE_WRITE_2 = 4'd8,
-    STATE_WRITE_3 = 4'd9,
-    STATE_READ = 4'd10,
-    STATE_STOP = 4'd11;
+typedef enum logic [3:0] {
+    STATE_IDLE,
+    STATE_ACTIVE_WRITE,
+    STATE_ACTIVE_READ,
+    STATE_START_WAIT,
+    STATE_START,
+    STATE_ADDRESS_1,
+    STATE_ADDRESS_2,
+    STATE_WRITE_1,
+    STATE_WRITE_2,
+    STATE_WRITE_3,
+    STATE_READ,
+    STATE_STOP
+} state_t;
 
-logic [3:0] state_reg = STATE_IDLE, state_next;
+state_t state_reg = STATE_IDLE, state_next;
 
-localparam [3:0]
-    PHY_STATE_IDLE = 4'd0,
-    PHY_STATE_ACTIVE = 4'd1,
-    PHY_STATE_REPEATED_START_1 = 4'd2,
-    PHY_STATE_REPEATED_START_2 = 4'd3,
-    PHY_STATE_START_1 = 4'd4,
-    PHY_STATE_START_2 = 4'd5,
-    PHY_STATE_WRITE_BIT_1 = 4'd6,
-    PHY_STATE_WRITE_BIT_2 = 4'd7,
-    PHY_STATE_WRITE_BIT_3 = 4'd8,
-    PHY_STATE_READ_BIT_1 = 4'd9,
-    PHY_STATE_READ_BIT_2 = 4'd10,
-    PHY_STATE_READ_BIT_3 = 4'd11,
-    PHY_STATE_READ_BIT_4 = 4'd12,
-    PHY_STATE_STOP_1 = 4'd13,
-    PHY_STATE_STOP_2 = 4'd14,
-    PHY_STATE_STOP_3 = 4'd15;
+typedef enum logic [3:0] {
+    PHY_STATE_IDLE,
+    PHY_STATE_ACTIVE,
+    PHY_STATE_REPEATED_START_1,
+    PHY_STATE_REPEATED_START_2,
+    PHY_STATE_START_1,
+    PHY_STATE_START_2,
+    PHY_STATE_WRITE_BIT_1,
+    PHY_STATE_WRITE_BIT_2,
+    PHY_STATE_WRITE_BIT_3,
+    PHY_STATE_READ_BIT_1,
+    PHY_STATE_READ_BIT_2,
+    PHY_STATE_READ_BIT_3,
+    PHY_STATE_READ_BIT_4,
+    PHY_STATE_STOP_1,
+    PHY_STATE_STOP_2,
+    PHY_STATE_STOP_3
+} phy_state_t;
 
-logic [3:0] phy_state_reg = STATE_IDLE, phy_state_next;
+phy_state_t phy_state_reg = PHY_STATE_IDLE, phy_state_next;
 
 logic phy_start_bit;
 logic phy_stop_bit;
@@ -359,7 +361,7 @@ always_comb begin
                         mode_stop_next = s_axis_cmd_stop;
 
                         s_axis_cmd_ready_next = 1'b0;
-                        
+
                         if (s_axis_cmd_start || s_axis_cmd_address != addr_reg || s_axis_cmd_read) begin
                             // address or mode mismatch or forced start - repeated start
 
@@ -406,7 +408,7 @@ always_comb begin
                         mode_stop_next = s_axis_cmd_stop;
 
                         s_axis_cmd_ready_next = 1'b0;
-                        
+
                         if (s_axis_cmd_start || s_axis_cmd_address != addr_reg || s_axis_cmd_write) begin
                             // address or mode mismatch or forced start - repeated start
 

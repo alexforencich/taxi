@@ -75,7 +75,7 @@ This module translates I2C read and write operations into AXI stream transfers.
 Bytes written over I2C will be delayed by one byte time so that the last byte
 in a write operation can be accurately marked.  When reading, the module will
 stretch SCL by holding it low until a data byte is presented at the AXI stream
-input.  
+input.
 
 Control:
 
@@ -139,17 +139,18 @@ I/O pin.  This would prevent devices from stretching the clock period.
 if (s_axis_tx.DATA_W != 8 || m_axis_rx.DATA_W != 8)
     $fatal(0, "Data interface width must be 8 bits (instance %m)");
 
-localparam [2:0]
-    STATE_IDLE = 3'd0,
-    STATE_ADDRESS = 3'd1,
-    STATE_ACK = 3'd2,
-    STATE_WRITE_1 = 3'd3,
-    STATE_WRITE_2 = 3'd4,
-    STATE_READ_1 = 3'd5,
-    STATE_READ_2 = 3'd6,
-    STATE_READ_3 = 3'd7;
+typedef enum logic [2:0] {
+    STATE_IDLE,
+    STATE_ADDRESS,
+    STATE_ACK,
+    STATE_WRITE_1,
+    STATE_WRITE_2,
+    STATE_READ_1,
+    STATE_READ_2,
+    STATE_READ_3
+} state_t;
 
-logic [2:0] state_reg = STATE_IDLE, state_next;
+state_t state_reg = STATE_IDLE, state_next;
 
 logic [6:0] addr_reg = '0, addr_next;
 logic [7:0] data_reg = '0, data_next;

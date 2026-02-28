@@ -178,15 +178,16 @@ if (2**$clog2(BYTE_LANES) != BYTE_LANES)
 if (8*2**$clog2(BYTE_SIZE/8) != BYTE_SIZE)
     $fatal(0, "Error: AXI word size must be a power of two multiple of 8 bits (instance %m)");
 
-localparam [2:0]
-    STATE_IDLE = 3'd0,
-    STATE_ADDRESS = 3'd1,
-    STATE_READ_1 = 3'd2,
-    STATE_READ_2 = 3'd3,
-    STATE_WRITE_1 = 3'd4,
-    STATE_WRITE_2 = 3'd5;
+typedef enum logic [2:0] {
+    STATE_IDLE,
+    STATE_ADDRESS,
+    STATE_READ_1,
+    STATE_READ_2,
+    STATE_WRITE_1,
+    STATE_WRITE_2
+} state_t;
 
-logic [2:0] state_reg = STATE_IDLE, state_next;
+state_t state_reg = STATE_IDLE, state_next;
 
 logic [7:0] count_reg = '0, count_next;
 logic last_cycle_reg = 1'b0;

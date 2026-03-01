@@ -225,7 +225,7 @@ always_comb begin
                 CMD_OP_DESTROY_EQ:
                 begin
                     // EQ
-                    block_base_addr_next = DP_APB_ADDR_W'({port_reg, 16'd0} | 16'h0000);
+                    block_base_addr_next = DP_APB_ADDR_W'({port_reg, 16'd0} | 'h0000);
                 end
                 CMD_OP_CREATE_CQ,
                 CMD_OP_MODIFY_CQ,
@@ -234,9 +234,9 @@ always_comb begin
                 begin
                     // CQ
                     if (qn_reg[0]) begin
-                        block_base_addr_next = DP_APB_ADDR_W'({port_reg, 16'd0} | 16'h0300);
+                        block_base_addr_next = DP_APB_ADDR_W'({port_reg, 16'd0} | 'h0300);
                     end else begin
-                        block_base_addr_next = DP_APB_ADDR_W'({port_reg, 16'd0} | 16'h0400);
+                        block_base_addr_next = DP_APB_ADDR_W'({port_reg, 16'd0} | 'h0400);
                     end
                 end
                 CMD_OP_CREATE_SQ,
@@ -245,7 +245,7 @@ always_comb begin
                 CMD_OP_DESTROY_SQ:
                 begin
                     // SQ
-                    block_base_addr_next = DP_APB_ADDR_W'({port_reg, 16'd0} | 16'h0100);
+                    block_base_addr_next = DP_APB_ADDR_W'({port_reg, 16'd0} | 'h0100);
                 end
                 CMD_OP_CREATE_RQ,
                 CMD_OP_MODIFY_RQ,
@@ -253,7 +253,7 @@ always_comb begin
                 CMD_OP_DESTROY_RQ:
                 begin
                     // RQ
-                    block_base_addr_next = DP_APB_ADDR_W'({port_reg, 16'd0} | 16'h0200);
+                    block_base_addr_next = DP_APB_ADDR_W'({port_reg, 16'd0} | 'h0200);
                 end
                 default: begin end
             endcase
@@ -324,7 +324,7 @@ always_comb begin
         STATE_Q_RESET_1: begin
             // reset queue 1
             if (!m_apb_dp_ctrl_psel_reg) begin
-                m_apb_dp_ctrl_paddr_next = block_base_addr_reg + 16'h0000;
+                m_apb_dp_ctrl_paddr_next = block_base_addr_reg + 'h0000;
                 m_apb_dp_ctrl_psel_next = 1'b1;
                 m_apb_dp_ctrl_pwrite_next = 1'b1;
                 m_apb_dp_ctrl_pwdata_next = 32'h00000000;
@@ -338,12 +338,12 @@ always_comb begin
         STATE_Q_RESET_2: begin
             // reset queue 2
 
-            cmd_ram_wr_data = 32'(block_base_addr_reg + 16'h0004) + PORT_BASE_ADDR;
+            cmd_ram_wr_data = 32'(block_base_addr_reg + 'h0004) + PORT_BASE_ADDR;
             cmd_ram_wr_addr = 7;
             cmd_ram_wr_en = 1'b1;
 
             if (!m_apb_dp_ctrl_psel_reg) begin
-                m_apb_dp_ctrl_paddr_next = block_base_addr_reg + 16'h0004;
+                m_apb_dp_ctrl_paddr_next = block_base_addr_reg + 'h0004;
                 m_apb_dp_ctrl_psel_next = 1'b1;
                 m_apb_dp_ctrl_pwrite_next = 1'b1;
                 m_apb_dp_ctrl_pwdata_next = 32'h00000000;
@@ -358,7 +358,7 @@ always_comb begin
             // set queue base addr (LSB)
             cmd_ram_rd_addr = 8;
             if (!m_apb_dp_ctrl_psel_reg) begin
-                m_apb_dp_ctrl_paddr_next = block_base_addr_reg + 16'h0008;
+                m_apb_dp_ctrl_paddr_next = block_base_addr_reg + 'h0008;
                 m_apb_dp_ctrl_psel_next = 1'b1;
                 m_apb_dp_ctrl_pwrite_next = 1'b1;
                 m_apb_dp_ctrl_pwdata_next = cmd_ram_rd_data;
@@ -373,7 +373,7 @@ always_comb begin
             // set queue base addr (MSB)
             cmd_ram_rd_addr = 9;
             if (!m_apb_dp_ctrl_psel_reg) begin
-                m_apb_dp_ctrl_paddr_next = block_base_addr_reg + 16'h000C;
+                m_apb_dp_ctrl_paddr_next = block_base_addr_reg + 'h000C;
                 m_apb_dp_ctrl_psel_next = 1'b1;
                 m_apb_dp_ctrl_pwrite_next = 1'b1;
                 m_apb_dp_ctrl_pwdata_next = cmd_ram_rd_data;
@@ -388,7 +388,7 @@ always_comb begin
             // enable queue
             cmd_ram_rd_addr = 6;
             if (!m_apb_dp_ctrl_psel_reg) begin
-                m_apb_dp_ctrl_paddr_next = block_base_addr_reg + 16'h0000;
+                m_apb_dp_ctrl_paddr_next = block_base_addr_reg + 'h0000;
                 m_apb_dp_ctrl_psel_next = 1'b1;
                 m_apb_dp_ctrl_pwrite_next = 1'b1;
                 m_apb_dp_ctrl_pwdata_next = '0;
@@ -408,7 +408,7 @@ always_comb begin
         STATE_Q_DISABLE: begin
             // disable queue
             if (!m_apb_dp_ctrl_psel_reg) begin
-                m_apb_dp_ctrl_paddr_next = block_base_addr_reg + 16'h0000;
+                m_apb_dp_ctrl_paddr_next = block_base_addr_reg + 'h0000;
                 m_apb_dp_ctrl_psel_next = 1'b1;
                 m_apb_dp_ctrl_pwrite_next = 1'b1;
                 m_apb_dp_ctrl_pwdata_next = 32'h00000000;

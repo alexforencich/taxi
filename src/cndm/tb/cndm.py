@@ -19,6 +19,8 @@ from cocotb.queue import Queue
 # Command opcodes
 CNDM_CMD_OP_NOP = 0x0000
 
+CNDM_CMD_OP_ACCESS_REG = 0x0180
+
 CNDM_CMD_OP_CREATE_EQ  = 0x0200
 CNDM_CMD_OP_MODIFY_EQ  = 0x0201
 CNDM_CMD_OP_QUERY_EQ   = 0x0202
@@ -359,6 +361,33 @@ class Driver:
             self.dev.request_irq(k, port.interrupt_handler)
 
             self.ports.append(port)
+
+    async def access_reg(self, reg, raw, write=False, data=0):
+        flags = 0
+        if raw:
+            flags |= 0x00000100
+        if write:
+            flags |= 0x00000001
+
+        rsp = await self.exec_cmd(struct.pack("<HHLLLLLLLQQLLLL",
+            0, # rsvd
+            CNDM_CMD_OP_ACCESS_REG, # opcode
+            flags, # flags
+            0, # port
+            0, # sqn
+            0, # cqn
+            0, # pd
+            0, # size
+            reg, # dboffs
+            data, # base addr
+            0, # ptr2
+            0, # prod_ptr
+            0, # cons_ptr
+            0, # rsvd
+            0, # rsvd
+        ))
+
+        return struct.unpack_from("<Q", rsp, 10*4)[0]
 
     async def exec_cmd(self, cmd):
         return await self.exec_mbox_cmd(cmd)

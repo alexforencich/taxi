@@ -144,6 +144,7 @@ struct cndm_priv {
 // cndm_cmd.c
 int cndm_exec_mbox_cmd(struct cndm_dev *cdev, void *cmd, void *rsp);
 int cndm_exec_cmd(struct cndm_dev *cdev, void *cmd, void *rsp);
+int cndm_access_reg(struct cndm_dev *cdev, u32 reg, int raw, int write, u64 *data);
 
 // cndm_devlink.c
 struct devlink *cndm_devlink_alloc(struct device *dev);

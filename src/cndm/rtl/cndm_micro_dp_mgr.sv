@@ -44,6 +44,8 @@ localparam DP_APB_STRB_W = m_apb_dp_ctrl.STRB_W;
 typedef enum logic [15:0] {
     CMD_OP_NOP = 16'h0000,
 
+    CMD_OP_ACCESS_REG = 16'h0180,
+
     CMD_OP_CREATE_EQ  = 16'h0200,
     CMD_OP_MODIFY_EQ  = 16'h0201,
     CMD_OP_QUERY_EQ   = 16'h0202,
@@ -73,6 +75,9 @@ typedef enum logic [15:0] {
 typedef enum logic [4:0] {
     STATE_IDLE,
     STATE_START,
+    STATE_REG_1,
+    STATE_REG_2,
+    STATE_REG_3,
     STATE_Q_RESET_1,
     STATE_Q_RESET_2,
     STATE_Q_SET_BASE_L,
@@ -259,13 +264,17 @@ always_comb begin
             endcase
 
             case (opcode_reg)
-                16'h0000: begin
+                CMD_OP_NOP: begin
                     // NOP
                     m_axis_rsp_tdata_next = '0; // TODO
                     m_axis_rsp_tvalid_next = 1'b1;
                     m_axis_rsp_tlast_next = 1'b0;
 
                     state_next = STATE_SEND_RSP;
+                end
+                CMD_OP_ACCESS_REG: begin
+                    // access register
+                    state_next = STATE_REG_1;
                 end
                 CMD_OP_CREATE_EQ,
                 CMD_OP_CREATE_CQ,
@@ -320,6 +329,48 @@ always_comb begin
                     state_next = STATE_PAD_RSP;
                 end
             endcase
+        end
+        STATE_REG_1: begin
+            // register access 1
+            cmd_ram_rd_addr = 7;
+            if (!m_apb_dp_ctrl_psel_reg) begin
+                m_apb_dp_ctrl_paddr_next = DP_APB_ADDR_W'(cmd_ram_rd_data);
+
+                state_next = STATE_REG_2;
+            end else begin
+                state_next = STATE_REG_1;
+            end
+        end
+        STATE_REG_2: begin
+            // register access 2
+            cmd_ram_rd_addr = 8;
+            if (!m_apb_dp_ctrl_psel_reg) begin
+                m_apb_dp_ctrl_psel_next = 1'b1;
+                m_apb_dp_ctrl_pwrite_next = flags_reg[0];
+                m_apb_dp_ctrl_pwdata_next = cmd_ram_rd_data;
+                m_apb_dp_ctrl_pstrb_next = '1;
+
+                state_next = STATE_REG_3;
+            end else begin
+                state_next = STATE_REG_2;
+            end
+        end
+        STATE_REG_3: begin
+            // register access 3
+
+            cmd_ram_wr_data = m_apb_dp_ctrl.prdata;
+            cmd_ram_wr_addr = 10;
+            cmd_ram_wr_en = 1'b1;
+
+            if (m_apb_dp_ctrl.pready) begin
+                m_axis_rsp_tdata_next = '0; // TODO
+                m_axis_rsp_tvalid_next = 1'b1;
+                m_axis_rsp_tlast_next = 1'b0;
+
+                state_next = STATE_SEND_RSP;
+            end else begin
+                state_next = STATE_REG_3;
+            end
         end
         STATE_Q_RESET_1: begin
             // reset queue 1

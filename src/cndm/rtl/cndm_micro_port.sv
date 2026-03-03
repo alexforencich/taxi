@@ -75,244 +75,76 @@ localparam RAM_SEG_DATA_W = dma_ram_wr.SEG_DATA_W;
 localparam RAM_SEG_BE_W = dma_ram_wr.SEG_BE_W;
 localparam RAM_SEL_W = dma_ram_wr.SEL_W;
 
-logic         txq_en_reg = '0;
-logic [3:0]   txq_size_reg = '0;
-logic [63:0]  txq_base_addr_reg = '0;
-logic [15:0]  txq_prod_reg = '0;
-wire [15:0]   txq_cons;
-logic         rxq_en_reg = '0;
-logic [3:0]   rxq_size_reg = '0;
-logic [63:0]  rxq_base_addr_reg = '0;
-logic [15:0]  rxq_prod_reg = '0;
-wire [15:0]   rxq_cons;
+taxi_axil_if #(
+    .DATA_W(s_axil_ctrl_wr.DATA_W),
+    .ADDR_W(15),
+    .STRB_W(s_axil_ctrl_wr.STRB_W),
+    .AWUSER_EN(s_axil_ctrl_wr.AWUSER_EN),
+    .AWUSER_W(s_axil_ctrl_wr.AWUSER_W),
+    .WUSER_EN(s_axil_ctrl_wr.WUSER_EN),
+    .WUSER_W(s_axil_ctrl_wr.WUSER_W),
+    .BUSER_EN(s_axil_ctrl_wr.BUSER_EN),
+    .BUSER_W(s_axil_ctrl_wr.BUSER_W),
+    .ARUSER_EN(s_axil_ctrl_wr.ARUSER_EN),
+    .ARUSER_W(s_axil_ctrl_wr.ARUSER_W),
+    .RUSER_EN(s_axil_ctrl_wr.RUSER_EN),
+    .RUSER_W(s_axil_ctrl_wr.RUSER_W)
+)
+axil_ctrl[2]();
 
-logic         txcq_en_reg = '0;
-logic [3:0]   txcq_size_reg = '0;
-logic [63:0]  txcq_base_addr_reg = '0;
-wire [15:0]   txcq_prod;
-logic         rxcq_en_reg = '0;
-logic [3:0]   rxcq_size_reg = '0;
-logic [63:0]  rxcq_base_addr_reg = '0;
-wire [15:0]   rxcq_prod;
+taxi_axil_interconnect_1s #(
+    .M_COUNT($size(axil_ctrl)),
+    .ADDR_W(s_axil_ctrl_wr.ADDR_W),
+    .M_REGIONS(1),
+    .M_BASE_ADDR('0),
+    .M_ADDR_W({$size(axil_ctrl){{1{32'd15}}}}),
+    .M_SECURE({$size(axil_ctrl){1'b0}})
+)
+port_intercon_inst (
+    .clk(clk),
+    .rst(rst),
 
-logic s_axil_ctrl_awready_reg = 1'b0;
-logic s_axil_ctrl_wready_reg = 1'b0;
-logic s_axil_ctrl_bvalid_reg = 1'b0;
+    /*
+     * AXI4-lite slave interface
+     */
+    .s_axil_wr(s_axil_ctrl_wr),
+    .s_axil_rd(s_axil_ctrl_rd),
 
-logic s_axil_ctrl_arready_reg = 1'b0;
-logic [AXIL_DATA_W-1:0] s_axil_ctrl_rdata_reg = '0;
-logic s_axil_ctrl_rvalid_reg = 1'b0;
+    /*
+     * AXI4-lite master interfaces
+     */
+    .m_axil_wr(axil_ctrl),
+    .m_axil_rd(axil_ctrl)
+);
 
-assign s_axil_ctrl_wr.awready = s_axil_ctrl_awready_reg;
-assign s_axil_ctrl_wr.wready = s_axil_ctrl_wready_reg;
-assign s_axil_ctrl_wr.bresp = '0;
-assign s_axil_ctrl_wr.buser = '0;
-assign s_axil_ctrl_wr.bvalid = s_axil_ctrl_bvalid_reg;
+taxi_apb_if #(
+    .DATA_W(32),
+    .ADDR_W(15)
+)
+apb_dp_ctrl[2]();
 
-assign s_axil_ctrl_rd.arready = s_axil_ctrl_arready_reg;
-assign s_axil_ctrl_rd.rdata = s_axil_ctrl_rdata_reg;
-assign s_axil_ctrl_rd.rresp = '0;
-assign s_axil_ctrl_rd.ruser = '0;
-assign s_axil_ctrl_rd.rvalid = s_axil_ctrl_rvalid_reg;
+taxi_apb_interconnect #(
+    .M_CNT($size(apb_dp_ctrl)),
+    .ADDR_W(s_apb_dp_ctrl.ADDR_W),
+    .M_REGIONS(1),
+    .M_BASE_ADDR('0),
+    .M_ADDR_W({$size(apb_dp_ctrl){{1{32'd15}}}}),
+    .M_SECURE({$size(apb_dp_ctrl){1'b0}})
+)
+port_dp_intercon_inst (
+    .clk(clk),
+    .rst(rst),
 
-logic s_apb_dp_ctrl_pready_reg = 1'b0;
-logic [AXIL_DATA_W-1:0] s_apb_dp_ctrl_prdata_reg = '0;
+    /*
+     * APB slave interface
+     */
+    .s_apb(s_apb_dp_ctrl),
 
-assign s_apb_dp_ctrl.pready = s_apb_dp_ctrl_pready_reg;
-assign s_apb_dp_ctrl.prdata = s_apb_dp_ctrl_prdata_reg;
-assign s_apb_dp_ctrl.pslverr = 1'b0;
-assign s_apb_dp_ctrl.pruser = '0;
-assign s_apb_dp_ctrl.pbuser = '0;
-
-always_ff @(posedge clk) begin
-    s_axil_ctrl_awready_reg <= 1'b0;
-    s_axil_ctrl_wready_reg <= 1'b0;
-    s_axil_ctrl_bvalid_reg <= s_axil_ctrl_bvalid_reg && !s_axil_ctrl_wr.bready;
-
-    s_axil_ctrl_arready_reg <= 1'b0;
-    s_axil_ctrl_rvalid_reg <= s_axil_ctrl_rvalid_reg && !s_axil_ctrl_rd.rready;
-
-    s_apb_dp_ctrl_pready_reg <= 1'b0;
-
-    if (s_axil_ctrl_wr.awvalid && s_axil_ctrl_wr.wvalid && !s_axil_ctrl_bvalid_reg) begin
-        s_axil_ctrl_awready_reg <= 1'b1;
-        s_axil_ctrl_wready_reg <= 1'b1;
-        s_axil_ctrl_bvalid_reg <= 1'b1;
-
-        case ({s_axil_ctrl_wr.awaddr[15:2], 2'b00})
-            16'h0100: begin
-                txq_en_reg <= s_axil_ctrl_wr.wdata[0];
-                txq_size_reg <= s_axil_ctrl_wr.wdata[19:16];
-            end
-            16'h0104: txq_prod_reg <= s_axil_ctrl_wr.wdata[15:0];
-            16'h0108: txq_base_addr_reg[31:0] <= s_axil_ctrl_wr.wdata;
-            16'h010c: txq_base_addr_reg[63:32] <= s_axil_ctrl_wr.wdata;
-
-            16'h0200: begin
-                rxq_en_reg <= s_axil_ctrl_wr.wdata[0];
-                rxq_size_reg <= s_axil_ctrl_wr.wdata[19:16];
-            end
-            16'h0204: rxq_prod_reg <= s_axil_ctrl_wr.wdata[15:0];
-            16'h0208: rxq_base_addr_reg[31:0] <= s_axil_ctrl_wr.wdata;
-            16'h020c: rxq_base_addr_reg[63:32] <= s_axil_ctrl_wr.wdata;
-
-            16'h0300: begin
-                txcq_en_reg <= s_axil_ctrl_wr.wdata[0];
-                txcq_size_reg <= s_axil_ctrl_wr.wdata[19:16];
-            end
-            16'h0308: txcq_base_addr_reg[31:0] <= s_axil_ctrl_wr.wdata;
-            16'h030c: txcq_base_addr_reg[63:32] <= s_axil_ctrl_wr.wdata;
-
-            16'h0400: begin
-                rxcq_en_reg <= s_axil_ctrl_wr.wdata[0];
-                rxcq_size_reg <= s_axil_ctrl_wr.wdata[19:16];
-            end
-            16'h0408: rxcq_base_addr_reg[31:0] <= s_axil_ctrl_wr.wdata;
-            16'h040c: rxcq_base_addr_reg[63:32] <= s_axil_ctrl_wr.wdata;
-            default: begin end
-        endcase
-    end
-
-    if (s_axil_ctrl_rd.arvalid && !s_axil_ctrl_rvalid_reg) begin
-        s_axil_ctrl_rdata_reg <= '0;
-
-        s_axil_ctrl_arready_reg <= 1'b1;
-        s_axil_ctrl_rvalid_reg <= 1'b1;
-
-        case ({s_axil_ctrl_rd.araddr[15:2], 2'b00})
-            16'h0100: begin
-                s_axil_ctrl_rdata_reg[0] <= txq_en_reg;
-                s_axil_ctrl_rdata_reg[19:16] <= txq_size_reg;
-            end
-            16'h0104: begin
-                s_axil_ctrl_rdata_reg[15:0] <= txq_prod_reg;
-                s_axil_ctrl_rdata_reg[31:16] <= txq_cons;
-            end
-            16'h0108: s_axil_ctrl_rdata_reg <= txq_base_addr_reg[31:0];
-            16'h010c: s_axil_ctrl_rdata_reg <= txq_base_addr_reg[63:32];
-
-            16'h0200: begin
-                s_axil_ctrl_rdata_reg[0] <= rxq_en_reg;
-                s_axil_ctrl_rdata_reg[19:16] <= rxq_size_reg;
-            end
-            16'h0204: begin
-                s_axil_ctrl_rdata_reg[15:0] <= rxq_prod_reg;
-                s_axil_ctrl_rdata_reg[31:16] <= rxq_cons;
-            end
-            16'h0208: s_axil_ctrl_rdata_reg <= rxq_base_addr_reg[31:0];
-            16'h020c: s_axil_ctrl_rdata_reg <= rxq_base_addr_reg[63:32];
-
-            16'h0300: begin
-                s_axil_ctrl_rdata_reg[0] <= txcq_en_reg;
-                s_axil_ctrl_rdata_reg[19:16] <= txcq_size_reg;
-            end
-            16'h0304: s_axil_ctrl_rdata_reg[15:0] <= txcq_prod;
-            16'h0308: s_axil_ctrl_rdata_reg <= txcq_base_addr_reg[31:0];
-            16'h030c: s_axil_ctrl_rdata_reg <= txcq_base_addr_reg[63:32];
-
-            16'h0400: begin
-                s_axil_ctrl_rdata_reg[0] <= rxcq_en_reg;
-                s_axil_ctrl_rdata_reg[19:16] <= rxcq_size_reg;
-            end
-            16'h0404: s_axil_ctrl_rdata_reg[15:0] <= rxcq_prod;
-            16'h0408: s_axil_ctrl_rdata_reg <= rxcq_base_addr_reg[31:0];
-            16'h040c: s_axil_ctrl_rdata_reg <= rxcq_base_addr_reg[63:32];
-            default: begin end
-        endcase
-    end
-
-    if (s_apb_dp_ctrl.penable && s_apb_dp_ctrl.psel && !s_apb_dp_ctrl_pready_reg) begin
-        s_apb_dp_ctrl_pready_reg <= 1'b1;
-        s_apb_dp_ctrl_prdata_reg <= '0;
-
-        if (s_apb_dp_ctrl.pwrite) begin
-            case ({s_apb_dp_ctrl.paddr[15:2], 2'b00})
-                16'h0100: begin
-                    txq_en_reg <= s_apb_dp_ctrl.pwdata[0];
-                    txq_size_reg <= s_apb_dp_ctrl.pwdata[19:16];
-                end
-                16'h0104: txq_prod_reg <= s_apb_dp_ctrl.pwdata[15:0];
-                16'h0108: txq_base_addr_reg[31:0] <= s_apb_dp_ctrl.pwdata;
-                16'h010c: txq_base_addr_reg[63:32] <= s_apb_dp_ctrl.pwdata;
-
-                16'h0200: begin
-                    rxq_en_reg <= s_apb_dp_ctrl.pwdata[0];
-                    rxq_size_reg <= s_apb_dp_ctrl.pwdata[19:16];
-                end
-                16'h0204: rxq_prod_reg <= s_apb_dp_ctrl.pwdata[15:0];
-                16'h0208: rxq_base_addr_reg[31:0] <= s_apb_dp_ctrl.pwdata;
-                16'h020c: rxq_base_addr_reg[63:32] <= s_apb_dp_ctrl.pwdata;
-
-                16'h0300: begin
-                    txcq_en_reg <= s_apb_dp_ctrl.pwdata[0];
-                    txcq_size_reg <= s_apb_dp_ctrl.pwdata[19:16];
-                end
-                16'h0308: txcq_base_addr_reg[31:0] <= s_apb_dp_ctrl.pwdata;
-                16'h030c: txcq_base_addr_reg[63:32] <= s_apb_dp_ctrl.pwdata;
-
-                16'h0400: begin
-                    rxcq_en_reg <= s_apb_dp_ctrl.pwdata[0];
-                    rxcq_size_reg <= s_apb_dp_ctrl.pwdata[19:16];
-                end
-                16'h0408: rxcq_base_addr_reg[31:0] <= s_apb_dp_ctrl.pwdata;
-                16'h040c: rxcq_base_addr_reg[63:32] <= s_apb_dp_ctrl.pwdata;
-                default: begin end
-            endcase
-        end
-
-        case ({s_apb_dp_ctrl.paddr[15:2], 2'b00})
-            16'h0100: begin
-                s_apb_dp_ctrl_prdata_reg[0] <= txq_en_reg;
-                s_apb_dp_ctrl_prdata_reg[19:16] <= txq_size_reg;
-            end
-            16'h0104: begin
-                s_apb_dp_ctrl_prdata_reg[15:0] <= txq_prod_reg;
-                s_apb_dp_ctrl_prdata_reg[31:16] <= txq_cons;
-            end
-            16'h0108: s_apb_dp_ctrl_prdata_reg <= txq_base_addr_reg[31:0];
-            16'h010c: s_apb_dp_ctrl_prdata_reg <= txq_base_addr_reg[63:32];
-
-            16'h0200: begin
-                s_apb_dp_ctrl_prdata_reg[0] <= rxq_en_reg;
-                s_apb_dp_ctrl_prdata_reg[19:16] <= rxq_size_reg;
-            end
-            16'h0204: begin
-                s_apb_dp_ctrl_prdata_reg[15:0] <= rxq_prod_reg;
-                s_apb_dp_ctrl_prdata_reg[31:16] <= rxq_cons;
-            end
-            16'h0208: s_apb_dp_ctrl_prdata_reg <= rxq_base_addr_reg[31:0];
-            16'h020c: s_apb_dp_ctrl_prdata_reg <= rxq_base_addr_reg[63:32];
-
-            16'h0300: begin
-                s_apb_dp_ctrl_prdata_reg[0] <= txcq_en_reg;
-                s_apb_dp_ctrl_prdata_reg[19:16] <= txcq_size_reg;
-            end
-            16'h0304: s_apb_dp_ctrl_prdata_reg[15:0] <= txcq_prod;
-            16'h0308: s_apb_dp_ctrl_prdata_reg <= txcq_base_addr_reg[31:0];
-            16'h030c: s_apb_dp_ctrl_prdata_reg <= txcq_base_addr_reg[63:32];
-
-            16'h0400: begin
-                s_apb_dp_ctrl_prdata_reg[0] <= rxcq_en_reg;
-                s_apb_dp_ctrl_prdata_reg[19:16] <= rxcq_size_reg;
-            end
-            16'h0404: s_apb_dp_ctrl_prdata_reg[15:0] <= rxcq_prod;
-            16'h0408: s_apb_dp_ctrl_prdata_reg <= rxcq_base_addr_reg[31:0];
-            16'h040c: s_apb_dp_ctrl_prdata_reg <= rxcq_base_addr_reg[63:32];
-            default: begin end
-        endcase
-    end
-
-    if (rst) begin
-        s_axil_ctrl_awready_reg <= 1'b0;
-        s_axil_ctrl_wready_reg <= 1'b0;
-        s_axil_ctrl_bvalid_reg <= 1'b0;
-
-        s_axil_ctrl_arready_reg <= 1'b0;
-        s_axil_ctrl_rvalid_reg <= 1'b0;
-
-        s_apb_dp_ctrl_pready_reg <= 1'b0;
-    end
-end
+    /*
+     * APB master interfaces
+     */
+    .m_apb(apb_dp_ctrl)
+);
 
 taxi_dma_desc_if #(
     .SRC_ADDR_W(dma_rd_desc_req.SRC_ADDR_W),
@@ -456,22 +288,22 @@ desc_rd_inst (
     .rst(rst),
 
     /*
+     * Control register interface
+     */
+    .s_axil_ctrl_wr(axil_ctrl[0]),
+    .s_axil_ctrl_rd(axil_ctrl[0]),
+
+    /*
+     * Datapath control register interface
+     */
+    .s_apb_dp_ctrl(apb_dp_ctrl[0]),
+
+    /*
      * DMA
      */
     .dma_rd_desc_req(dma_rd_desc_int[0]),
     .dma_rd_desc_sts(dma_rd_desc_int[0]),
     .dma_ram_wr(dma_ram_wr_int[0]),
-
-    .txq_en(txq_en_reg),
-    .txq_size(txq_size_reg),
-    .txq_base_addr(txq_base_addr_reg),
-    .txq_prod(txq_prod_reg),
-    .txq_cons(txq_cons),
-    .rxq_en(rxq_en_reg),
-    .rxq_size(rxq_size_reg),
-    .rxq_base_addr(rxq_base_addr_reg),
-    .rxq_prod(rxq_prod_reg),
-    .rxq_cons(rxq_cons),
 
     .desc_req(desc_req),
     .axis_desc(axis_desc)
@@ -483,20 +315,22 @@ cpl_wr_inst (
     .rst(rst),
 
     /*
+     * Control register interface
+     */
+    .s_axil_ctrl_wr(axil_ctrl[1]),
+    .s_axil_ctrl_rd(axil_ctrl[1]),
+
+    /*
+     * Datapath control register interface
+     */
+    .s_apb_dp_ctrl(apb_dp_ctrl[1]),
+
+    /*
      * DMA
      */
     .dma_wr_desc_req(dma_wr_desc_int[0]),
     .dma_wr_desc_sts(dma_wr_desc_int[0]),
     .dma_ram_rd(dma_ram_rd_int[0]),
-
-    .txcq_en(txcq_en_reg),
-    .txcq_size(txcq_size_reg),
-    .txcq_base_addr(txcq_base_addr_reg),
-    .txcq_prod(txcq_prod),
-    .rxcq_en(rxcq_en_reg),
-    .rxcq_size(rxcq_size_reg),
-    .rxcq_base_addr(rxcq_base_addr_reg),
-    .rxcq_prod(rxcq_prod),
 
     .axis_cpl(axis_cpl),
     .irq(irq)

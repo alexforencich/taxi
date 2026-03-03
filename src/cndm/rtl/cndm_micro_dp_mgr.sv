@@ -248,8 +248,8 @@ always_comb begin
                 CMD_OP_DESTROY_EQ:
                 begin
                     // EQ
-                    dp_ptr_next = DP_APB_ADDR_W'({port_reg, 16'd0} | 'h0000) + DP_APB_ADDR_W'(PORT_BASE_ADDR_DP);
-                    host_ptr_next = 32'({port_reg, 16'd0} | 'h0000) + PORT_BASE_ADDR_HOST;
+                    dp_ptr_next = DP_APB_ADDR_W'({port_reg, 16'd0} | 'h8000) + DP_APB_ADDR_W'(PORT_BASE_ADDR_DP);
+                    host_ptr_next = 32'({port_reg, 16'd0} | 'h8000) + PORT_BASE_ADDR_HOST;
                 end
                 CMD_OP_CREATE_CQ,
                 CMD_OP_MODIFY_CQ,
@@ -258,11 +258,11 @@ always_comb begin
                 begin
                     // CQ
                     if (qn_reg[0]) begin
-                        dp_ptr_next = DP_APB_ADDR_W'({port_reg, 16'd0} | 'h0300) + DP_APB_ADDR_W'(PORT_BASE_ADDR_DP);
-                        host_ptr_next = 32'({port_reg, 16'd0} | 'h0300) + PORT_BASE_ADDR_HOST;
+                        dp_ptr_next = DP_APB_ADDR_W'({port_reg, 16'd0} | 'h8000) + DP_APB_ADDR_W'(PORT_BASE_ADDR_DP);
+                        host_ptr_next = 32'({port_reg, 16'd0} | 'h8000) + PORT_BASE_ADDR_HOST;
                     end else begin
-                        dp_ptr_next = DP_APB_ADDR_W'({port_reg, 16'd0} | 'h0400) + DP_APB_ADDR_W'(PORT_BASE_ADDR_DP);
-                        host_ptr_next = 32'({port_reg, 16'd0} | 'h0400) + PORT_BASE_ADDR_HOST;
+                        dp_ptr_next = DP_APB_ADDR_W'({port_reg, 16'd0} | 'h8100) + DP_APB_ADDR_W'(PORT_BASE_ADDR_DP);
+                        host_ptr_next = 32'({port_reg, 16'd0} | 'h8100) + PORT_BASE_ADDR_HOST;
                     end
                 end
                 CMD_OP_CREATE_SQ,
@@ -271,8 +271,8 @@ always_comb begin
                 CMD_OP_DESTROY_SQ:
                 begin
                     // SQ
-                    dp_ptr_next = DP_APB_ADDR_W'({port_reg, 16'd0} | 'h0100) + DP_APB_ADDR_W'(PORT_BASE_ADDR_DP);
-                    host_ptr_next = 32'({port_reg, 16'd0} | 'h0100) + PORT_BASE_ADDR_HOST;
+                    dp_ptr_next = DP_APB_ADDR_W'({port_reg, 16'd0} | 'h0000) + DP_APB_ADDR_W'(PORT_BASE_ADDR_DP);
+                    host_ptr_next = 32'({port_reg, 16'd0} | 'h0000) + PORT_BASE_ADDR_HOST;
                 end
                 CMD_OP_CREATE_RQ,
                 CMD_OP_MODIFY_RQ,
@@ -280,8 +280,8 @@ always_comb begin
                 CMD_OP_DESTROY_RQ:
                 begin
                     // RQ
-                    dp_ptr_next = DP_APB_ADDR_W'({port_reg, 16'd0} | 'h0200) + DP_APB_ADDR_W'(PORT_BASE_ADDR_DP);
-                    host_ptr_next = 32'({port_reg, 16'd0} | 'h0200) + PORT_BASE_ADDR_HOST;
+                    dp_ptr_next = DP_APB_ADDR_W'({port_reg, 16'd0} | 'h0100) + DP_APB_ADDR_W'(PORT_BASE_ADDR_DP);
+                    host_ptr_next = 32'({port_reg, 16'd0} | 'h0100) + PORT_BASE_ADDR_HOST;
                 end
                 default: begin end
             endcase

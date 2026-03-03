@@ -64,13 +64,14 @@ taxi_dma_desc_if #(
 ) dma_desc();
 
 // Transmit datapath control state machine
-localparam [2:0]
-    STATE_IDLE = 0,
-    STATE_READ_DESC = 1,
-    STATE_READ_DATA = 2,
-    STATE_TX_DATA = 3;
+typedef enum logic [1:0] {
+    STATE_IDLE,
+    STATE_READ_DESC,
+    STATE_READ_DATA,
+    STATE_TX_DATA
+} state_t;
 
-logic [2:0] state_reg = STATE_IDLE;
+state_t state_reg = STATE_IDLE;
 
 logic desc_req_reg = 1'b0;
 

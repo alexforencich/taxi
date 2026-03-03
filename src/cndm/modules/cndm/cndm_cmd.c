@@ -24,6 +24,9 @@ int cndm_exec_mbox_cmd(struct cndm_dev *cdev, void *cmd, void *rsp)
 		iowrite32(*((u32 *)(cmd + k*4)), cdev->hw_addr + 0x10000 + k*4);
 	}
 
+	// ensure the command is completely written
+	wmb();
+
 	// execute it
 	iowrite32(0x00000001, cdev->hw_addr + 0x0200);
 

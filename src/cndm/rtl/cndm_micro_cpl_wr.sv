@@ -54,12 +54,13 @@ taxi_axis_if #(
     .USER_W(axis_cpl[0].USER_W)
 ) cpl_comb();
 
-localparam [2:0]
-    STATE_IDLE = 0,
-    STATE_RX_CPL = 1,
-    STATE_WRITE_DATA = 2;
+typedef enum logic [1:0] {
+    STATE_IDLE,
+    STATE_RX_CPL,
+    STATE_WRITE_DATA
+} state_t;
 
-logic [2:0] state_reg = STATE_IDLE;
+state_t state_reg = STATE_IDLE;
 
 logic [15:0] txcq_prod_ptr_reg = '0;
 logic [15:0] rxcq_prod_ptr_reg = '0;

@@ -543,11 +543,11 @@ class Port:
         self.index = index
         self.hw_regs = driver.hw_regs
 
-        self.rxq = None
-        self.rxcq = None
+        self.rxq_count = 1
+        self.rxq = []
 
-        self.txq = None
-        self.txcq = None
+        self.txq_count = 1
+        self.txq = []
 
         self.rx_queue = Queue()
 
@@ -555,20 +555,26 @@ class Port:
         await self.open()
 
     async def open(self):
-        self.rxcq = Cq(self.driver, self)
-        await self.rxcq.open(self.index, 256)
+        for k in range(self.rxq_count):
+            cq = Cq(self.driver, self)
+            await cq.open(self.index, 256)
 
-        self.rxq = Rq(self.driver, self)
-        await self.rxq.open(self.rxcq, 256)
+            q = Rq(self.driver, self)
+            await q.open(cq, 256)
 
-        self.txcq = Cq(self.driver, self)
-        await self.txcq.open(self.index, 256)
+            self.rxq.append(q)
 
-        self.txq = Sq(self.driver, self)
-        await self.txq.open(self.txcq, 256)
+        for k in range(self.txq_count):
+            cq = Cq(self.driver, self)
+            await cq.open(self.index, 256)
 
-    async def start_xmit(self, data):
-        await self.txq.start_xmit(data)
+            q = Sq(self.driver, self)
+            await q.open(cq, 256)
+
+            self.txq.append(q)
+
+    async def start_xmit(self, data, tx_ring=0):
+        await self.txq[tx_ring].start_xmit(data)
 
     async def recv(self):
         return await self.rx_queue.get()
@@ -578,8 +584,10 @@ class Port:
 
     async def interrupt_handler(self):
         self.log.info("Interrupt")
-        await self.rxcq.handler(self.rxcq)
-        await self.txcq.handler(self.txcq)
+        for q in self.rxq:
+            await q.cq.handler(q.cq)
+        for q in self.txq:
+            await q.cq.handler(q.cq)
 
 
 class Driver:

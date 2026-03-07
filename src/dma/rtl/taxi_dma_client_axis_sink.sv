@@ -265,7 +265,7 @@ always_comb begin
 
             length_next = 0;
 
-            cycle_count_next = CYCLE_COUNT_W'(desc_req.req_len - LEN_W'(1)) >> $clog2(AXIS_KEEP_W_INT);
+            cycle_count_next = CYCLE_COUNT_W'(desc_req.req_len - LEN_W'(1) >> $clog2(AXIS_KEEP_W_INT));
             last_cycle_next = cycle_count_next == 0;
             if (cycle_count_next == 0 && last_cycle_offset_next != 0) begin
                 keep_mask_next = {AXIS_KEEP_W_INT{1'b1}} >> (AXIS_KEEP_W_INT - last_cycle_offset_next);

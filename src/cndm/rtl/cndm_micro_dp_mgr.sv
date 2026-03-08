@@ -17,14 +17,32 @@ Authors:
  */
 module cndm_micro_dp_mgr #
 (
-    parameter PORTS = 2,
+    // FW ID
+    parameter FPGA_ID = 32'hDEADBEEF,
+    parameter FW_ID = 32'h0000C002,
+    parameter FW_VER = 32'h000_01_000,
+    parameter BOARD_ID = 32'h1234_0000,
+    parameter BOARD_VER = 32'h001_00_000,
+    parameter BUILD_DATE = 32'd602976000,
+    parameter GIT_HASH = 32'h5f87c2e8,
+    parameter RELEASE_INFO = 32'h00000000,
 
+    // Structural configuration
+    parameter PORTS = 2,
+    parameter SYS_CLK_PER_NS_NUM = 4,
+    parameter SYS_CLK_PER_NS_DENOM = 1,
+
+    // Queue configuration
     parameter WQN_W = 5,
     parameter CQN_W = WQN_W,
 
+    // PTP configuration
     parameter logic PTP_EN = 1'b1,
-    parameter PTP_BASE_ADDR_DP = 0,
+    parameter PTP_CLK_PER_NS_NUM = 512,
+    parameter PTP_CLK_PER_NS_DENOM = 165,
 
+    // Addressing
+    parameter PTP_BASE_ADDR_DP = 0,
     parameter PORT_BASE_ADDR_DP = 0,
     parameter PORT_BASE_ADDR_HOST = 0,
     parameter PORT_STRIDE = 'h10000,
@@ -56,6 +74,8 @@ localparam DP_APB_STRB_W = m_apb_dp_ctrl.STRB_W;
 
 typedef enum logic [15:0] {
     CMD_OP_NOP = 16'h0000,
+
+    CMD_OP_CFG        = 16'h0100,
 
     CMD_OP_ACCESS_REG = 16'h0180,
     CMD_OP_PTP        = 16'h0190,
@@ -96,6 +116,7 @@ typedef enum logic [2:0] {
 typedef enum logic [4:0] {
     STATE_IDLE,
     STATE_START,
+    STATE_CFG_READ,
     STATE_REG_1,
     STATE_REG_2,
     STATE_REG_3,
@@ -135,12 +156,73 @@ logic [DP_APB_STRB_W-1:0] m_apb_dp_ctrl_pstrb_reg = '0, m_apb_dp_ctrl_pstrb_next
 // command RAM
 localparam CMD_AW = 4;
 
-logic [31:0] cmd_ram[2**CMD_AW];
+logic [31:0] cmd_ram[2**CMD_AW] = '{default: '0};
 logic [31:0] cmd_ram_wr_data;
 logic [CMD_AW-1:0] cmd_ram_wr_addr;
 logic cmd_ram_wr_en;
 logic [CMD_AW-1:0] cmd_ram_rd_addr;
 wire [31:0] cmd_ram_rd_data = cmd_ram[cmd_ram_rd_addr];
+
+// ID ROM
+localparam ID_AW = 5;
+logic [31:0] id_rom[2**ID_AW] = '{default: '0};
+logic [ID_AW-1:0] id_rom_rd_addr;
+wire [31:0] id_rom_rd_data = id_rom[id_rom_rd_addr];
+
+initial begin
+    // Common
+    id_rom[0] = 0; // status
+    id_rom[1] = 0; // flags
+    id_rom[2][15:0] = 0; // cfg_page (replaced)
+    id_rom[2][31:16] = 2; // cfg_page_max
+    id_rom[3] = 32'h000_01_000; // CMD_VER
+    id_rom[4] = FW_VER;
+    id_rom[5][7:0] = 8'(PORTS);
+    id_rom[6] = 0;
+    id_rom[7] = 0;
+    // Page 0: FW ID
+    id_rom[8] = FPGA_ID;
+    id_rom[9] = FW_ID;
+    id_rom[10] = FW_VER;
+    id_rom[11] = BOARD_ID;
+    id_rom[12] = BOARD_VER;
+    id_rom[13] = BUILD_DATE;
+    id_rom[14] = GIT_HASH;
+    id_rom[15] = RELEASE_INFO;
+    // Page 1: HW config
+    id_rom[16][15:0] = 16'(PORTS);
+    id_rom[16][31:16] = 0;
+    id_rom[17] = 0;
+    id_rom[18] = 0;
+    id_rom[19] = 0;
+    id_rom[20][15:0] = 16'(SYS_CLK_PER_NS_DENOM);
+    id_rom[20][31:16] = 16'(SYS_CLK_PER_NS_NUM);
+    id_rom[21][15:0] = 16'(PTP_CLK_PER_NS_DENOM);
+    id_rom[21][31:16] = 16'(PTP_CLK_PER_NS_NUM);
+    id_rom[22] = 0;
+    id_rom[23] = 0;
+    // Page 2: Resources
+    id_rom[24][7:0] = 0; // LOG_MAX_EQ
+    id_rom[24][15:8] = 0; // LOG_MAX_EQ_SZ
+    id_rom[24][23:16] = 0; // EQ_POOL
+    id_rom[24][31:24] = 0; // EQE_VER
+    id_rom[25][7:0] = CQN_W; // LOG_MAX_CQ
+    id_rom[25][15:8] = 15; // LOG_MAX_CQ_SZ
+    id_rom[25][23:16] = 0; // CQ_POOL
+    id_rom[25][31:24] = 1; // CQE_VER
+    id_rom[26][7:0] = WQN_W; // LOG_MAX_SQ
+    id_rom[26][15:8] = 15; // LOG_MAX_SQ_SZ
+    id_rom[26][23:16] = 1; // SQ_POOL
+    id_rom[26][31:24] = 1; // SQE_VER
+    id_rom[27][7:0] = WQN_W; // LOG_MAX_RQ
+    id_rom[27][15:8] = 15; // LOG_MAX_RQ_SZ
+    id_rom[27][23:16] = 1; // RQ_POOL
+    id_rom[27][31:24] = 1; // RQE_VER
+    id_rom[28] = 0;
+    id_rom[29] = 0;
+    id_rom[30] = 0;
+    id_rom[31] = 0;
+end
 
 assign s_axis_cmd.tready = s_axis_cmd_tready_reg;
 
@@ -202,6 +284,8 @@ always_comb begin
     cmd_ram_wr_addr = cmd_wr_ptr_reg;
     cmd_ram_wr_en = 1'b0;
     cmd_ram_rd_addr = '0;
+
+    id_rom_rd_addr = ID_AW'(cnt_reg);
 
     cmd_frame_next = cmd_frame_reg;
     cmd_wr_ptr_next = cmd_wr_ptr_reg;
@@ -343,6 +427,12 @@ always_comb begin
 
                     state_next = STATE_SEND_RSP;
                 end
+                CMD_OP_CFG: begin
+                    // dump config page
+                    cmd_ptr_next = 2;
+                    cnt_next = 2;
+                    state_next = STATE_CFG_READ;
+                end
                 CMD_OP_ACCESS_REG: begin
                     // access register
                     state_next = STATE_REG_1;
@@ -426,6 +516,36 @@ always_comb begin
                     state_next = STATE_PAD_RSP;
                 end
             endcase
+        end
+        STATE_CFG_READ: begin
+            // read config page data
+            id_rom_rd_addr = ID_AW'(cnt_reg);
+
+            cmd_ram_wr_data = id_rom_rd_data;
+            cmd_ram_wr_addr = cmd_ptr_reg;
+            cmd_ram_wr_en = 1'b1;
+            if (cmd_ptr_reg == 2) begin
+                cmd_ram_wr_data[15:0] = dw2_reg[15:0];
+            end
+
+            cnt_next = cnt_reg + 1;
+            cmd_ptr_next = cmd_ptr_reg + 1;
+
+            if (cmd_ptr_reg == 15) begin
+                // done
+                m_axis_rsp_tdata_next = '0; // TODO
+                m_axis_rsp_tvalid_next = 1'b1;
+                m_axis_rsp_tlast_next = 1'b0;
+
+                state_next = STATE_SEND_RSP;
+            end else if (cmd_ptr_reg == 7) begin
+                // jump to selected page
+                cnt_next = 16'((dw2_reg + 1) * 8);
+                state_next = STATE_CFG_READ;
+            end else begin
+                // more to read
+                state_next = STATE_CFG_READ;
+            end
         end
         STATE_REG_1: begin
             // register access 1

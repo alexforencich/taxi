@@ -313,14 +313,32 @@ taxi_apb_if #(
 apb_dp_ctrl();
 
 cndm_micro_dp_mgr #(
-    .PORTS(PORTS),
+    // FW ID
+    .FPGA_ID(FPGA_ID),
+    .FW_ID(FW_ID),
+    .FW_VER(FW_VER),
+    .BOARD_ID(BOARD_ID),
+    .BOARD_VER(BOARD_VER),
+    .BUILD_DATE(BUILD_DATE),
+    .GIT_HASH(GIT_HASH),
+    .RELEASE_INFO(RELEASE_INFO),
 
+    // Structural configuration
+    .PORTS(PORTS),
+    .SYS_CLK_PER_NS_NUM(4),
+    .SYS_CLK_PER_NS_DENOM(1),
+
+    // Queue configuration
     .WQN_W(WQN_W),
     .CQN_W(CQN_W),
 
+    // PTP configuration
     .PTP_EN(PTP_TS_EN),
-    .PTP_BASE_ADDR_DP(0),
+    .PTP_CLK_PER_NS_NUM(PTP_CLK_PER_NS_NUM),
+    .PTP_CLK_PER_NS_DENOM(PTP_CLK_PER_NS_DENOM),
 
+    // Addressing
+    .PTP_BASE_ADDR_DP(0),
     .PORT_BASE_ADDR_DP(PORT_BASE_ADDR_DP),
     .PORT_BASE_ADDR_HOST(PORT_BASE_ADDR_HOST)
 )

@@ -164,65 +164,85 @@ logic [CMD_AW-1:0] cmd_ram_rd_addr;
 wire [31:0] cmd_ram_rd_data = cmd_ram[cmd_ram_rd_addr];
 
 // ID ROM
-localparam ID_AW = 5;
-logic [31:0] id_rom[2**ID_AW] = '{default: '0};
+localparam ID_PAGES = 3;
+localparam ID_AW = $clog2((ID_PAGES+1)*8);
+logic [31:0] id_rom[(ID_PAGES+1)*8] = '{
+    // Common
+    0, // 0: status
+    0, // 1: flags
+    { // 2
+        16'(ID_PAGES-1), // [31:16] cfg_page_max
+        16'd0 // [15:0] cfg_page (replaced)
+    },
+    32'h000_01_000, // 3: CMD_VER
+    FW_VER, // 4
+    { // 5
+        8'd0, // [31:24]
+        8'd0, // [23:16]
+        8'd0, // [15:8]
+        8'(PORTS) // [7:0]
+    },
+    0, // 6
+    0, // 7
+    // Page 0: FW ID
+    FPGA_ID, // 8
+    FW_ID, // 9
+    FW_VER, // 10
+    BOARD_ID, // 11
+    BOARD_VER, // 12
+    BUILD_DATE, // 13
+    GIT_HASH, // 14
+    RELEASE_INFO, // 15
+    // Page 1: HW config
+    { // 16
+        16'd0, // [31:16]
+        16'(PORTS) // [15:0]
+    },
+    0, // 17
+    0, // 18
+    0, // 19
+    { // 20
+        16'(SYS_CLK_PER_NS_NUM), // [31:16]
+        16'(SYS_CLK_PER_NS_DENOM) // [15:0]
+    },
+    { // 21
+        16'(PTP_CLK_PER_NS_NUM), // [31:16]
+        16'(PTP_CLK_PER_NS_DENOM) // [15:0]
+    },
+    0, // 22
+    0, // 23
+    // Page 2: Resources
+    { // 24
+        8'd0, // [31:24] EQE_VER
+        8'd0, // [23:16] EQ_POOL
+        8'd0, // [15:8] LOG_MAX_EQ_SZ
+        8'd0  // [7:0] LOG_MAX_EQ
+    },
+    { // 25
+        8'd1, // [31:24] CQE_VER
+        8'd0, // [23:16] CQ_POOL
+        8'd15, // [15:8] LOG_MAX_CQ_SZ
+        8'(CQN_W) // [7:0] LOG_MAX_CQ
+    },
+    { // 26
+        8'd1, // [31:24] SQE_VER
+        8'd1, // [23:16] SQ_POOL
+        8'd15, // [15:8] LOG_MAX_SQ_SZ
+        8'(WQN_W) // [7:0] LOG_MAX_SQ
+    },
+    { // 27
+        8'd1, // [31:24] RQE_VER
+        8'd1, // [23:16] RQ_POOL
+        8'd15, // [15:8] LOG_MAX_RQ_SZ
+        8'(WQN_W) // [7:0] LOG_MAX_RQ
+    },
+    0, // 28
+    0, // 29
+    0, // 30
+    0 // 31
+};
 logic [ID_AW-1:0] id_rom_rd_addr;
 wire [31:0] id_rom_rd_data = id_rom[id_rom_rd_addr];
-
-initial begin
-    // Common
-    id_rom[0] = 0; // status
-    id_rom[1] = 0; // flags
-    id_rom[2][15:0] = 0; // cfg_page (replaced)
-    id_rom[2][31:16] = 2; // cfg_page_max
-    id_rom[3] = 32'h000_01_000; // CMD_VER
-    id_rom[4] = FW_VER;
-    id_rom[5][7:0] = 8'(PORTS);
-    id_rom[6] = 0;
-    id_rom[7] = 0;
-    // Page 0: FW ID
-    id_rom[8] = FPGA_ID;
-    id_rom[9] = FW_ID;
-    id_rom[10] = FW_VER;
-    id_rom[11] = BOARD_ID;
-    id_rom[12] = BOARD_VER;
-    id_rom[13] = BUILD_DATE;
-    id_rom[14] = GIT_HASH;
-    id_rom[15] = RELEASE_INFO;
-    // Page 1: HW config
-    id_rom[16][15:0] = 16'(PORTS);
-    id_rom[16][31:16] = 0;
-    id_rom[17] = 0;
-    id_rom[18] = 0;
-    id_rom[19] = 0;
-    id_rom[20][15:0] = 16'(SYS_CLK_PER_NS_DENOM);
-    id_rom[20][31:16] = 16'(SYS_CLK_PER_NS_NUM);
-    id_rom[21][15:0] = 16'(PTP_CLK_PER_NS_DENOM);
-    id_rom[21][31:16] = 16'(PTP_CLK_PER_NS_NUM);
-    id_rom[22] = 0;
-    id_rom[23] = 0;
-    // Page 2: Resources
-    id_rom[24][7:0] = 0; // LOG_MAX_EQ
-    id_rom[24][15:8] = 0; // LOG_MAX_EQ_SZ
-    id_rom[24][23:16] = 0; // EQ_POOL
-    id_rom[24][31:24] = 0; // EQE_VER
-    id_rom[25][7:0] = CQN_W; // LOG_MAX_CQ
-    id_rom[25][15:8] = 15; // LOG_MAX_CQ_SZ
-    id_rom[25][23:16] = 0; // CQ_POOL
-    id_rom[25][31:24] = 1; // CQE_VER
-    id_rom[26][7:0] = WQN_W; // LOG_MAX_SQ
-    id_rom[26][15:8] = 15; // LOG_MAX_SQ_SZ
-    id_rom[26][23:16] = 1; // SQ_POOL
-    id_rom[26][31:24] = 1; // SQE_VER
-    id_rom[27][7:0] = WQN_W; // LOG_MAX_RQ
-    id_rom[27][15:8] = 15; // LOG_MAX_RQ_SZ
-    id_rom[27][23:16] = 1; // RQ_POOL
-    id_rom[27][31:24] = 1; // RQE_VER
-    id_rom[28] = 0;
-    id_rom[29] = 0;
-    id_rom[30] = 0;
-    id_rom[31] = 0;
-end
 
 assign s_axis_cmd.tready = s_axis_cmd_tready_reg;
 

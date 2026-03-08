@@ -96,7 +96,7 @@ logic s_axil_b_rvalid_pipe_reg = 1'b0;
 
 // verilator lint_off MULTIDRIVEN
 // (* RAM_STYLE="BLOCK" *)
-logic [DATA_W-1:0] mem[2**VALID_ADDR_W];
+logic [DATA_W-1:0] mem[2**VALID_ADDR_W] = '{default: '0};
 // verilator lint_on MULTIDRIVEN
 
 wire [VALID_ADDR_W-1:0] s_axil_a_awaddr_valid = VALID_ADDR_W'(s_axil_wr_a.awaddr >> (ADDR_W - VALID_ADDR_W));
@@ -128,16 +128,6 @@ assign s_axil_rd_b.rdata = PIPELINE_OUTPUT ? s_axil_b_rdata_pipe_reg : s_axil_b_
 assign s_axil_rd_b.rresp = 2'b00;
 assign s_axil_rd_b.ruser = '0;
 assign s_axil_rd_b.rvalid = PIPELINE_OUTPUT ? s_axil_b_rvalid_pipe_reg : s_axil_b_rvalid_reg;
-
-initial begin
-    // two nested loops for smaller number of iterations per loop
-    // workaround for synthesizer complaints about large loop counts
-    for (integer i = 0; i < 2**VALID_ADDR_W; i = i + 2**(VALID_ADDR_W/2)) begin
-        for (integer j = i; j < i + 2**(VALID_ADDR_W/2); j = j + 1) begin
-            mem[j] = 0;
-        end
-    end
-end
 
 always_comb begin
     mem_wr_en_a = 1'b0;

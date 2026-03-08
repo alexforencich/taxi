@@ -100,7 +100,7 @@ logic s_axi_rlast_pipe_reg = 1'b0;
 logic s_axi_rvalid_pipe_reg = 1'b0;
 
 // (* RAM_STYLE="BLOCK" *)
-logic [DATA_W-1:0] mem[2**VALID_ADDR_W];
+logic [DATA_W-1:0] mem[2**VALID_ADDR_W] = '{default: '0};
 
 wire [VALID_ADDR_W-1:0] read_addr_valid = VALID_ADDR_W'(read_addr_reg >> (ADDR_W - VALID_ADDR_W));
 wire [VALID_ADDR_W-1:0] write_addr_valid = VALID_ADDR_W'(write_addr_reg >> (ADDR_W - VALID_ADDR_W));
@@ -119,16 +119,6 @@ assign s_axi_rd.rresp = 2'b00;
 assign s_axi_rd.rlast = PIPELINE_OUTPUT ? s_axi_rlast_pipe_reg : s_axi_rlast_reg;
 assign s_axi_rd.ruser = '0;
 assign s_axi_rd.rvalid = PIPELINE_OUTPUT ? s_axi_rvalid_pipe_reg : s_axi_rvalid_reg;
-
-initial begin
-    // two nested loops for smaller number of iterations per loop
-    // workaround for synthesizer complaints about large loop counts
-    for (integer i = 0; i < 2**VALID_ADDR_W; i = i + 2**(VALID_ADDR_W/2)) begin
-        for (integer j = i; j < i + 2**(VALID_ADDR_W/2); j = j + 1) begin
-            mem[j] = '0;
-        end
-    end
-end
 
 always_comb begin
     write_state_next = WRITE_STATE_IDLE;

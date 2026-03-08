@@ -251,10 +251,10 @@ logic [TR_CNT_W-1:0] trans_count_reg = 0;
 wire trans_limit = trans_count_reg >= TR_CNT_W'(S_ACCEPT) && !trans_complete;
 
 // transfer ID thread tracking
-logic [ID_W-1:0] thread_id_reg[S_INT_THREADS-1:0];
-logic [SEL_W-1:0] thread_m_reg[S_INT_THREADS-1:0];
-logic [3:0] thread_region_reg[S_INT_THREADS-1:0];
-logic [$clog2(S_ACCEPT+1)-1:0] thread_count_reg[S_INT_THREADS-1:0];
+logic [ID_W-1:0] thread_id_reg[S_INT_THREADS-1:0] = '{default: '0};
+logic [SEL_W-1:0] thread_m_reg[S_INT_THREADS-1:0] = '{default: '0};
+logic [3:0] thread_region_reg[S_INT_THREADS-1:0] = '{default: '0};
+logic [$clog2(S_ACCEPT+1)-1:0] thread_count_reg[S_INT_THREADS-1:0] = '{default: '0};
 
 // TODO fix loop
 /* verilator lint_off UNOPTFLAT */
@@ -266,10 +266,6 @@ wire [S_INT_THREADS-1:0] thread_trans_start;
 wire [S_INT_THREADS-1:0] thread_trans_complete;
 
 for (genvar n = 0; n < S_INT_THREADS; n = n + 1) begin
-    initial begin
-        thread_count_reg[n] = '0;
-    end
-
     assign thread_active[n] = thread_count_reg[n] != 0;
     assign thread_match[n] = thread_active[n] && thread_id_reg[n] == s_axi_aid;
     assign thread_match_dest[n] = thread_match[n] && thread_m_reg[n] == m_select_next && (M_REGIONS < 2 || thread_region_reg[n] == m_axi_aregion_next);

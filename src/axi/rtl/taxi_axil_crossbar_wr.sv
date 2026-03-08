@@ -172,9 +172,9 @@ for (genvar m = 0; m < S_COUNT; m = m + 1) begin : s_ifaces
     logic [FIFO_AW+1-1:0] fifo_rd_ptr_reg = '0;
 
     (* ram_style = "distributed", ramstyle = "no_rw_check, mlab" *)
-    logic [CL_M_COUNT_INT-1:0] fifo_select[2**FIFO_AW];
+    logic [CL_M_COUNT_INT-1:0] fifo_select[2**FIFO_AW] = '{default: '0};
     (* ram_style = "distributed", ramstyle = "no_rw_check, mlab" *)
-    logic fifo_decerr[2**FIFO_AW];
+    logic fifo_decerr[2**FIFO_AW] = '{default: '0};
 
     wire [CL_M_COUNT_INT-1:0] fifo_wr_select;
     wire fifo_wr_decerr;
@@ -187,13 +187,6 @@ for (genvar m = 0; m < S_COUNT; m = m + 1) begin : s_ifaces
     logic fifo_half_full_reg = 1'b0;
 
     wire fifo_empty = fifo_rd_ptr_reg == fifo_wr_ptr_reg;
-
-    initial begin
-        for (integer i = 0; i < 2**FIFO_AW; i = i + 1) begin
-            fifo_select[i] = '0;
-            fifo_decerr[i] = '0;
-        end
-    end
 
     always_ff @(posedge clk) begin
         if (fifo_wr_en) begin
@@ -382,19 +375,13 @@ for (genvar n = 0; n < M_COUNT; n = n + 1) begin : m_ifaces
     logic [FIFO_AW+1-1:0] fifo_rd_ptr_reg = '0;
 
     (* ram_style = "distributed", ramstyle = "no_rw_check, mlab" *)
-    logic [CL_S_COUNT_INT-1:0] fifo_select[2**FIFO_AW];
+    logic [CL_S_COUNT_INT-1:0] fifo_select[2**FIFO_AW] = '{default: '0};
     wire [CL_S_COUNT_INT-1:0] fifo_wr_select;
     wire fifo_wr_en;
     wire fifo_rd_en;
     logic fifo_half_full_reg = 1'b0;
 
     wire fifo_empty = fifo_rd_ptr_reg == fifo_wr_ptr_reg;
-
-    initial begin
-        for (integer i = 0; i < 2**FIFO_AW; i = i + 1) begin
-            fifo_select[i] = '0;
-        end
-    end
 
     always_ff @(posedge clk) begin
         if (fifo_wr_en) begin

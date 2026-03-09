@@ -33,8 +33,15 @@ module cndm_micro_dp_mgr #
     parameter SYS_CLK_PER_NS_DEN = 1,
 
     // Queue configuration
-    parameter WQN_W = 5,
-    parameter CQN_W = WQN_W,
+    parameter EQN_W = 5,
+    parameter CQN_W = 5,
+    parameter SQN_W = 5,
+    parameter RQN_W = 5,
+    parameter EQE_VER = 1,
+    parameter CQE_VER = 1,
+    parameter SQE_VER = 1,
+    parameter RQE_VER = 1,
+    parameter LOG_MAX_WQ_SZ = 15,
 
     // PTP configuration
     parameter logic PTP_EN = 1'b1,
@@ -47,8 +54,10 @@ module cndm_micro_dp_mgr #
     parameter PORT_BASE_ADDR_HOST = 0,
     parameter PORT_STRIDE = 'h10000,
     parameter WQ_REG_STRIDE = 32,
-    parameter QM_OFFSET = 'h0000,
+    parameter EQM_OFFSET = 'h4000,
     parameter CQM_OFFSET = 'h4000,
+    parameter SQM_OFFSET = 'h0000,
+    parameter RQM_OFFSET = 'h0000,
     parameter PORT_CTRL_OFFSET = 'h8000
 )
 (
@@ -166,6 +175,13 @@ wire [31:0] cmd_ram_rd_data = cmd_ram[cmd_ram_rd_addr];
 // ID ROM
 localparam ID_PAGES = 3;
 localparam ID_AW = $clog2((ID_PAGES+1)*8);
+
+// detect sharing between EQ/CQ and SQ/RQ (same queue manager)
+localparam EQ_POOL = 1;
+localparam CQ_POOL = EQ_POOL + (EQM_OFFSET == CQM_OFFSET ? 0 : 1);
+localparam SQ_POOL = CQ_POOL + 1;
+localparam RQ_POOL = SQ_POOL + (SQM_OFFSET == RQM_OFFSET ? 0 : 1);
+
 logic [31:0] id_rom[(ID_PAGES+1)*8] = '{
     // Common
     0, // 0: status
@@ -213,28 +229,28 @@ logic [31:0] id_rom[(ID_PAGES+1)*8] = '{
     0, // 23
     // Page 2: Resources
     { // 24
-        8'd0, // [31:24] EQE_VER
-        8'd0, // [23:16] EQ_POOL
-        8'd0, // [15:8] LOG_MAX_EQ_SZ
-        8'd0  // [7:0] LOG_MAX_EQ
+        8'(EQE_VER), // [31:24] EQE_VER
+        8'(EQ_POOL), // [23:16] EQ_POOL
+        8'(LOG_MAX_WQ_SZ), // [15:8] LOG_MAX_EQ_SZ
+        8'(EQN_W) // [7:0] LOG_MAX_EQ
     },
     { // 25
-        8'd1, // [31:24] CQE_VER
-        8'd0, // [23:16] CQ_POOL
-        8'd15, // [15:8] LOG_MAX_CQ_SZ
+        8'(CQE_VER), // [31:24] CQE_VER
+        8'(CQ_POOL), // [23:16] CQ_POOL
+        8'(LOG_MAX_WQ_SZ), // [15:8] LOG_MAX_CQ_SZ
         8'(CQN_W) // [7:0] LOG_MAX_CQ
     },
     { // 26
-        8'd1, // [31:24] SQE_VER
-        8'd1, // [23:16] SQ_POOL
-        8'd15, // [15:8] LOG_MAX_SQ_SZ
-        8'(WQN_W) // [7:0] LOG_MAX_SQ
+        8'(SQE_VER), // [31:24] SQE_VER
+        8'(SQ_POOL), // [23:16] SQ_POOL
+        8'(LOG_MAX_WQ_SZ), // [15:8] LOG_MAX_SQ_SZ
+        8'(SQN_W) // [7:0] LOG_MAX_SQ
     },
     { // 27
-        8'd1, // [31:24] RQE_VER
-        8'd1, // [23:16] RQ_POOL
-        8'd15, // [15:8] LOG_MAX_RQ_SZ
-        8'(WQN_W) // [7:0] LOG_MAX_RQ
+        8'(RQE_VER), // [31:24] RQE_VER
+        8'(RQ_POOL), // [23:16] RQ_POOL
+        8'(LOG_MAX_WQ_SZ), // [15:8] LOG_MAX_RQ_SZ
+        8'(RQN_W) // [7:0] LOG_MAX_RQ
     },
     0, // 28
     0, // 29
@@ -373,20 +389,22 @@ always_comb begin
 
             // determine block base address
             case (opcode_reg)
-                // // EQ
-                // CMD_OP_CREATE_EQ:
-                // begin
-                //     dw3_next = 0;
-                //     dp_ptr_next = DP_APB_ADDR_W'({dw2_reg, 16'd0} | 'h8000) + DP_APB_ADDR_W'(PORT_BASE_ADDR_DP);
-                //     host_ptr_next = 32'({dw2_reg, 16'd0} | 'h8000) + PORT_BASE_ADDR_HOST;
-                // end
-                // CMD_OP_MODIFY_EQ,
-                // CMD_OP_QUERY_EQ,
-                // CMD_OP_DESTROY_EQ:
-                // begin
-                //     dp_ptr_next = DP_APB_ADDR_W'({dw2_reg, 16'd0} | 'h8000) + DP_APB_ADDR_W'(PORT_BASE_ADDR_DP);
-                //     host_ptr_next = 32'({dw2_reg, 16'd0} | 'h8000) + PORT_BASE_ADDR_HOST;
-                // end
+                // EQ
+                CMD_OP_CREATE_EQ:
+                begin
+                    cnt_next = 2**EQN_W-1;
+                    qtype_next = QTYPE_EQ;
+                    dp_ptr_next = DP_APB_ADDR_W'((dw2_reg[15:0] * PORT_STRIDE) + EQM_OFFSET + PORT_BASE_ADDR_DP);
+                    host_ptr_next = (dw2_reg[15:0] * PORT_STRIDE) + EQM_OFFSET + PORT_BASE_ADDR_HOST;
+                end
+                CMD_OP_MODIFY_EQ,
+                CMD_OP_QUERY_EQ,
+                CMD_OP_DESTROY_EQ:
+                begin
+                    qtype_next = QTYPE_EQ;
+                    dp_ptr_next = DP_APB_ADDR_W'((dw2_reg[15:0] * PORT_STRIDE) + EQM_OFFSET + (dw3_reg[15:0] * WQ_REG_STRIDE) + PORT_BASE_ADDR_DP);
+                    host_ptr_next = (dw2_reg[15:0] * PORT_STRIDE) + EQM_OFFSET + (dw3_reg[15:0] * WQ_REG_STRIDE) + PORT_BASE_ADDR_HOST;
+                end
                 // CQ
                 CMD_OP_CREATE_CQ:
                 begin
@@ -406,34 +424,34 @@ always_comb begin
                 // SQ
                 CMD_OP_CREATE_SQ:
                 begin
-                    cnt_next = 2**WQN_W-1;
+                    cnt_next = 2**SQN_W-1;
                     qtype_next = QTYPE_SQ;
-                    dp_ptr_next = DP_APB_ADDR_W'((dw2_reg[15:0] * PORT_STRIDE) + QM_OFFSET + PORT_BASE_ADDR_DP);
-                    host_ptr_next = (dw2_reg[15:0] * PORT_STRIDE) + QM_OFFSET + PORT_BASE_ADDR_HOST;
+                    dp_ptr_next = DP_APB_ADDR_W'((dw2_reg[15:0] * PORT_STRIDE) + SQM_OFFSET + PORT_BASE_ADDR_DP);
+                    host_ptr_next = (dw2_reg[15:0] * PORT_STRIDE) + SQM_OFFSET + PORT_BASE_ADDR_HOST;
                 end
                 CMD_OP_MODIFY_SQ,
                 CMD_OP_QUERY_SQ,
                 CMD_OP_DESTROY_SQ:
                 begin
                     qtype_next = QTYPE_SQ;
-                    dp_ptr_next = DP_APB_ADDR_W'((dw2_reg[15:0] * PORT_STRIDE) + QM_OFFSET + (dw3_reg[15:0] * WQ_REG_STRIDE) + PORT_BASE_ADDR_DP);
-                    host_ptr_next = (dw2_reg[15:0] * PORT_STRIDE) + QM_OFFSET + (dw3_reg[15:0] * WQ_REG_STRIDE) + PORT_BASE_ADDR_HOST;
+                    dp_ptr_next = DP_APB_ADDR_W'((dw2_reg[15:0] * PORT_STRIDE) + SQM_OFFSET + (dw3_reg[15:0] * WQ_REG_STRIDE) + PORT_BASE_ADDR_DP);
+                    host_ptr_next = (dw2_reg[15:0] * PORT_STRIDE) + SQM_OFFSET + (dw3_reg[15:0] * WQ_REG_STRIDE) + PORT_BASE_ADDR_HOST;
                 end
                 // RQ
                 CMD_OP_CREATE_RQ:
                 begin
-                    cnt_next = 2**WQN_W-1;
+                    cnt_next = 2**RQN_W-1;
                     qtype_next = QTYPE_RQ;
-                    dp_ptr_next = DP_APB_ADDR_W'((dw2_reg[15:0] * PORT_STRIDE) + QM_OFFSET + PORT_BASE_ADDR_DP);
-                    host_ptr_next = (dw2_reg[15:0] * PORT_STRIDE) + QM_OFFSET + PORT_BASE_ADDR_HOST;
+                    dp_ptr_next = DP_APB_ADDR_W'((dw2_reg[15:0] * PORT_STRIDE) + RQM_OFFSET + PORT_BASE_ADDR_DP);
+                    host_ptr_next = (dw2_reg[15:0] * PORT_STRIDE) + RQM_OFFSET + PORT_BASE_ADDR_HOST;
                 end
                 CMD_OP_MODIFY_RQ,
                 CMD_OP_QUERY_RQ,
                 CMD_OP_DESTROY_RQ:
                 begin
                     qtype_next = QTYPE_RQ;
-                    dp_ptr_next = DP_APB_ADDR_W'((dw2_reg[15:0] * PORT_STRIDE) + QM_OFFSET + (dw3_reg[15:0] * WQ_REG_STRIDE) + PORT_BASE_ADDR_DP);
-                    host_ptr_next = (dw2_reg[15:0] * PORT_STRIDE) + QM_OFFSET + (dw3_reg[15:0] * WQ_REG_STRIDE) + PORT_BASE_ADDR_HOST;
+                    dp_ptr_next = DP_APB_ADDR_W'((dw2_reg[15:0] * PORT_STRIDE) + RQM_OFFSET + (dw3_reg[15:0] * WQ_REG_STRIDE) + PORT_BASE_ADDR_DP);
+                    host_ptr_next = (dw2_reg[15:0] * PORT_STRIDE) + RQM_OFFSET + (dw3_reg[15:0] * WQ_REG_STRIDE) + PORT_BASE_ADDR_HOST;
                 end
                 default: begin end
             endcase

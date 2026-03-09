@@ -335,8 +335,10 @@ cndm_micro_dp_mgr #(
     .SYS_CLK_PER_NS_DEN(SYS_CLK_PER_NS_DEN),
 
     // Queue configuration
-    .WQN_W(WQN_W),
+    .EQN_W(CQN_W),
     .CQN_W(CQN_W),
+    .SQN_W(WQN_W),
+    .RQN_W(WQN_W),
 
     // PTP configuration
     .PTP_EN(PTP_TS_EN),

@@ -19,7 +19,9 @@ module cndm_micro_queue_state #(
     parameter QN_W = 5,
     parameter DQN_W = 5,
     parameter logic IS_CQ = 1'b0,
-    parameter logic QTYPE_EN = !IS_CQ,
+    parameter logic IS_EQ = 1'b0,
+    parameter logic CQ_IRQ = IS_CQ,
+    parameter logic QTYPE_EN = 1'b1,
     parameter QE_SIZE = 16,
     parameter DMA_ADDR_W = 64
 )
@@ -63,7 +65,12 @@ module cndm_micro_queue_state #(
     /*
      * Interrupts
      */
-    taxi_axis_if.src                    m_axis_irq
+    taxi_axis_if.src                    m_axis_irq,
+
+    /*
+     * Event output
+     */
+    taxi_axis_if.src                    m_axis_event
 );
 
 localparam PTR_W = 16;
@@ -78,6 +85,10 @@ localparam APB_DATA_W = s_apb_dp_ctrl.DATA_W;
 
 localparam IRQN_W = m_axis_irq.DATA_W;
 
+localparam EQN_W = m_axis_event.DEST_W;
+localparam EVENT_DATA_W = 64;
+localparam EVENT_DEST_W = m_axis_event.DEST_W;
+
 // check configuration
 if (s_axil_ctrl_rd.DATA_W != 32 || s_axil_ctrl_wr.DATA_W != 32)
     $fatal(0, "Error: AXI data width must be 32 (instance %m)");
@@ -90,6 +101,13 @@ if (s_apb_dp_ctrl.DATA_W != 32)
 
 if (s_apb_dp_ctrl.ADDR_W < ADDR_W)
     $fatal(0, "Error: APB address width is insufficient (instance %m)");
+
+typedef enum logic [2:0] {
+    QTYPE_EQ,
+    QTYPE_CQ,
+    QTYPE_SQ,
+    QTYPE_RQ
+} qtype_t;
 
 logic s_axil_ctrl_awready_reg = 1'b0, s_axil_ctrl_awready_next;
 logic s_axil_ctrl_wready_reg = 1'b0, s_axil_ctrl_wready_next;
@@ -160,11 +178,26 @@ assign m_axis_irq.tid    = '0;
 assign m_axis_irq.tdest  = '0;
 assign m_axis_irq.tuser  = '0;
 
+logic [EVENT_DATA_W-1:0] m_axis_event_tdata_reg = '0, m_axis_event_tdata_next;
+logic [EQN_W-1:0] m_axis_event_tdest_reg = '0, m_axis_event_tdest_next;
+logic m_axis_event_tvalid_reg = 1'b0, m_axis_event_tvalid_next;
+
+assign m_axis_event.tdata  = m_axis_event.DATA_W'(m_axis_event_tdata_reg);
+assign m_axis_event.tkeep  = '1;
+assign m_axis_event.tstrb  = m_axis_event.tkeep;
+assign m_axis_event.tvalid = m_axis_event_tvalid_reg;
+assign m_axis_event.tlast  = 1'b1;
+assign m_axis_event.tid    = '0;
+assign m_axis_event.tdest  = m_axis_event_tdest_reg;
+assign m_axis_event.tuser  = '0;
+
 logic [2**QN_W-1:0] queue_enable_reg = '0;
 (* ram_style = "distributed", ramstyle = "no_rw_check, mlab" *)
 logic queue_mem_arm[2**QN_W] = '{default: '0};
 (* ram_style = "distributed", ramstyle = "no_rw_check, mlab" *)
 logic queue_mem_fire[2**QN_W] = '{default: '0};
+(* ram_style = "distributed", ramstyle = "no_rw_check, mlab" *)
+logic queue_mem_cq_irq[2**QN_W] = '{default: '0};
 (* ram_style = "distributed", ramstyle = "no_rw_check, mlab" *)
 logic [2:0] queue_mem_qtype[2**QN_W] = '{default: '0};
 (* ram_style = "distributed", ramstyle = "no_rw_check, mlab" *)
@@ -184,6 +217,7 @@ logic [QN_W-1:0] queue_mem_addr;
 wire queue_mem_rd_enable = queue_enable_reg[queue_mem_addr];
 wire queue_mem_rd_arm = queue_mem_arm[queue_mem_addr];
 wire queue_mem_rd_fire = queue_mem_fire[queue_mem_addr];
+wire queue_mem_rd_cq_irq = queue_mem_cq_irq[queue_mem_addr];
 wire [2:0] queue_mem_rd_qtype = queue_mem_qtype[queue_mem_addr];
 wire [DQN_W-1:0] queue_mem_rd_dqn = queue_mem_dqn[queue_mem_addr];
 wire [3:0] queue_mem_rd_log_size = queue_mem_log_size[queue_mem_addr];
@@ -197,6 +231,7 @@ wire queue_mem_rd_status_full = ($unsigned(queue_mem_rd_prod_ptr - queue_mem_rd_
 logic queue_mem_wr_enable;
 logic queue_mem_wr_arm;
 logic queue_mem_wr_fire;
+logic queue_mem_wr_cq_irq;
 logic [2:0] queue_mem_wr_qtype;
 logic [DQN_W-1:0] queue_mem_wr_dqn;
 logic [3:0] queue_mem_wr_log_size;
@@ -231,12 +266,17 @@ always_comb begin
     m_axis_irq_irqn_next = m_axis_irq_irqn_reg;
     m_axis_irq_tvalid_next = m_axis_irq_tvalid_reg && !m_axis_irq.tready;
 
+    m_axis_event_tdata_next = m_axis_event_tdata_reg;
+    m_axis_event_tdest_next = m_axis_event_tdest_reg;
+    m_axis_event_tvalid_next = m_axis_event_tvalid_reg && !m_axis_event.tready;
+
     queue_mem_wr_en = 1'b0;
     queue_mem_addr = '0;
 
     queue_mem_wr_enable = queue_mem_rd_enable;
     queue_mem_wr_arm = queue_mem_rd_arm;
     queue_mem_wr_fire = queue_mem_rd_fire;
+    queue_mem_wr_cq_irq = queue_mem_rd_cq_irq;
     queue_mem_wr_qtype = queue_mem_rd_qtype;
     queue_mem_wr_dqn = queue_mem_rd_dqn;
     queue_mem_wr_log_size = queue_mem_rd_log_size;
@@ -265,12 +305,12 @@ always_comb begin
 
         case (s_axil_ctrl_awaddr_reg_index)
             3'd2: begin
-                if (!IS_CQ) begin
+                if (!IS_CQ && !IS_EQ) begin
                     queue_mem_wr_prod_ptr = s_axil_ctrl_wr.wdata[15:0];
                 end
             end
             3'd3: begin
-                if (IS_CQ) begin
+                if (IS_CQ || IS_EQ) begin
                     queue_mem_wr_cons_ptr = s_axil_ctrl_wr.wdata[15:0];
                     if (s_axil_ctrl_wr.wdata[31]) begin
                         queue_mem_wr_arm = 1'b1;
@@ -299,7 +339,10 @@ always_comb begin
 
                     queue_mem_wr_fire = 1'b0;
                 end
-                3'd1: queue_mem_wr_dqn = s_apb_dp_ctrl.pwdata[DQN_W-1:0];
+                3'd1: begin
+                    queue_mem_wr_dqn = s_apb_dp_ctrl.pwdata[DQN_W-1:0];
+                    queue_mem_wr_cq_irq = s_apb_dp_ctrl.pwdata[31];
+                end
                 3'd2: queue_mem_wr_prod_ptr = s_apb_dp_ctrl.pwdata[15:0];
                 3'd3: begin
                     queue_mem_wr_cons_ptr = s_apb_dp_ctrl.pwdata[15:0];
@@ -317,11 +360,14 @@ always_comb begin
         case (s_apb_dp_ctrl_paddr_reg_index)
             3'd0: begin
                 s_apb_dp_ctrl_prdata_next[0] = queue_mem_rd_enable;
-                s_apb_dp_ctrl_prdata_next[1] = IS_CQ ? queue_mem_rd_arm : 1'b0;
+                s_apb_dp_ctrl_prdata_next[1] = (IS_CQ || IS_EQ) ? queue_mem_rd_arm : 1'b0;
                 s_apb_dp_ctrl_prdata_next[19:16] = queue_mem_rd_log_size;
                 s_apb_dp_ctrl_prdata_next[23:20] = QTYPE_EN ? 4'(queue_mem_rd_qtype) : '0;
             end
-            3'd1: s_apb_dp_ctrl_prdata_next = 32'(queue_mem_rd_dqn);
+            3'd1: begin
+                s_apb_dp_ctrl_prdata_next[30:0] = 31'(queue_mem_rd_dqn);
+                s_apb_dp_ctrl_prdata_next[31] = (IS_CQ && CQ_IRQ) ? queue_mem_rd_cq_irq : 1'b0;
+            end
             3'd2: s_apb_dp_ctrl_prdata_next = 32'(queue_mem_rd_prod_ptr);
             3'd3: s_apb_dp_ctrl_prdata_next = 32'(queue_mem_rd_cons_ptr);
             3'd6: s_apb_dp_ctrl_prdata_next = queue_mem_rd_base_addr[31:0];
@@ -346,7 +392,7 @@ always_comb begin
         rsp_qn_next = req_qn;
         rsp_dqn_next = queue_mem_rd_dqn;
         rsp_error_next = !queue_mem_rd_enable || (QTYPE_EN && req_qtype != queue_mem_rd_qtype);
-        if (IS_CQ) begin
+        if (IS_CQ || IS_EQ) begin
             rsp_addr_next = queue_mem_rd_base_addr + DMA_ADDR_W'(16'(queue_mem_rd_prod_ptr & ({16{1'b1}} >> (16 - queue_mem_rd_log_size))) * QE_SIZE);
             rsp_phase_tag_next = !queue_mem_rd_prod_ptr[queue_mem_rd_log_size];
             if (queue_mem_rd_status_full)
@@ -368,16 +414,35 @@ always_comb begin
 
         queue_mem_addr = scrub_ptr_reg;
 
-        if (IS_CQ && queue_mem_rd_enable && queue_mem_rd_arm && queue_mem_rd_fire) begin
-            if (!m_axis_irq_tvalid_reg || m_axis_irq.tready) begin
-                // fire in the hole
+        if ((IS_CQ || IS_EQ) && queue_mem_rd_enable && queue_mem_rd_arm && queue_mem_rd_fire) begin
+            if ((IS_CQ && !IS_EQ && (!CQ_IRQ || !queue_mem_rd_cq_irq)) || (QTYPE_EN && queue_mem_rd_qtype == QTYPE_CQ && (!CQ_IRQ || !queue_mem_rd_cq_irq))) begin
+                // event - only for CQ
+                if (!m_axis_event_tvalid_reg || m_axis_event.tready) begin
+                    // fire in the hole
 
-                m_axis_irq_irqn_next = IRQN_W'(queue_mem_rd_dqn);
-                m_axis_irq_tvalid_next = 1'b1;
+                    m_axis_event_tdata_next = '0;
+                    m_axis_event_tdata_next[15:0] = '0; // rsvd
+                    m_axis_event_tdata_next[31:16] = '0; // CPL
+                    m_axis_event_tdata_next[63:32] = 32'(scrub_ptr_reg); // CQN
+                    m_axis_event_tdest_next = EQN_W'(queue_mem_rd_dqn);
+                    m_axis_event_tvalid_next = 1'b1;
 
-                queue_mem_wr_arm = 1'b0;
-                queue_mem_wr_fire = 1'b0;
-                queue_mem_wr_en = 1'b1;
+                    queue_mem_wr_arm = 1'b0;
+                    queue_mem_wr_fire = 1'b0;
+                    queue_mem_wr_en = 1'b1;
+                end
+            end else if ((!IS_CQ && IS_EQ) || (IS_CQ && !IS_EQ && (CQ_IRQ && queue_mem_rd_cq_irq)) || (QTYPE_EN && (queue_mem_rd_qtype == QTYPE_EQ || (queue_mem_rd_qtype == QTYPE_CQ && (CQ_IRQ && queue_mem_rd_cq_irq))))) begin
+                // interrupt - EQ or CQ, but CQ requires config bit set to select interrupts
+                if (!m_axis_irq_tvalid_reg || m_axis_irq.tready) begin
+                    // fire in the hole
+
+                    m_axis_irq_irqn_next = IRQN_W'(queue_mem_rd_dqn);
+                    m_axis_irq_tvalid_next = 1'b1;
+
+                    queue_mem_wr_arm = 1'b0;
+                    queue_mem_wr_fire = 1'b0;
+                    queue_mem_wr_en = 1'b1;
+                end
             end
         end
 
@@ -410,12 +475,17 @@ always @(posedge clk) begin
     m_axis_irq_irqn_reg <= m_axis_irq_irqn_next;
     m_axis_irq_tvalid_reg <= m_axis_irq_tvalid_next;
 
+    m_axis_event_tdata_reg <= m_axis_event_tdata_next;
+    m_axis_event_tdest_reg <= m_axis_event_tdest_next;
+    m_axis_event_tvalid_reg <= m_axis_event_tvalid_next;
+
     scrub_ptr_reg <= scrub_ptr_next;
 
     if (queue_mem_wr_en) begin
         queue_enable_reg[queue_mem_addr] <= queue_mem_wr_enable;
         queue_mem_arm[queue_mem_addr] <= queue_mem_wr_arm;
         queue_mem_fire[queue_mem_addr] <= queue_mem_wr_fire;
+        queue_mem_cq_irq[queue_mem_addr] <= queue_mem_wr_cq_irq;
         queue_mem_qtype[queue_mem_addr] <= queue_mem_wr_qtype;
         queue_mem_dqn[queue_mem_addr] <= queue_mem_wr_dqn;
         queue_mem_log_size[queue_mem_addr] <= queue_mem_wr_log_size;
@@ -440,6 +510,8 @@ always @(posedge clk) begin
         notify_req_ready_reg <= 1'b0;
 
         m_axis_irq_tvalid_reg <= 1'b0;
+
+        m_axis_event_tvalid_reg <= 1'b0;
 
         scrub_ptr_reg <= '0;
 

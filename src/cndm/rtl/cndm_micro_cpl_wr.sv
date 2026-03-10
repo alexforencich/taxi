@@ -16,7 +16,10 @@ Authors:
  * Corundum-micro completion write module
  */
 module cndm_micro_cpl_wr #(
-    parameter CQN_W = 5
+    parameter CQN_W = 5,
+    parameter logic IS_CQ = 1'b1,
+    parameter logic IS_EQ = 1'b0,
+    parameter logic CQ_IRQ = IS_CQ
 )
 (
     input  wire logic         clk,
@@ -48,17 +51,34 @@ module cndm_micro_cpl_wr #(
     /*
      * Completion input
      */
-    taxi_axis_if.snk          s_axis_cpl
+    taxi_axis_if.snk          s_axis_cpl,
+
+    /*
+     * Event input
+     */
+    taxi_axis_if.snk          s_axis_event,
+
+    /*
+     * Event output
+     */
+    taxi_axis_if.src          m_axis_event
 );
 
 localparam DMA_ADDR_W = dma_wr_desc_req.DST_ADDR_W;
 
 localparam IRQN_W = m_axis_irq.DATA_W;
 
+typedef enum logic [2:0] {
+    QTYPE_EQ,
+    QTYPE_CQ,
+    QTYPE_SQ,
+    QTYPE_RQ
+} qtype_t;
+
 logic [CQN_W-1:0]       cq_req_cqn_reg = '0;
+logic [2:0]             cq_req_qtype_reg = '0;
 logic                   cq_req_valid_reg = 1'b0;
 logic                   cq_req_ready;
-logic [IRQN_W-1:0]      cq_rsp_irqn;
 logic [DMA_ADDR_W-1:0]  cq_rsp_addr;
 logic                   cq_rsp_phase_tag;
 logic                   cq_rsp_error;
@@ -72,8 +92,10 @@ logic                   notify_req_ready;
 cndm_micro_queue_state #(
     .QN_W(CQN_W),
     .DQN_W(IRQN_W),
-    .IS_CQ(1),
-    .QTYPE_EN(0),
+    .IS_CQ(IS_CQ || !IS_EQ),
+    .IS_EQ(IS_EQ),
+    .CQ_IRQ(CQ_IRQ),
+    .QTYPE_EN(IS_CQ && IS_EQ),
     .QE_SIZE(16),
     .DMA_ADDR_W(DMA_ADDR_W)
 )
@@ -96,11 +118,11 @@ cq_mgr_inst (
      * Queue management interface
      */
     .req_qn(cq_req_cqn_reg),
-    .req_qtype('0),
+    .req_qtype(cq_req_qtype_reg),
     .req_valid(cq_req_valid_reg),
     .req_ready(cq_req_ready),
     .rsp_qn(),
-    .rsp_dqn(cq_rsp_irqn),
+    .rsp_dqn(),
     .rsp_addr(cq_rsp_addr),
     .rsp_phase_tag(cq_rsp_phase_tag),
     .rsp_error(cq_rsp_error),
@@ -117,7 +139,12 @@ cq_mgr_inst (
     /*
      * Interrupts
      */
-    .m_axis_irq(m_axis_irq)
+    .m_axis_irq(m_axis_irq),
+
+    /*
+     * Event output
+     */
+    .m_axis_event(m_axis_event)
 );
 
 typedef enum logic [1:0] {
@@ -130,8 +157,11 @@ state_t state_reg = STATE_IDLE;
 
 logic phase_tag_reg = 1'b0;
 
+logic [127:0] data_reg = '0;
+
 always_ff @(posedge clk) begin
     s_axis_cpl.tready <= 1'b0;
+    s_axis_event.tready <= 1'b0;
 
     dma_wr_desc_req.req_src_sel <= '0;
     dma_wr_desc_req.req_src_asid <= '0;
@@ -155,11 +185,21 @@ always_ff @(posedge clk) begin
         STATE_IDLE: begin
             dma_wr_desc_req.req_src_addr <= '0;
 
-            cq_req_cqn_reg <= s_axis_cpl.tdest;
-
-            if (s_axis_cpl.tvalid && !s_axis_cpl.tready && (!notify_req_valid_reg || notify_req_ready)) begin
+            if (IS_EQ && s_axis_event.tvalid && !s_axis_event.tready && (!notify_req_valid_reg || notify_req_ready)) begin
+                data_reg <= s_axis_event.tdata;
+                cq_req_cqn_reg <= s_axis_event.tdest;
+                cq_req_qtype_reg <= QTYPE_EQ;
+                cq_req_valid_reg <= 1'b1;
+                notify_req_qn_reg <= s_axis_event.tdest;
+                s_axis_event.tready <= 1'b1;
+                state_reg <= STATE_QUERY_CQ;
+            end else if ((IS_CQ || !IS_EQ) && s_axis_cpl.tvalid && !s_axis_cpl.tready && (!notify_req_valid_reg || notify_req_ready)) begin
+                data_reg <= s_axis_cpl.tdata;
+                cq_req_cqn_reg <= s_axis_cpl.tdest;
+                cq_req_qtype_reg <= QTYPE_CQ;
                 cq_req_valid_reg <= 1'b1;
                 notify_req_qn_reg <= s_axis_cpl.tdest;
+                s_axis_cpl.tready <= 1'b1;
                 state_reg <= STATE_QUERY_CQ;
             end else begin
                 state_reg <= STATE_IDLE;
@@ -177,7 +217,6 @@ always_ff @(posedge clk) begin
 
                 if (cq_rsp_error) begin
                     // drop completion
-                    s_axis_cpl.tready <= 1'b1;
                     state_reg <= STATE_IDLE;
                 end else begin
                     dma_wr_desc_req.req_valid <= 1'b1;
@@ -187,7 +226,6 @@ always_ff @(posedge clk) begin
         end
         STATE_WRITE_DATA: begin
             if (dma_wr_desc_sts.sts_valid) begin
-                s_axis_cpl.tready <= 1'b1;
                 notify_req_valid_reg <= 1'b1;
                 state_reg <= STATE_IDLE;
             end
@@ -213,7 +251,7 @@ localparam SEG_BE_W = dma_ram_rd.SEG_BE_W;
 if (SEGS*SEG_DATA_W < 128)
     $fatal(0, "Total segmented interface width must be at least 128 (instance %m)");
 
-wire [SEGS-1:0][SEG_DATA_W-1:0] ram_data = (SEG_DATA_W*SEGS)'({phase_tag_reg, s_axis_cpl.tdata[126:0]});
+wire [SEGS-1:0][SEG_DATA_W-1:0] ram_data = (SEG_DATA_W*SEGS)'({phase_tag_reg, data_reg[126:0]});
 
 for (genvar n = 0; n < SEGS; n = n + 1) begin
 

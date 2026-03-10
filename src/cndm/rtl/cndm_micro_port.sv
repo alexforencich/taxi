@@ -483,8 +483,21 @@ cpl_mux_inst (
     .m_axis(axis_cpl)
 );
 
+taxi_axis_if #(
+    .DATA_W(16*8),
+    .KEEP_EN(1),
+    .LAST_EN(1),
+    .ID_EN(0),
+    .DEST_EN(1),
+    .DEST_W(CQN_W),
+    .USER_EN(0)
+) axis_event();
+
 cndm_micro_cpl_wr #(
-    .CQN_W(CQN_W)
+    .CQN_W(CQN_W),
+    .IS_CQ(1),
+    .IS_EQ(1),
+    .CQ_IRQ(1)
 )
 cpl_wr_inst (
     .clk(clk),
@@ -516,7 +529,17 @@ cpl_wr_inst (
     /*
      * Completion input
      */
-    .s_axis_cpl(axis_cpl)
+    .s_axis_cpl(axis_cpl),
+
+    /*
+     * Event input
+     */
+    .s_axis_event(axis_event),
+
+    /*
+     * Event output
+     */
+    .m_axis_event(axis_event)
 );
 
 // TX path

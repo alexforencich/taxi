@@ -67,11 +67,14 @@ logic                   wq_rsp_valid;
 logic                   wq_rsp_ready_reg = 1'b0;
 
 taxi_axis_if axis_irq_stub();
+taxi_axis_if axis_event_stub();
 
 cndm_micro_queue_state #(
     .QN_W(WQN_W),
     .DQN_W(CQN_W),
     .IS_CQ(0),
+    .IS_EQ(0),
+    .CQ_IRQ(0),
     .QTYPE_EN(1),
     .QE_SIZE(16),
     .DMA_ADDR_W(DMA_ADDR_W)
@@ -116,7 +119,12 @@ wq_mgr_inst (
     /*
      * Interrupts
      */
-    .m_axis_irq(axis_irq_stub)
+    .m_axis_irq(axis_irq_stub),
+
+    /*
+     * Event output
+     */
+    .m_axis_event(axis_event_stub)
 );
 
 taxi_dma_desc_if #(

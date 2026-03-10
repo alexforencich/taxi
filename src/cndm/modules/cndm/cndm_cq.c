@@ -10,6 +10,15 @@ Authors:
 
 #include "cndm.h"
 
+static int cndm_cq_int(struct notifier_block *nb, unsigned long action, void *data)
+{
+	struct cndm_cq *cq = container_of(nb, struct cndm_cq, irq_nb);
+
+	napi_schedule_irqoff(&cq->napi);
+
+	return NOTIFY_DONE;
+}
+
 struct cndm_cq *cndm_create_cq(struct cndm_priv *priv)
 {
 	struct cndm_cq *cq;
@@ -24,6 +33,8 @@ struct cndm_cq *cndm_create_cq(struct cndm_priv *priv)
 
 	cq->cqn = -1;
 	cq->enabled = 0;
+
+	cq->irq_nb.notifier_call = cndm_cq_int;
 
 	cq->cons_ptr = 0;
 
@@ -40,14 +51,14 @@ void cndm_destroy_cq(struct cndm_cq *cq)
 	kfree(cq);
 }
 
-int cndm_open_cq(struct cndm_cq *cq, int irqn, int size)
+int cndm_open_cq(struct cndm_cq *cq, struct cndm_irq *irq, int size)
 {
 	int ret = 0;
 
 	struct cndm_cmd_queue cmd;
 	struct cndm_cmd_queue rsp;
 
-	if (cq->enabled || cq->buf)
+	if (cq->enabled || cq->buf || !irq)
 		return -EINVAL;
 
 	cq->size = roundup_pow_of_two(size);
@@ -59,6 +70,14 @@ int cndm_open_cq(struct cndm_cq *cq, int irqn, int size)
 	if (!cq->buf)
 		return -ENOMEM;
 
+	if (irq) {
+		ret = atomic_notifier_chain_register(&irq->nh, &cq->irq_nb);
+		if (ret)
+			goto fail;
+
+		cq->irq = irq;
+	}
+
 	cq->cons_ptr = 0;
 
 	// clear all phase tag bits
@@ -68,7 +87,7 @@ int cndm_open_cq(struct cndm_cq *cq, int irqn, int size)
 	cmd.flags = 0x00000000;
 	cmd.port = cq->priv->ndev->dev_port;
 	cmd.qn = 0;
-	cmd.qn2 = irqn; // TODO
+	cmd.qn2 = irq->index; // TODO
 	cmd.pd = 0;
 	cmd.size = ilog2(cq->size);
 	cmd.dboffs = 0;
@@ -119,6 +138,11 @@ void cndm_close_cq(struct cndm_cq *cq)
 		cq->cqn = -1;
 		cq->db_offset = 0;
 		cq->db_addr = NULL;
+	}
+
+	if (cq->irq) {
+		atomic_notifier_chain_unregister(&cq->irq->nh, &cq->irq_nb);
+		cq->irq = NULL;
 	}
 
 	if (cq->buf) {

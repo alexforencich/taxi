@@ -38,7 +38,7 @@ static int cndm_open(struct net_device *ndev)
 			goto fail;
 		}
 
-		ret = cndm_open_cq(cq, 0, 256);
+		ret = cndm_open_cq(cq, &priv->cdev->irq[0], 256);
 		if (ret) {
 			cndm_destroy_cq(cq);
 			goto fail;
@@ -75,7 +75,7 @@ static int cndm_open(struct net_device *ndev)
 			goto fail;
 		}
 
-		ret = cndm_open_cq(cq, 0, 256);
+		ret = cndm_open_cq(cq, &priv->cdev->irq[0], 256);
 		if (ret) {
 			cndm_destroy_cq(cq);
 			goto fail;
@@ -278,20 +278,6 @@ static const struct net_device_ops cndm_netdev_ops = {
 #endif
 };
 
-static int cndm_netdev_irq(struct notifier_block *nb, unsigned long action, void *data)
-{
-	struct cndm_priv *priv = container_of(nb, struct cndm_priv, irq_nb);
-
-	netdev_dbg(priv->ndev, "Interrupt");
-
-	if (priv->port_up) {
-		napi_schedule_irqoff(&priv->txq->cq->napi);
-		napi_schedule_irqoff(&priv->rxq->cq->napi);
-	}
-
-	return NOTIFY_DONE;
-}
-
 struct net_device *cndm_create_netdev(struct cndm_dev *cdev, int port)
 {
 	struct device *dev = cdev->dev;
@@ -350,14 +336,6 @@ struct net_device *cndm_create_netdev(struct cndm_dev *cdev, int port)
 
 	priv->registered = 1;
 
-	priv->irq_nb.notifier_call = cndm_netdev_irq;
-	priv->irq = &cdev->irq[port % cdev->irq_count];
-	ret = atomic_notifier_chain_register(&priv->irq->nh, &priv->irq_nb);
-	if (ret) {
-		priv->irq = NULL;
-		goto fail;
-	}
-
 	return ndev;
 
 fail:
@@ -371,11 +349,6 @@ void cndm_destroy_netdev(struct net_device *ndev)
 
 	if (priv->registered)
 		unregister_netdev(ndev);
-
-	if (priv->irq)
-		atomic_notifier_chain_unregister(&priv->irq->nh, &priv->irq_nb);
-
-	priv->irq = NULL;
 
 	free_netdev(ndev);
 }

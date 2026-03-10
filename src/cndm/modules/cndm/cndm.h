@@ -173,11 +173,40 @@ struct cndm_cq {
 	int enabled;
 
 	struct cndm_ring *src_ring;
-
+	struct cndm_eq *eq;
 	struct cndm_irq *irq;
 	struct notifier_block irq_nb;
 
 	void (*handler)(struct cndm_cq *cq);
+
+	u32 db_offset;
+	u8 __iomem *db_addr;
+};
+
+struct cndm_eq {
+	u32 cons_ptr;
+
+	u32 size;
+	u32 size_mask;
+	u32 stride;
+
+	size_t buf_size;
+	u8 *buf;
+	dma_addr_t buf_dma_addr;
+
+	struct device *dev;
+	struct cndm_dev *cdev;
+	struct cndm_priv *priv;
+	int eqn;
+	int enabled;
+
+	struct cndm_irq *irq;
+	struct notifier_block irq_nb;
+
+	void (*handler)(struct cndm_eq *eq);
+
+	spinlock_t table_lock;
+	struct radix_tree_root cq_table;
 
 	u32 db_offset;
 	u8 __iomem *db_addr;
@@ -197,6 +226,8 @@ struct cndm_priv {
 
 	int rxq_count;
 	int txq_count;
+
+	struct cndm_eq *eq;
 
 	struct cndm_ring *txq;
 	struct cndm_ring *rxq;
@@ -230,10 +261,20 @@ ktime_t cndm_read_cpl_ts(struct cndm_ring *ring, const struct cndm_cpl *cpl);
 void cndm_register_phc(struct cndm_dev *cdev);
 void cndm_unregister_phc(struct cndm_dev *cdev);
 
+// cndm_eq.c
+struct cndm_eq *cndm_create_eq(struct cndm_priv *priv);
+void cndm_destroy_eq(struct cndm_eq *eq);
+int cndm_open_eq(struct cndm_eq *eq, struct cndm_irq *irq, int size);
+void cndm_close_eq(struct cndm_eq *eq);
+int cndm_eq_attach_cq(struct cndm_eq *eq, struct cndm_cq *cq);
+void cndm_eq_detach_cq(struct cndm_eq *eq, struct cndm_cq *cq);
+void cndm_eq_write_cons_ptr(const struct cndm_eq *eq);
+void cndm_eq_write_cons_ptr_arm(const struct cndm_eq *eq);
+
 // cndm_cq.c
 struct cndm_cq *cndm_create_cq(struct cndm_priv *priv);
 void cndm_destroy_cq(struct cndm_cq *cq);
-int cndm_open_cq(struct cndm_cq *cq, struct cndm_irq *irq, int size);
+int cndm_open_cq(struct cndm_cq *cq, struct cndm_eq *eq, struct cndm_irq *irq, int size);
 void cndm_close_cq(struct cndm_cq *cq);
 void cndm_cq_write_cons_ptr(const struct cndm_cq *cq);
 void cndm_cq_write_cons_ptr_arm(const struct cndm_cq *cq);

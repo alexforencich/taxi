@@ -10,14 +10,7 @@ Authors:
 
 #include "cndm.h"
 
-static int cndm_cq_int(struct notifier_block *nb, unsigned long action, void *data)
-{
-	struct cndm_cq *cq = container_of(nb, struct cndm_cq, irq_nb);
-
-	napi_schedule_irqoff(&cq->napi);
-
-	return NOTIFY_DONE;
-}
+static int cndm_cq_int(struct notifier_block *nb, unsigned long action, void *data);
 
 struct cndm_cq *cndm_create_cq(struct cndm_priv *priv)
 {
@@ -51,14 +44,15 @@ void cndm_destroy_cq(struct cndm_cq *cq)
 	kfree(cq);
 }
 
-int cndm_open_cq(struct cndm_cq *cq, struct cndm_irq *irq, int size)
+int cndm_open_cq(struct cndm_cq *cq, struct cndm_eq *eq, struct cndm_irq *irq, int size)
 {
+	u32 dqn;
 	int ret = 0;
 
 	struct cndm_cmd_queue cmd;
 	struct cndm_cmd_queue rsp;
 
-	if (cq->enabled || cq->buf || !irq)
+	if (cq->enabled || cq->buf || (!irq && !eq))
 		return -EINVAL;
 
 	cq->size = roundup_pow_of_two(size);
@@ -70,12 +64,17 @@ int cndm_open_cq(struct cndm_cq *cq, struct cndm_irq *irq, int size)
 	if (!cq->buf)
 		return -ENOMEM;
 
-	if (irq) {
+	// can use either EQ or IRQ, but prefer EQ if both are specified
+	if (eq) {
+		cq->eq = eq;
+		dqn = eq->eqn;
+	} else if (irq) {
 		ret = atomic_notifier_chain_register(&irq->nh, &cq->irq_nb);
 		if (ret)
 			goto fail;
 
 		cq->irq = irq;
+		dqn = irq->index | 0x80000000;
 	}
 
 	cq->cons_ptr = 0;
@@ -87,7 +86,7 @@ int cndm_open_cq(struct cndm_cq *cq, struct cndm_irq *irq, int size)
 	cmd.flags = 0x00000000;
 	cmd.port = cq->priv->ndev->dev_port;
 	cmd.qn = 0;
-	cmd.qn2 = irq->index; // TODO
+	cmd.qn2 = dqn;
 	cmd.pd = 0;
 	cmd.size = ilog2(cq->size);
 	cmd.dboffs = 0;
@@ -105,6 +104,10 @@ int cndm_open_cq(struct cndm_cq *cq, struct cndm_irq *irq, int size)
 	cq->cqn = rsp.qn;
 	cq->db_offset = rsp.dboffs;
 	cq->db_addr = cq->cdev->hw_addr + rsp.dboffs;
+
+	if (eq) {
+		cndm_eq_attach_cq(eq, cq);
+	}
 
 	cq->enabled = 1;
 
@@ -140,6 +143,11 @@ void cndm_close_cq(struct cndm_cq *cq)
 		cq->db_addr = NULL;
 	}
 
+	if (cq->eq) {
+		cndm_eq_detach_cq(cq->eq, cq);
+		cq->eq = NULL;
+	}
+
 	if (cq->irq) {
 		atomic_notifier_chain_unregister(&cq->irq->nh, &cq->irq_nb);
 		cq->irq = NULL;
@@ -160,4 +168,14 @@ void cndm_cq_write_cons_ptr(const struct cndm_cq *cq)
 void cndm_cq_write_cons_ptr_arm(const struct cndm_cq *cq)
 {
 	iowrite32((cq->cons_ptr & 0xffff) | 0x80000000, cq->db_addr);
+}
+
+static int cndm_cq_int(struct notifier_block *nb, unsigned long action, void *data)
+{
+	struct cndm_cq *cq = container_of(nb, struct cndm_cq, irq_nb);
+
+	if (likely(cq->handler))
+		cq->handler(cq);
+
+	return NOTIFY_DONE;
 }

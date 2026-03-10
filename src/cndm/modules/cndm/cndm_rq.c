@@ -10,6 +10,8 @@ Authors:
 
 #include "cndm.h"
 
+static void cndm_rq_cq_handler(struct cndm_cq *cq);
+
 struct cndm_ring *cndm_create_rq(struct cndm_priv *priv)
 {
 	struct cndm_ring *rq;
@@ -69,7 +71,7 @@ int cndm_open_rq(struct cndm_ring *rq, struct cndm_priv *priv, struct cndm_cq *c
 	rq->priv = priv;
 	rq->cq = cq;
 	cq->src_ring = rq;
-	// cq->handler = cndm_rx_irq;
+	cq->handler = cndm_rq_cq_handler;
 
 	rq->prod_ptr = 0;
 	rq->cons_ptr = 0;
@@ -352,6 +354,11 @@ rx_drop:
 	return done;
 }
 
+static void cndm_rq_cq_handler(struct cndm_cq *cq)
+{
+	napi_schedule_irqoff(&cq->napi);
+}
+
 int cndm_poll_rx_cq(struct napi_struct *napi, int budget)
 {
 	struct cndm_cq *cq = container_of(napi, struct cndm_cq, napi);
@@ -364,7 +371,6 @@ int cndm_poll_rx_cq(struct napi_struct *napi, int budget)
 
 	napi_complete(napi);
 
-	// TODO re-enable interrupts
 	cndm_cq_write_cons_ptr_arm(cq);
 
 	return done;

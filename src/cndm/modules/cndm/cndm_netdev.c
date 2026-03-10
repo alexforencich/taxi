@@ -38,7 +38,7 @@ static int cndm_open(struct net_device *ndev)
 			goto fail;
 		}
 
-		ret = cndm_open_cq(cq, &priv->cdev->irq[0], 256);
+		ret = cndm_open_cq(cq, priv->eq, &priv->cdev->irq[0], 256);
 		if (ret) {
 			cndm_destroy_cq(cq);
 			goto fail;
@@ -75,7 +75,7 @@ static int cndm_open(struct net_device *ndev)
 			goto fail;
 		}
 
-		ret = cndm_open_cq(cq, &priv->cdev->irq[0], 256);
+		ret = cndm_open_cq(cq, priv->eq, &priv->cdev->irq[0], 256);
 		if (ret) {
 			cndm_destroy_cq(cq);
 			goto fail;
@@ -326,6 +326,19 @@ struct net_device *cndm_create_netdev(struct cndm_dev *cdev, int port)
 	ndev->min_mtu = ETH_MIN_MTU;
 	ndev->max_mtu = 1500;
 
+	priv->eq = cndm_create_eq(priv);
+	if (IS_ERR_OR_NULL(priv->eq)) {
+		ret = PTR_ERR(priv->eq);
+		priv->eq = NULL;
+		goto fail;
+	}
+
+	ret = cndm_open_eq(priv->eq, &priv->cdev->irq[0], 256);
+	if (ret) {
+		cndm_destroy_eq(priv->eq);
+		goto fail;
+	}
+
 	netif_carrier_off(ndev);
 
 	ret = register_netdev(ndev);
@@ -349,6 +362,9 @@ void cndm_destroy_netdev(struct net_device *ndev)
 
 	if (priv->registered)
 		unregister_netdev(ndev);
+
+	if (priv->eq)
+		cndm_destroy_eq(priv->eq);
 
 	free_netdev(ndev);
 }

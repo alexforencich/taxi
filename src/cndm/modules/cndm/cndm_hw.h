@@ -202,14 +202,10 @@ struct cndm_cpl {
 };
 
 struct cndm_event {
+	__le16 rsvd0;
 	__le16 type;
-	__le16 source;
-	__le32 rsvd0;
+	__le32 source;
 	__le32 rsvd1;
-	__le32 rsvd2;
-	__le32 rsvd3;
-	__le32 rsvd4;
-	__le32 rsvd5;
 	__le32 phase;
 };
 

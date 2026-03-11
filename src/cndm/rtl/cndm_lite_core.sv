@@ -139,7 +139,7 @@ taxi_axil_if #(
 )
 axil_ctrl[PORTS+PORT_OFFSET_HOST]();
 
-taxi_axil_interconnect_1s #(
+taxi_axil_crossbar_1s #(
     .M_COUNT($size(axil_ctrl)),
     .ADDR_W(s_axil_ctrl_wr.ADDR_W),
     .M_REGIONS(1),

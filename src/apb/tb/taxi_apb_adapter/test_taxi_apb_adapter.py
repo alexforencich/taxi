@@ -157,15 +157,12 @@ def cycle_pause():
 
 if getattr(cocotb, 'top', None) is not None:
 
-    for test in [run_test_write, run_test_read]:
+    for test in [run_test_write, run_test_read, run_stress_test]:
 
         factory = TestFactory(test)
         factory.add_option("idle_inserter", [None, cycle_pause])
         factory.add_option("backpressure_inserter", [None, cycle_pause])
         factory.generate_tests()
-
-    factory = TestFactory(run_stress_test)
-    factory.generate_tests()
 
 
 # cocotb-test

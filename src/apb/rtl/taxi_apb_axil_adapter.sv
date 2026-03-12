@@ -168,7 +168,7 @@ if (AXIL_BYTE_LANES == APB_BYTE_LANES) begin : bypass
                 m_axil_auser_next = s_apb.pauser;
                 m_axil_wuser_next = s_apb.pwuser;
 
-                if (s_apb.psel && s_apb.penable && !s_apb.pready) begin
+                if (s_apb.psel && !s_apb.pready) begin
                     if (s_apb.pwrite) begin
                         m_axil_awvalid_next = 1'b1;
                         m_axil_wvalid_next = 1'b1;
@@ -322,7 +322,7 @@ end else if (AXIL_BYTE_LANES > APB_BYTE_LANES) begin : upsize
                 m_axil_auser_next = s_apb.pauser;
                 m_axil_wuser_next = s_apb.pwuser;
 
-                if (s_apb.psel && s_apb.penable && !s_apb.pready) begin
+                if (s_apb.psel && !s_apb.pready) begin
                     if (s_apb.pwrite) begin
                         m_axil_awvalid_next = 1'b1;
                         m_axil_wvalid_next = 1'b1;
@@ -501,7 +501,7 @@ end else begin : downsize
 
                 s_apb_pslverr_next = 1'b0;
 
-                if (s_apb.psel && s_apb.penable && !s_apb.pready) begin
+                if (s_apb.psel && !s_apb.pready) begin
                     if (s_apb.pwrite) begin
                         m_axil_awvalid_next = 1'b1;
                         m_axil_wvalid_next = 1'b1;

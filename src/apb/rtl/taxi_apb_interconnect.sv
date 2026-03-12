@@ -249,7 +249,7 @@ always_ff @(posedge clk) begin
         m_apb_psel_reg <= '0;
         m_apb_penable_reg <= 1'b0;
 
-        if (s_apb.psel && s_apb.penable && !s_apb_pready_reg) begin
+        if (s_apb.psel && !s_apb_pready_reg) begin
             act_reg <= 1'b1;
             for (integer i = 0; i < M_CNT; i = i + 1) begin
                 for (integer j = 0; j < M_REGIONS; j = j + 1) begin

@@ -101,7 +101,7 @@ always_comb begin
 
     s_apb_a_pready_next = 1'b0;
 
-    if (s_apb_a.psel && s_apb_a.penable && (!s_apb_a_pready_reg && (PIPELINE_OUTPUT || !s_apb_a_pready_pipe_reg))) begin
+    if (s_apb_a.psel && (!s_apb_a_pready_reg && (PIPELINE_OUTPUT || !s_apb_a_pready_pipe_reg))) begin
         s_apb_a_pready_next = 1'b1;
 
         if (s_apb_a.pwrite) begin
@@ -139,7 +139,7 @@ always_comb begin
 
     s_apb_b_pready_next = 1'b0;
 
-    if (s_apb_b.psel && s_apb_b.penable && (!s_apb_b_pready_reg && (PIPELINE_OUTPUT || !s_apb_b_pready_pipe_reg))) begin
+    if (s_apb_b.psel && (!s_apb_b_pready_reg && (PIPELINE_OUTPUT || !s_apb_b_pready_pipe_reg))) begin
         s_apb_b_pready_next = 1'b1;
 
         if (s_apb_b.pwrite) begin

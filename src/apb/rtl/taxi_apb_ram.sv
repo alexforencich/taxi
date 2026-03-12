@@ -75,7 +75,7 @@ always_comb begin
 
     s_apb_pready_next = 1'b0;
 
-    if (s_apb.psel && s_apb.penable && (!s_apb_pready_reg && (PIPELINE_OUTPUT || !s_apb_pready_pipe_reg))) begin
+    if (s_apb.psel && (!s_apb_pready_reg && (PIPELINE_OUTPUT || !s_apb_pready_pipe_reg))) begin
         s_apb_pready_next = 1'b1;
 
         if (s_apb.pwrite) begin

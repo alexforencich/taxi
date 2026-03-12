@@ -162,7 +162,7 @@ end else if (M_BYTE_LANES > S_BYTE_LANES) begin : upsize
                 m_apb_pauser_next = s_apb.pauser;
                 m_apb_pwuser_next = s_apb.pwuser;
 
-                if (s_apb.psel && s_apb.penable && !s_apb.pready) begin
+                if (s_apb.psel && !s_apb.pready) begin
                     m_apb_psel_next = 1'b1;
                     state_next = STATE_DATA;
                 end else begin
@@ -317,7 +317,7 @@ end else begin : downsize
 
                 s_apb_pslverr_next = 1'b0;
 
-                if (s_apb.psel && s_apb.penable && !s_apb.pready) begin
+                if (s_apb.psel && !s_apb.pready) begin
                     m_apb_psel_next = 1'b1;
                     state_next = STATE_DATA;
                 end else begin

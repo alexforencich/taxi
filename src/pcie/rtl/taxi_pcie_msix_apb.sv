@@ -405,7 +405,7 @@ always_comb begin
         end
     end
 
-    if (s_apb.psel && s_apb.penable) begin
+    if (s_apb.psel) begin
         rd_data_shift_next = s_apb_paddr_word;
 
         if (s_apb.pwrite) begin

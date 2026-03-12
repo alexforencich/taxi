@@ -353,14 +353,14 @@ always_comb begin
 
                 if (s_axis_cmd.tready && s_axis_cmd.tvalid) begin
                     // command valid
+                    s_axis_cmd_ready_next = 1'b0;
+
                     if (s_axis_cmd_read ^ (s_axis_cmd_write || s_axis_cmd_write_multi)) begin
                         // read or write command
                         addr_next = s_axis_cmd_address;
                         mode_read_next = s_axis_cmd_read;
                         mode_write_multiple_next = s_axis_cmd_write_multi;
                         mode_stop_next = s_axis_cmd_stop;
-
-                        s_axis_cmd_ready_next = 1'b0;
 
                         if (s_axis_cmd_start || s_axis_cmd_address != addr_reg || s_axis_cmd_read) begin
                             // address or mode mismatch or forced start - repeated start
@@ -387,6 +387,7 @@ always_comb begin
                 end else begin
                     if (stop_on_idle && s_axis_cmd.tready && !s_axis_cmd.tvalid) begin
                         // no waiting command and stop_on_idle selected, issue stop condition
+                        s_axis_cmd_ready_next = 1'b0;
                         phy_stop_bit = 1'b1;
                         state_next = STATE_IDLE;
                     end else begin
@@ -400,14 +401,14 @@ always_comb begin
 
                 if (s_axis_cmd.tready && s_axis_cmd.tvalid) begin
                     // command valid
+                    s_axis_cmd_ready_next = 1'b0;
+
                     if (s_axis_cmd_read ^ (s_axis_cmd_write || s_axis_cmd_write_multi)) begin
                         // read or write command
                         addr_next = s_axis_cmd_address;
                         mode_read_next = s_axis_cmd_read;
                         mode_write_multiple_next = s_axis_cmd_write_multi;
                         mode_stop_next = s_axis_cmd_stop;
-
-                        s_axis_cmd_ready_next = 1'b0;
 
                         if (s_axis_cmd_start || s_axis_cmd_address != addr_reg || s_axis_cmd_write) begin
                             // address or mode mismatch or forced start - repeated start
@@ -442,6 +443,7 @@ always_comb begin
                 end else begin
                     if (stop_on_idle && s_axis_cmd.tready && !s_axis_cmd.tvalid) begin
                         // no waiting command and stop_on_idle selected, issue stop condition
+                        s_axis_cmd_ready_next = 1'b0;
                         // write ack for previous read
                         phy_write_bit = 1'b1;
                         phy_tx_data = 1'b1;

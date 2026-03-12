@@ -284,7 +284,7 @@ always_ff @(posedge clk) begin
     offset_ptp_ts_req_reg <= offset_ptp_ts_req_reg && !offset_ptp_ts_ack_sync2_reg;
     set_ptp_period_req_reg <= set_ptp_period_req_reg && !set_ptp_period_ack_sync2_reg;
 
-    if (s_apb.penable && s_apb.psel && !s_apb_pready_reg) begin
+    if (s_apb.psel && !s_apb_pready_reg) begin
         s_apb_pready_reg <= 1'b1;
         s_apb_prdata_reg <= '0;
 

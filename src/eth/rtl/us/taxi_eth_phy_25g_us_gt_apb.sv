@@ -285,7 +285,7 @@ always_ff @(posedge clk) begin
     com_drp_en_reg <= 1'b0;
     com_drp_we_reg <= 1'b0;
 
-    if (s_apb_ctrl.psel && s_apb_ctrl.penable && !s_apb_ctrl_pready_reg) begin
+    if (s_apb_ctrl.psel && !s_apb_ctrl_pready_reg) begin
         act_reg <= 1'b1;
 
         case (s_apb_ctrl.paddr[15:14])

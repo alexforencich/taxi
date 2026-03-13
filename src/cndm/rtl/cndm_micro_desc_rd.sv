@@ -46,8 +46,26 @@ module cndm_micro_desc_rd #(
 );
 
 localparam DMA_ADDR_W = dma_rd_desc_req.SRC_ADDR_W;
+localparam DMA_TAG_W = dma_rd_desc_req.TAG_W;
 
 localparam RAM_ADDR_W = 16;
+
+localparam SLOT_CNT = 2;
+localparam SLOT_AW = $clog2(SLOT_CNT);
+
+localparam SLOT_SZ = dma_ram_wr.SEG_DATA_W * dma_ram_wr.SEG_DATA_W / 8;
+localparam CL_SLOT_SZ = $clog2(SLOT_SZ);
+
+localparam ID_W = s_axis_desc_req.ID_W;
+localparam TAG_W = SLOT_AW;
+
+logic [SLOT_AW+1-1:0] slot_start_ptr_reg = '0;
+logic [SLOT_AW+1-1:0] slot_rd_ptr_reg = '0;
+logic [SLOT_AW+1-1:0] slot_finish_ptr_reg = '0;
+logic slot_valid_reg[2**SLOT_AW] = '{default: '0};
+logic slot_error_reg[2**SLOT_AW] = '{default: '0};
+logic [TAG_W-1:0] slot_id_reg[2**SLOT_AW] = '{default: '0};
+logic [CQN_W-1:0] slot_cqn_reg[2**SLOT_AW] = '{default: '0};
 
 typedef enum logic [2:0] {
     QTYPE_EQ,
@@ -58,11 +76,13 @@ typedef enum logic [2:0] {
 
 logic [WQN_W-1:0]       wq_req_wqn_reg = '0;
 logic [2:0]             wq_req_qtype_reg = '0;
+logic [TAG_W-1:0]       wq_req_tag_reg = '0;
 logic                   wq_req_valid_reg = 1'b0;
 logic                   wq_req_ready;
 logic [CQN_W-1:0]       wq_rsp_cqn;
 logic [DMA_ADDR_W-1:0]  wq_rsp_addr;
 logic                   wq_rsp_error;
+logic [TAG_W-1:0]       wq_rsp_tag;
 logic                   wq_rsp_valid;
 logic                   wq_rsp_ready_reg = 1'b0;
 
@@ -72,6 +92,7 @@ taxi_axis_if axis_event_stub();
 cndm_micro_queue_state #(
     .QN_W(WQN_W),
     .DQN_W(CQN_W),
+    .TAG_W(TAG_W),
     .IS_CQ(0),
     .IS_EQ(0),
     .CQ_IRQ(0),
@@ -99,6 +120,7 @@ wq_mgr_inst (
      */
     .req_qn(wq_req_wqn_reg),
     .req_qtype(wq_req_qtype_reg),
+    .req_tag(wq_req_tag_reg),
     .req_valid(wq_req_valid_reg),
     .req_ready(wq_req_ready),
     .rsp_qn(),
@@ -106,6 +128,7 @@ wq_mgr_inst (
     .rsp_addr(wq_rsp_addr),
     .rsp_phase_tag(),
     .rsp_error(wq_rsp_error),
+    .rsp_tag(wq_rsp_tag),
     .rsp_valid(wq_rsp_valid),
     .rsp_ready(wq_rsp_ready_reg),
 
@@ -136,7 +159,7 @@ taxi_dma_desc_if #(
     .DST_ASID_EN(1'b0),
     .IMM_EN(1'b0),
     .LEN_W(5),
-    .TAG_W(1),
+    .TAG_W(SLOT_AW+1),
     .ID_EN(m_axis_desc.ID_EN),
     .ID_W(m_axis_desc.ID_W),
     .DEST_EN(m_axis_desc.DEST_EN),
@@ -144,15 +167,6 @@ taxi_dma_desc_if #(
     .USER_EN(m_axis_desc.USER_EN),
     .USER_W(m_axis_desc.USER_W)
 ) dma_desc();
-
-typedef enum logic [1:0] {
-    STATE_IDLE,
-    STATE_QUERY_WQ,
-    STATE_READ_DESC,
-    STATE_TX_DESC
-} state_t;
-
-state_t state_reg = STATE_IDLE;
 
 logic s_axis_desc_req_tready_reg = 1'b0;
 
@@ -189,62 +203,68 @@ always_ff @(posedge clk) begin
 
     s_axis_desc_req_tready_reg <= 1'b0;
 
-    case (state_reg)
-        STATE_IDLE: begin
-            s_axis_desc_req_tready_reg <= 1'b1;
+    // queue state query
+    s_axis_desc_req_tready_reg <= ((slot_start_ptr_reg ^ slot_finish_ptr_reg) != 2'b10) && (!wq_req_valid_reg || wq_req_ready);
 
-            if (s_axis_desc_req.tvalid && s_axis_desc_req.tready) begin
-                s_axis_desc_req_tready_reg <= 1'b0;
-                wq_req_wqn_reg <= s_axis_desc_req.tdest;
-                wq_req_qtype_reg <= s_axis_desc_req.tuser;
-                wq_req_valid_reg <= 1'b1;
-                dma_desc.req_id <= s_axis_desc_req.tid;
-                state_reg <= STATE_QUERY_WQ;
-            end else begin
-                state_reg <= STATE_IDLE;
-            end
-        end
-        STATE_QUERY_WQ: begin
-            wq_rsp_ready_reg <= 1'b1;
+    if (s_axis_desc_req.tvalid && s_axis_desc_req.tready) begin
+        s_axis_desc_req_tready_reg <= 1'b0;
+        wq_req_wqn_reg <= s_axis_desc_req.tdest;
+        wq_req_qtype_reg <= s_axis_desc_req.tuser;
+        wq_req_tag_reg <= slot_start_ptr_reg[SLOT_AW-1:0];
+        wq_req_valid_reg <= 1'b1;
 
-            if (wq_rsp_valid && wq_rsp_ready_reg) begin
-                wq_rsp_ready_reg <= 1'b0;
+        slot_id_reg[slot_start_ptr_reg[SLOT_AW-1:0]] <= s_axis_desc_req.tid;
+        slot_valid_reg[slot_start_ptr_reg[SLOT_AW-1:0]] <= 1'b0;
+        slot_error_reg[slot_start_ptr_reg[SLOT_AW-1:0]] <= 1'b0;
 
-                dma_rd_desc_req.req_src_addr <= wq_rsp_addr;
+        slot_start_ptr_reg <= slot_start_ptr_reg + 1;
+    end
 
-                dma_desc.req_dest <= wq_rsp_cqn;
+    // start host DMA read
+    wq_rsp_ready_reg <= 1'b1;
 
-                if (wq_rsp_error) begin
-                    // report error
-                    dma_desc.req_user <= 1'b1;
-                    dma_desc.req_valid <= 1'b1;
-                    state_reg <= STATE_TX_DESC;
-                end else begin
-                    // read desc
-                    dma_desc.req_user <= 1'b0;
-                    dma_rd_desc_req.req_valid <= 1'b1;
-                    state_reg <= STATE_READ_DESC;
-                end
-            end
+    if (wq_rsp_valid && wq_rsp_ready_reg) begin
+        wq_rsp_ready_reg <= 1'b0;
+
+        dma_rd_desc_req.req_src_addr <= wq_rsp_addr;
+        dma_rd_desc_req.req_dst_addr <= RAM_ADDR_W'(wq_rsp_tag*SLOT_SZ);
+        dma_rd_desc_req.req_tag <= DMA_TAG_W'(wq_rsp_tag);
+
+        slot_cqn_reg[wq_rsp_tag] <= wq_rsp_cqn;
+        slot_error_reg[wq_rsp_tag] <= wq_rsp_error;
+
+        if (!wq_rsp_error) begin
+            // read desc
+            dma_rd_desc_req.req_valid <= 1'b1;
         end
-        STATE_READ_DESC: begin
-            if (dma_rd_desc_sts.sts_valid) begin
-                dma_desc.req_valid <= 1'b1;
-                state_reg <= STATE_TX_DESC;
-            end
-        end
-        STATE_TX_DESC: begin
-            if (dma_desc.sts_valid) begin
-                state_reg <= STATE_IDLE;
-            end
-        end
-        default: begin
-            state_reg <= STATE_IDLE;
-        end
-    endcase
+    end
+
+    // store host DMA read status
+    if (dma_rd_desc_sts.sts_valid) begin
+        slot_valid_reg[dma_rd_desc_sts.sts_tag[SLOT_AW-1:0]] <= 1'b1;
+    end
+
+    // start internal DMA
+    if ((slot_valid_reg[slot_rd_ptr_reg[SLOT_AW-1:0]] || slot_error_reg[slot_rd_ptr_reg[SLOT_AW-1:0]]) && slot_rd_ptr_reg != slot_start_ptr_reg) begin
+        dma_desc.req_src_addr <= RAM_ADDR_W'(slot_rd_ptr_reg[SLOT_AW-1:0]*SLOT_SZ);
+        dma_desc.req_dest <= slot_cqn_reg[slot_rd_ptr_reg[SLOT_AW-1:0]];
+        dma_desc.req_id <= slot_id_reg[slot_rd_ptr_reg[SLOT_AW-1:0]];
+        dma_desc.req_user <= slot_error_reg[slot_rd_ptr_reg[SLOT_AW-1:0]];
+        dma_desc.req_tag <= slot_rd_ptr_reg;
+        dma_desc.req_valid <= 1'b1;
+
+        slot_rd_ptr_reg <= slot_rd_ptr_reg + 1;
+    end
+
+    // handle internal DMA status
+    if (dma_desc.sts_valid) begin
+        slot_finish_ptr_reg <= dma_desc.sts_tag;
+    end
 
     if (rst) begin
-        state_reg <= STATE_IDLE;
+        slot_start_ptr_reg <= '0;
+        slot_rd_ptr_reg <= '0;
+        slot_finish_ptr_reg <= '0;
     end
 end
 

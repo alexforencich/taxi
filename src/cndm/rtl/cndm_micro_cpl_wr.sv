@@ -119,6 +119,7 @@ cq_mgr_inst (
      */
     .req_qn(cq_req_cqn_reg),
     .req_qtype(cq_req_qtype_reg),
+    .req_tag('0),
     .req_valid(cq_req_valid_reg),
     .req_ready(cq_req_ready),
     .rsp_qn(),
@@ -126,6 +127,7 @@ cq_mgr_inst (
     .rsp_addr(cq_rsp_addr),
     .rsp_phase_tag(cq_rsp_phase_tag),
     .rsp_error(cq_rsp_error),
+    .rsp_tag(),
     .rsp_valid(cq_rsp_valid),
     .rsp_ready(cq_rsp_ready_reg),
 

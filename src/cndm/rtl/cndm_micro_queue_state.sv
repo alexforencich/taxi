@@ -18,6 +18,7 @@ Authors:
 module cndm_micro_queue_state #(
     parameter QN_W = 5,
     parameter DQN_W = 5,
+    parameter TAG_W = 5,
     parameter logic IS_CQ = 1'b0,
     parameter logic IS_EQ = 1'b0,
     parameter logic CQ_IRQ = IS_CQ,
@@ -45,6 +46,7 @@ module cndm_micro_queue_state #(
      */
     input  wire logic [QN_W-1:0]        req_qn,
     input  wire logic [2:0]             req_qtype,
+    input  wire logic [TAG_W-1:0]       req_tag,
     input  wire logic                   req_valid,
     output wire logic                   req_ready,
     output wire logic [QN_W-1:0]        rsp_qn,
@@ -52,6 +54,7 @@ module cndm_micro_queue_state #(
     output wire logic [DMA_ADDR_W-1:0]  rsp_addr,
     output wire logic                   rsp_phase_tag,
     output wire logic                   rsp_error,
+    output wire logic [TAG_W-1:0]       rsp_tag,
     output wire logic                   rsp_valid,
     input  wire logic                   rsp_ready,
 
@@ -152,6 +155,7 @@ logic [DQN_W-1:0] rsp_dqn_reg = '0, rsp_dqn_next;
 logic [DMA_ADDR_W-1:0] rsp_addr_reg = '0, rsp_addr_next;
 logic rsp_phase_tag_reg = 1'b0, rsp_phase_tag_next;
 logic rsp_error_reg = 1'b0, rsp_error_next;
+logic [TAG_W-1:0] rsp_tag_reg = '0, rsp_tag_next;
 logic rsp_valid_reg = 1'b0, rsp_valid_next;
 
 assign req_ready = req_ready_reg;
@@ -160,6 +164,7 @@ assign rsp_dqn = rsp_dqn_reg;
 assign rsp_addr = rsp_addr_reg;
 assign rsp_phase_tag = rsp_phase_tag_reg;
 assign rsp_error = rsp_error_reg;
+assign rsp_tag = rsp_tag_reg;
 assign rsp_valid = rsp_valid_reg;
 
 logic notify_req_ready_reg = 1'b0, notify_req_ready_next;
@@ -274,6 +279,7 @@ always_comb begin
     rsp_addr_next = rsp_addr_reg;
     rsp_phase_tag_next = rsp_phase_tag_reg;
     rsp_error_next = rsp_error_reg;
+    rsp_tag_next = rsp_tag_reg;
     rsp_valid_next = rsp_valid_reg && !rsp_ready;
 
     notify_req_ready_next = 1'b0;
@@ -364,6 +370,7 @@ always_comb begin
 
                 queue_mem_addr_next = req_qn;
                 // req_qtype
+                rsp_tag_next = req_tag;
 
                 state_next = STATE_REQ;
             end else begin
@@ -561,6 +568,7 @@ always @(posedge clk) begin
     rsp_addr_reg <= rsp_addr_next;
     rsp_phase_tag_reg <= rsp_phase_tag_next;
     rsp_error_reg <= rsp_error_next;
+    rsp_tag_reg <= rsp_tag_next;
     rsp_valid_reg <= rsp_valid_next;
 
     notify_req_ready_reg <= notify_req_ready_next;

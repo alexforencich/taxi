@@ -210,8 +210,8 @@ always_comb begin
     addr_next = addr_reg;
     data_next = data_reg;
 
-    m_apb_psel_next = m_apb_psel_reg;
-    m_apb_penable_next = m_apb_penable_reg;
+    m_apb_psel_next = 1'b0;
+    m_apb_penable_next = 1'b0;
     m_apb_pwrite_next = m_apb_pwrite_reg;
     m_apb_pstrb_next = m_apb_pstrb_reg;
 
@@ -220,8 +220,6 @@ always_comb begin
             // idle, wait for start of packet
             xfcp_usp_ds_tready_next = xfcp_usp_us_tready_int_early;
             id_ptr_next = '0;
-
-            m_apb_psel_next = 1'b0;
 
             if (xfcp_usp_ds.tready && xfcp_usp_ds.tvalid) begin
                 if (xfcp_usp_ds.tlast) begin
@@ -341,7 +339,6 @@ always_comb begin
                     // set initial word offset
                     count_next = addr_reg & WORD_AM;
                     m_apb_pstrb_next = '0;
-                    m_apb_psel_next = 1'b1;
                     data_next = '0;
                     if (m_apb_pwrite_reg) begin
                         // start writing
@@ -356,6 +353,8 @@ always_comb begin
                         end
                     end else begin
                         // start reading
+                        m_apb_psel_next = 1'b1;
+                        m_apb_pwrite_next = 1'b0;
                         xfcp_usp_ds_tready_next = !(last_cycle_reg || (xfcp_usp_ds.tvalid && xfcp_usp_ds.tlast));
                         state_next = STATE_READ_1;
                     end
@@ -377,12 +376,14 @@ always_comb begin
             // wait for data
             m_apb_psel_next = 1'b1;
             m_apb_penable_next = 1'b1;
+            m_apb_pwrite_next = 1'b0;
 
             // drop padding
             xfcp_usp_ds_tready_next = !(last_cycle_reg || (xfcp_usp_ds.tvalid && xfcp_usp_ds.tlast));
 
             if (m_apb.psel && m_apb.penable && m_apb.pready) begin
                 // read cycle complete, store result
+                m_apb_psel_next = 1'b0;
                 m_apb_penable_next = 1'b0;
                 data_next = m_apb.prdata;
                 addr_next = addr_reg + (1 << (ADDR_W-VALID_ADDR_W+BYTE_AW));
@@ -393,8 +394,6 @@ always_comb begin
         end
         STATE_READ_2: begin
             // send data
-            m_apb_psel_next = 1'b1;
-            m_apb_penable_next = 1'b0;
 
             // drop padding
             xfcp_usp_ds_tready_next = !(last_cycle_reg || (xfcp_usp_ds.tvalid && xfcp_usp_ds.tlast));
@@ -410,7 +409,6 @@ always_comb begin
                 if (ptr_reg == 1) begin
                     // last word of read
                     xfcp_usp_us_tlast_int = 1'b1;
-                    m_apb_psel_next = 1'b0;
                     if (!(last_cycle_reg || (xfcp_usp_ds.tvalid && xfcp_usp_ds.tlast))) begin
                         state_next = STATE_WAIT_LAST;
                     end else begin
@@ -420,6 +418,8 @@ always_comb begin
                 end else if (count_reg == (STRB_W*BYTE_W/8)-1) begin
                     // end of stored data word; read the next one
                     count_next = 0;
+                    m_apb_psel_next = 1'b1;
+                    m_apb_pwrite_next = 1'b0;
                     state_next = STATE_READ_1;
                 end else begin
                     state_next = STATE_READ_2;
@@ -431,8 +431,6 @@ always_comb begin
         STATE_WRITE_1: begin
             // write data
             xfcp_usp_ds_tready_next = 1'b1;
-            m_apb_psel_next = 1'b1;
-            m_apb_penable_next = 1'b0;
 
             if (xfcp_usp_ds.tready && xfcp_usp_ds.tvalid) begin
                 // store word
@@ -444,7 +442,8 @@ always_comb begin
                     // have full word or at end of block, start write operation
                     count_next = 0;
                     xfcp_usp_ds_tready_next = 1'b0;
-                    m_apb_penable_next = 1'b1;
+                    m_apb_psel_next = 1'b1;
+                    m_apb_pwrite_next = 1'b1;
                     state_next = STATE_WRITE_2;
                     if (xfcp_usp_ds.tlast) begin
                         // last asserted, nothing further to write
@@ -452,7 +451,6 @@ always_comb begin
                     end
                 end else if (xfcp_usp_ds.tlast) begin
                     // last asserted, return to idle
-                    m_apb_psel_next = 1'b0;
                     state_next = STATE_IDLE;
                 end else begin
                     state_next = STATE_WRITE_1;
@@ -465,11 +463,13 @@ always_comb begin
             // wait for write completion
             m_apb_psel_next = 1'b1;
             m_apb_penable_next = 1'b1;
+            m_apb_pwrite_next = 1'b1;
 
             if (m_apb.psel && m_apb.penable && m_apb.pready) begin
                 // end of write operation
                 data_next = '0;
                 addr_next = addr_reg + (1 << (ADDR_W-VALID_ADDR_W+BYTE_AW));
+                m_apb_psel_next = 1'b0;
                 m_apb_penable_next = 1'b0;
                 m_apb_pstrb_next = '0;
                 if (ptr_reg == 0) begin
@@ -479,7 +479,6 @@ always_comb begin
                         state_next = STATE_WAIT_LAST;
                     end else begin
                         xfcp_usp_ds_tready_next = xfcp_usp_us_tready_int_early;
-                        m_apb_psel_next = 1'b0;
                         state_next = STATE_IDLE;
                     end
                 end else begin

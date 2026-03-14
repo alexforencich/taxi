@@ -94,6 +94,7 @@ logic sfp_mgt_refclk_0_p;
 logic sfp_mgt_refclk_0_n;
 
 logic [1:0] sfp_tx_disable_b;
+logic [1:0] sfp_rx_los;
 
 logic pcie_clk;
 logic pcie_rst;
@@ -281,6 +282,7 @@ uut (
     .sfp_mgt_refclk_0_n(sfp_mgt_refclk_0_n),
 
     .sfp_tx_disable_b(sfp_tx_disable_b),
+    .sfp_rx_los(sfp_rx_los),
 
     /*
      * PCIe

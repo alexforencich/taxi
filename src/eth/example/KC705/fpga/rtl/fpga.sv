@@ -80,6 +80,7 @@ module fpga #
     input  wire logic        sgmii_mgt_refclk_n,
 
     output wire logic        sfp_tx_disable_b,
+    input  wire logic        sfp_rx_los,
 
     /*
      * Ethernet: 1000BASE-T GMII, RGMII, or SGMII
@@ -700,6 +701,7 @@ core_inst (
     .sfp_gmii_tx_en(sfp_gmii_tx_en_int),
     .sfp_gmii_tx_er(sfp_gmii_tx_er_int),
     .sfp_tx_disable_b(sfp_tx_disable_b),
+    .sfp_rx_los(sfp_rx_los),
 
     /*
      * Ethernet: 1000BASE-T GMII/RGMII/SGMII

@@ -79,6 +79,7 @@ module fpga_core #
     output wire logic        sfp_gmii_tx_en,
     output wire logic        sfp_gmii_tx_er,
     output wire logic        sfp_tx_disable_b,
+    input  wire logic        sfp_rx_los,
 
     /*
      * Ethernet: 1000BASE-T

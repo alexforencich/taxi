@@ -81,6 +81,7 @@ module fpga_core #
     input  wire logic        sfp_mgt_refclk_n,
 
     output wire logic        sfp_tx_disable_b,
+    input  wire logic        sfp_rx_los,
 
     /*
      * Ethernet: 1000BASE-T

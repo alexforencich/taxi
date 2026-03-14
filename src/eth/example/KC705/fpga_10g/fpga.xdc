@@ -151,6 +151,7 @@ set_property -dict {LOC AE20 IOSTANDARD LVCMOS25 SLEW SLOW DRIVE 12} [get_ports 
 set_property -dict {LOC AG24 IOSTANDARD LVCMOS25 PULLUP true} [get_ports si5324_int]
 
 set_property -dict {LOC Y20  IOSTANDARD LVCMOS25 SLEW SLOW DRIVE 12} [get_ports {sfp_tx_disable_b}]
+set_property -dict {LOC P19  IOSTANDARD LVCMOS25} [get_ports {sfp_rx_los}]
 
 # 125 MHz MGT reference clock (SGMII, 1000BASE-X)
 #create_clock -period 8.000 -name sgmii_mgt_refclk [get_ports sgmii_mgt_refclk_p]

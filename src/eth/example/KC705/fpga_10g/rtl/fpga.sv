@@ -84,6 +84,7 @@ module fpga #
     input  wire logic        si5324_int,
 
     output wire logic        sfp_tx_disable_b,
+    input  wire logic        sfp_rx_los,
 
     /*
      * Ethernet: 1000BASE-T GMII or RGMII
@@ -526,6 +527,7 @@ core_inst (
     .sfp_mgt_refclk_n(sfp_mgt_refclk_n),
 
     .sfp_tx_disable_b(sfp_tx_disable_b),
+    .sfp_rx_los(sfp_rx_los),
 
     /*
      * Ethernet: 1000BASE-T GMII/RGMII/SGMII

@@ -21,7 +21,10 @@ static void cndm_get_drvinfo(struct net_device *ndev,
 
 	strscpy(drvinfo->driver, KBUILD_MODNAME, sizeof(drvinfo->driver));
 	strscpy(drvinfo->version, DRIVER_VERSION, sizeof(drvinfo->version));
-	snprintf(drvinfo->fw_version, sizeof(drvinfo->fw_version), "TODO"); // TODO
+	snprintf(drvinfo->fw_version, sizeof(drvinfo->fw_version),
+		"%d.%d.%d", cdev->fw_ver >> 20,
+		(cdev->fw_ver >> 12) & 0xff,
+		cdev->fw_ver & 0xfff);
 	strscpy(drvinfo->bus_info, dev_name(cdev->dev), sizeof(drvinfo->bus_info));
 }
 

@@ -44,8 +44,8 @@ static int cndm_get_ts_info(struct net_device *ndev,
 	if (cdev->ptp_clock)
 		info->phc_index = ptp_clock_index(cdev->ptp_clock);
 
-	// if (!(priv->if_features & cndm_IF_FEATURE_PTP_TS) || !cdev->ptp_clock)
-	// 	return 0;
+	if (!cdev->ptp_clock)
+		return 0;
 
 	info->so_timestamping |= SOF_TIMESTAMPING_TX_HARDWARE |
 		SOF_TIMESTAMPING_RX_HARDWARE | SOF_TIMESTAMPING_RAW_HARDWARE;

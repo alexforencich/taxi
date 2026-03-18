@@ -97,6 +97,11 @@ struct cndm_dev {
 	u8 log_max_rq_sz;
 	u8 rq_pool;
 	u8 rqe_ver;
+
+	// HW IDs
+	char sn_str[32];
+	char base_mac[ETH_ALEN];
+	int mac_cnt;
 };
 
 struct cndm_tx_info {
@@ -237,6 +242,8 @@ struct cndm_priv {
 int cndm_exec_mbox_cmd(struct cndm_dev *cdev, void *cmd, void *rsp);
 int cndm_exec_cmd(struct cndm_dev *cdev, void *cmd, void *rsp);
 int cndm_access_reg(struct cndm_dev *cdev, u32 reg, int raw, int write, u64 *data);
+int cndm_hwid_sn_rd(struct cndm_dev *cdev, int *len, void *data);
+int cndm_hwid_mac_rd(struct cndm_dev *cdev, u16 index, int *cnt, void *data);
 
 // cndm_devlink.c
 struct devlink *cndm_devlink_alloc(struct device *dev);

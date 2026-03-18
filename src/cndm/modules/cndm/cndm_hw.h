@@ -19,6 +19,9 @@ Authors:
 
 #define CNDM_CMD_OP_ACCESS_REG 0x0180
 #define CNDM_CMD_OP_PTP        0x0190
+#define CNDM_CMD_OP_HWID       0x01A0
+#define CNDM_CMD_OP_HWMON      0x01B0
+#define CNDM_CMD_OP_PLL        0x01C0
 
 #define CNDM_CMD_OP_CREATE_EQ  0x0200
 #define CNDM_CMD_OP_MODIFY_EQ  0x0201
@@ -44,6 +47,31 @@ Authors:
 #define CNDM_CMD_OP_MODIFY_QP  0x0241
 #define CNDM_CMD_OP_QUERY_QP   0x0242
 #define CNDM_CMD_OP_DESTROY_QP 0x0243
+
+#define CNDM_CMD_BRD_OP_NOP 0x0000
+
+#define CNDM_CMD_BRD_OP_FLASH_RD  0x0100
+#define CNDM_CMD_BRD_OP_FLASH_WR  0x0101
+#define CNDM_CMD_BRD_OP_FLASH_CMD 0x0108
+
+#define CNDM_CMD_BRD_OP_EEPROM_RD 0x0200
+#define CNDM_CMD_BRD_OP_EEPROM_WR 0x0201
+
+#define CNDM_CMD_BRD_OP_OPTIC_RD 0x0300
+#define CNDM_CMD_BRD_OP_OPTIC_WR 0x0301
+
+#define CNDM_CMD_BRD_OP_HWID_SN_RD  0x0400
+#define CNDM_CMD_BRD_OP_HWID_VPD_RD 0x0410
+#define CNDM_CMD_BRD_OP_HWID_MAC_RD 0x0480
+
+#define CNDM_CMD_BRD_OP_PLL_STATUS_RD   0x0500
+#define CNDM_CMD_BRD_OP_PLL_TUNE_RAW_RD 0x0502
+#define CNDM_CMD_BRD_OP_PLL_TUNE_RAW_WR 0x0503
+#define CNDM_CMD_BRD_OP_PLL_TUNE_PPT_RD 0x0504
+#define CNDM_CMD_BRD_OP_PLL_TUNE_PPT_WR 0x0505
+
+#define CNDM_CMD_BRD_OP_I2C_RD 0x8100
+#define CNDM_CMD_BRD_OP_I2C_WR 0x8101
 
 struct cndm_cmd_cfg {
 	__le16 rsvd;
@@ -151,6 +179,29 @@ struct cndm_cmd_ptp {
 
 	__le64 period;
 	__le32 rsvd2[2];
+};
+
+struct cndm_cmd_hwid {
+	__le16 rsvd;
+	union {
+		__le16 opcode;
+		__le16 status;
+	};
+	__le32 flags;
+	__le16 index;
+	union {
+		__le16 brd_opcode;
+		__le16 brd_status;
+	};
+	__le32 brd_flags;
+	__u8 page;
+	__u8 bank;
+	__u8 dev_addr_offset;
+	__u8 rsvd2;
+	__le32 addr;
+	__le32 len;
+	__le32 rsvd3;
+	__le32 data[8];
 };
 
 struct cndm_cmd_queue {

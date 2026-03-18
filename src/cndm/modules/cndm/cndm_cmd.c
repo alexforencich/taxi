@@ -91,3 +91,64 @@ int cndm_access_reg(struct cndm_dev *cdev, u32 reg, int raw, int write, u64 *dat
 
 	return 0;
 }
+
+int cndm_hwid_sn_rd(struct cndm_dev *cdev, int *len, void *data)
+{
+	struct cndm_cmd_hwid cmd;
+	struct cndm_cmd_hwid rsp;
+	int ret = 0;
+	char buf[64];
+	char *ptr;
+
+	cmd.opcode = CNDM_CMD_OP_HWID;
+	cmd.flags = 0x00000000;
+	cmd.index = 0;
+	cmd.brd_opcode = CNDM_CMD_BRD_OP_HWID_SN_RD;
+	cmd.brd_flags = 0x00000000;
+
+	ret = cndm_exec_cmd(cdev, &cmd, &rsp);
+	if (ret)
+		return ret;
+
+	if (rsp.status || rsp.brd_status)
+		return rsp.status ? rsp.status : rsp.brd_status;
+
+	// memcpy(&buf, ((void *)&rsp.data), min(cmd.len, 32)); // TODO
+	memcpy(&buf, ((void *)&rsp.data), 32);
+	buf[32] = 0;
+	ptr = strim(buf);
+
+	if (len)
+		*len = strlen(ptr);
+	if (data)
+		strscpy(data, ptr, 32);
+
+	return 0;
+}
+
+int cndm_hwid_mac_rd(struct cndm_dev *cdev, u16 index, int *cnt, void *data)
+{
+	struct cndm_cmd_hwid cmd;
+	struct cndm_cmd_hwid rsp;
+	int ret = 0;
+
+	cmd.opcode = CNDM_CMD_OP_HWID;
+	cmd.flags = 0x00000000;
+	cmd.index = index;
+	cmd.brd_opcode = CNDM_CMD_BRD_OP_HWID_MAC_RD;
+	cmd.brd_flags = 0x00000000;
+
+	ret = cndm_exec_cmd(cdev, &cmd, &rsp);
+	if (ret)
+		return ret;
+
+	if (rsp.status || rsp.brd_status)
+		return rsp.status ? rsp.status : rsp.brd_status;
+
+	if (cnt)
+		*cnt = 1; // *((u16 *)&rsp.data); // TODO
+	if (data)
+		memcpy(data, ((void *)&rsp.data)+2, ETH_ALEN);
+
+	return 0;
+}

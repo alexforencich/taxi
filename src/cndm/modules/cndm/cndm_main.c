@@ -209,6 +209,27 @@ static int cndm_common_probe(struct cndm_dev *cdev)
 	dev_info(dev, "RQ pool: %d", cdev->rq_pool);
 	dev_info(dev, "RQE version: %d", cdev->rqe_ver);
 
+	dev_info(dev, "Read HW IDs");
+
+	ret = cndm_hwid_sn_rd(cdev, NULL, &cdev->sn_str);
+	if (ret) {
+		dev_info(dev, "No readable serial number");
+	} else {
+		dev_info(dev, "SN: %s", cdev->sn_str);
+	}
+
+	ret = cndm_hwid_mac_rd(cdev, 0, &cdev->mac_cnt, &cdev->base_mac);
+	if (ret) {
+		dev_info(dev, "No readable MACs");
+		cdev->mac_cnt = 0;
+	} else if (!is_valid_ether_addr(cdev->base_mac)) {
+		dev_warn(dev, "Base MAC is invalid");
+		cdev->mac_cnt = 0;
+	} else {
+		dev_info(dev, "MAC count: %d", cdev->mac_cnt);
+		dev_info(dev, "Base MAC: %pM", cdev->base_mac);
+	}
+
 	if (cdev->port_count > ARRAY_SIZE(cdev->ndev))
 		cdev->port_count = ARRAY_SIZE(cdev->ndev);
 

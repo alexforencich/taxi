@@ -44,6 +44,12 @@ static int cndm_devlink_info_get(struct devlink *devlink,
 	if (ret)
 		return ret;
 
+	if (strlen(cdev->sn_str) != 0) {
+		ret = devlink_info_board_serial_number_put(req, cdev->sn_str);
+		if (ret)
+			return ret;
+	}
+
 	snprintf(str, sizeof(str), "%08x", cdev->fw_id);
 
 	ret = devlink_info_version_running_put(req, "fw.id", str);

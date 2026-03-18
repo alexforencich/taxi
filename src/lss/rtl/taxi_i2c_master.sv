@@ -45,7 +45,8 @@ module taxi_i2c_master (
     /*
      * Configuration
      */
-    input  wire logic [15:0]  prescale,
+    input  wire logic [15:0]  prescale = 10,
+    input  wire logic [15:0]  tbuf_cyc = 10,
     input  wire logic         stop_on_idle
 );
 
@@ -117,6 +118,10 @@ Parameters:
 prescale
     set prescale to 1/4 of the minimum clock period in units
     of input clk cycles (prescale = Fclk / (FI2Cclk * 4))
+
+tbuf_cyc
+    bus free time (tBUF) before a start or repeated start in
+    units of bit periods / scl cycles
 
 stop_on_idle
     automatically issue stop when command input is not valid
@@ -214,8 +219,10 @@ logic mode_read_reg = 1'b0, mode_read_next;
 logic mode_write_multiple_reg = 1'b0, mode_write_multiple_next;
 logic mode_stop_reg = 1'b0, mode_stop_next;
 
-logic [15:0] delay_count_reg = '0, delay_count_next;
+logic [15:0] delay_count_qb_reg = '0, delay_count_qb_next;
+logic [15+2:0] delay_count_tbuf_reg = '0, delay_count_tbuf_next;
 logic delay_run_reg = 1'b0, delay_run_next;
+logic delay_tbuf_reg = 1'b0, delay_tbuf_next;
 logic delay_scl_reg = 1'b0, delay_scl_next;
 logic delay_sda_reg = 1'b0, delay_sda_next;
 
@@ -595,8 +602,10 @@ always_comb begin
     phy_ready_next = 1'b0;
     phy_rx_data_next = phy_rx_data_reg;
 
-    delay_count_next = delay_count_reg;
+    delay_count_qb_next = delay_count_qb_reg;
+    delay_count_tbuf_next = delay_count_tbuf_reg;
     delay_run_next = delay_run_reg;
+    delay_tbuf_next = delay_tbuf_reg;
     delay_scl_next = delay_scl_reg;
     delay_sda_next = delay_sda_reg;
 
@@ -613,13 +622,18 @@ always_comb begin
         delay_sda_next = sda_o_reg && !sda_i_reg;
     end else if (delay_run_reg) begin
         // time delay
-        if (delay_count_reg != 0) begin
-            delay_count_next = delay_count_reg - 1;
+        if (delay_count_qb_reg != 0) begin
+            delay_count_qb_next = delay_count_qb_reg - 1;
+        end else if (delay_tbuf_reg && delay_count_tbuf_reg != 0) begin
+            delay_count_qb_next = prescale;
+            delay_count_tbuf_next = delay_count_tbuf_reg - 1;
         end else begin
             delay_run_next = 1'b0;
+            delay_tbuf_next = 1'b0;
         end
     end else begin
-        delay_count_next = prescale;
+        delay_count_qb_next = prescale;
+        delay_count_tbuf_next = {tbuf_cyc, 2'b00};
     end
 
     if (phy_release_bus) begin
@@ -662,6 +676,7 @@ always_comb begin
                     phy_ready_next = 1'b0;
                     sda_o_next = 1'b1;
                     delay_run_next = 1'b1;
+                    delay_tbuf_next = 1'b1;
                     phy_state_next = PHY_STATE_REPEATED_START_1;
                 end else if (phy_write_bit && phy_ready_reg) begin
                     phy_ready_next = 1'b0;
@@ -818,6 +833,7 @@ always_comb begin
 
                 sda_o_next = 1'b1;
                 delay_run_next = 1'b1;
+                delay_tbuf_next = 1'b1;
                 phy_state_next = PHY_STATE_STOP_3;
             end
             PHY_STATE_STOP_3: begin
@@ -852,8 +868,10 @@ always_ff @(posedge clk) begin
     mode_write_multiple_reg <= mode_write_multiple_next;
     mode_stop_reg <= mode_stop_next;
 
-    delay_count_reg <= delay_count_next;
+    delay_count_qb_reg <= delay_count_qb_next;
+    delay_count_tbuf_reg <= delay_count_tbuf_next;
     delay_run_reg <= delay_run_next;
+    delay_tbuf_reg <= delay_tbuf_next;
     delay_scl_reg <= delay_scl_next;
     delay_sda_reg <= delay_sda_next;
 
@@ -892,8 +910,10 @@ always_ff @(posedge clk) begin
     if (rst) begin
         state_reg <= STATE_IDLE;
         phy_state_reg <= PHY_STATE_IDLE;
-        delay_count_reg <= '0;
+        delay_count_qb_reg <= '0;
+        delay_count_tbuf_reg <= '0;
         delay_run_reg <= 1'b0;
+        delay_tbuf_reg <= 1'b0;
         delay_scl_reg <= 1'b0;
         delay_sda_reg <= 1'b0;
         s_axis_cmd_ready_reg <= 1'b0;

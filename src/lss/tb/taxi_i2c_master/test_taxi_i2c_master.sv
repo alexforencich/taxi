@@ -36,6 +36,7 @@ logic bus_active;
 logic missed_ack;
 
 logic [15:0] prescale;
+logic [15:0] tbuf_cyc;
 logic stop_on_idle;
 
 taxi_i2c_master
@@ -70,6 +71,7 @@ uut (
      * Configuration
      */
     .prescale(prescale),
+    .tbuf_cyc(tbuf_cyc),
     .stop_on_idle(stop_on_idle)
 );
 

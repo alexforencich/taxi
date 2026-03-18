@@ -51,7 +51,8 @@ class TB:
         self.i2c_mem.append(I2cMemory(sda=dut.sda_o, sda_o=dut.sda_i,
             scl=dut.scl_o, scl_o=dut.scl_i, addr=0x51, size=1024))
 
-        dut.prescale.setimmediatevalue(2)
+        dut.prescale.setimmediatevalue(20)
+        dut.tbuf_cyc.setimmediatevalue(20)
         dut.stop_on_idle.setimmediatevalue(0)
 
     async def reset(self):

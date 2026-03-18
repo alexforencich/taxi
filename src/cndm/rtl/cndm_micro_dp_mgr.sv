@@ -129,6 +129,25 @@ typedef enum logic [15:0] {
     CMD_OP_DESTROY_QP = 16'h0243
 } cmd_opcode_t;
 
+typedef enum logic [15:0] {
+    CMD_STS_OK = 16'h0000,
+    CMD_STS_EPERM = 16'h0001,
+    CMD_STS_EIO = 16'h0005,
+    CMD_STS_ENXIO = 16'h0006,
+    CMD_STS_EAGAIN = 16'h000B,
+    CMD_STS_ENOMEM = 16'h000C,
+    CMD_STS_EACCESS = 16'h000D,
+    CMD_STS_EFAULT = 16'h000E,
+    CMD_STS_EBUSY = 16'h0010,
+    CMD_STS_ENODEV = 16'h0013,
+    CMD_STS_EINVAL = 16'h0016,
+    CMD_STS_ENOSPC = 16'h001C,
+    CMD_STS_EDOM = 16'h0021,
+    CMD_STS_ERANGE = 16'h0022,
+    CMD_STS_ENOTSUP = 16'h005F,
+    CMD_STS_ETIMEDOUT = 16'h006E
+} cmd_status_t;
+
 typedef enum logic [2:0] {
     QTYPE_EQ,
     QTYPE_CQ,
@@ -502,7 +521,8 @@ always_comb begin
             case (opcode_reg)
                 CMD_OP_NOP: begin
                     // NOP
-                    m_axis_rsp_tdata_next = '0; // TODO
+                    m_axis_rsp_tdata_next[15:0] = '0; // rsvd
+                    m_axis_rsp_tdata_next[31:16] = CMD_STS_OK;
                     m_axis_rsp_tvalid_next = 1'b1;
                     m_axis_rsp_tlast_next = 1'b0;
 
@@ -536,7 +556,8 @@ always_comb begin
                         end
                     end else begin
                         // PTP not enabled
-                        m_axis_rsp_tdata_next = '0; // TODO
+                        m_axis_rsp_tdata_next[15:0] = '0; // rsvd
+                        m_axis_rsp_tdata_next[31:16] = CMD_STS_ENOTSUP;
                         m_axis_rsp_tvalid_next = 1'b1;
                         m_axis_rsp_tlast_next = 1'b0;
 
@@ -550,7 +571,8 @@ always_comb begin
                         state_next = STATE_BOARD_CMD;
                     end else begin
                         // PTP not enabled
-                        m_axis_rsp_tdata_next = '0; // TODO
+                        m_axis_rsp_tdata_next[15:0] = '0; // rsvd
+                        m_axis_rsp_tdata_next[31:16] = CMD_STS_ENOTSUP;
                         m_axis_rsp_tvalid_next = 1'b1;
                         m_axis_rsp_tlast_next = 1'b0;
 
@@ -572,7 +594,8 @@ always_comb begin
                 CMD_OP_MODIFY_RQ:
                 begin
                     // modify queue operation
-                    m_axis_rsp_tdata_next = '0; // TODO
+                    m_axis_rsp_tdata_next[15:0] = '0; // rsvd
+                    m_axis_rsp_tdata_next[31:16] = CMD_STS_ENOTSUP;
                     m_axis_rsp_tvalid_next = 1'b1;
                     m_axis_rsp_tlast_next = 1'b0;
 
@@ -586,7 +609,8 @@ always_comb begin
                 CMD_OP_QUERY_RQ:
                 begin
                     // query queue operation
-                    m_axis_rsp_tdata_next = '0; // TODO
+                    m_axis_rsp_tdata_next[15:0] = '0; // rsvd
+                    m_axis_rsp_tdata_next[31:16] = CMD_STS_ENOTSUP;
                     m_axis_rsp_tvalid_next = 1'b1;
                     m_axis_rsp_tlast_next = 1'b0;
 
@@ -604,7 +628,8 @@ always_comb begin
                 end
                 default: begin
                     // unknown opcode
-                    m_axis_rsp_tdata_next = '0; // TODO error code
+                    m_axis_rsp_tdata_next[15:0] = '0; // rsvd
+                    m_axis_rsp_tdata_next[31:16] = CMD_STS_EINVAL;
                     m_axis_rsp_tvalid_next = 1'b1;
                     m_axis_rsp_tlast_next = 1'b0;
 
@@ -628,7 +653,8 @@ always_comb begin
 
             if (cmd_ptr_reg == 15) begin
                 // done
-                m_axis_rsp_tdata_next = '0; // TODO
+                m_axis_rsp_tdata_next[15:0] = '0; // rsvd
+                m_axis_rsp_tdata_next[31:16] = CMD_STS_OK;
                 m_axis_rsp_tvalid_next = 1'b1;
                 m_axis_rsp_tlast_next = 1'b0;
 
@@ -675,7 +701,8 @@ always_comb begin
             cmd_ram_wr_en = 1'b1;
 
             if (m_apb_dp_ctrl.pready) begin
-                m_axis_rsp_tdata_next = '0; // TODO
+                m_axis_rsp_tdata_next[15:0] = '0; // rsvd
+                m_axis_rsp_tdata_next[31:16] = CMD_STS_OK;
                 m_axis_rsp_tvalid_next = 1'b1;
                 m_axis_rsp_tlast_next = 1'b0;
 
@@ -713,7 +740,8 @@ always_comb begin
                     host_ptr_next = host_ptr_reg + WQ_REG_STRIDE;
                     if (cnt_reg == 0) begin
                         // no more queues
-                        m_axis_rsp_tdata_next = '0; // TODO
+                        m_axis_rsp_tdata_next[15:0] = '0; // rsvd
+                        m_axis_rsp_tdata_next[31:16] = CMD_STS_ENOMEM;
                         m_axis_rsp_tvalid_next = 1'b1;
                         m_axis_rsp_tlast_next = 1'b0;
 
@@ -862,7 +890,8 @@ always_comb begin
                 m_apb_dp_ctrl_pwdata_next = dw3_reg;
                 m_apb_dp_ctrl_pstrb_next = '1;
 
-                m_axis_rsp_tdata_next = '0; // TODO
+                m_axis_rsp_tdata_next[15:0] = '0; // rsvd
+                m_axis_rsp_tdata_next[31:16] = CMD_STS_OK;
                 m_axis_rsp_tvalid_next = 1'b1;
                 m_axis_rsp_tlast_next = 1'b0;
 
@@ -880,7 +909,8 @@ always_comb begin
                 m_apb_dp_ctrl_pwdata_next = 32'h00000000;
                 m_apb_dp_ctrl_pstrb_next = '1;
 
-                m_axis_rsp_tdata_next = '0; // TODO
+                m_axis_rsp_tdata_next[15:0] = '0; // rsvd
+                m_axis_rsp_tdata_next[31:16] = CMD_STS_OK;
                 m_axis_rsp_tvalid_next = 1'b1;
                 m_axis_rsp_tlast_next = 1'b0;
 
@@ -916,7 +946,8 @@ always_comb begin
 
                 if (cnt_reg == 11) begin
                     // done
-                    m_axis_rsp_tdata_next = '0; // TODO
+                    m_axis_rsp_tdata_next[15:0] = '0; // rsvd
+                    m_axis_rsp_tdata_next[31:16] = CMD_STS_OK;
                     m_axis_rsp_tvalid_next = 1'b1;
                     m_axis_rsp_tlast_next = 1'b0;
 
@@ -1003,7 +1034,8 @@ always_comb begin
 
                 if (cnt_reg == 11) begin
                     // done
-                    m_axis_rsp_tdata_next = '0; // TODO
+                    m_axis_rsp_tdata_next[15:0] = '0; // rsvd
+                    m_axis_rsp_tdata_next[31:16] = CMD_STS_OK;
                     m_axis_rsp_tvalid_next = 1'b1;
                     m_axis_rsp_tlast_next = 1'b0;
 
@@ -1049,7 +1081,8 @@ always_comb begin
                 cmd_ptr_next = cmd_ptr_reg + 1;
 
                 if (s_axis_brd_ctrl_rsp.tlast) begin
-                    m_axis_rsp_tdata_next = '0; // TODO
+                    m_axis_rsp_tdata_next[15:0] = '0; // rsvd
+                    m_axis_rsp_tdata_next[31:16] = CMD_STS_OK;
                     m_axis_rsp_tvalid_next = 1'b1;
                     m_axis_rsp_tlast_next = 1'b0;
 

@@ -12,6 +12,8 @@ Authors:
 
 int cndm_exec_mbox_cmd(struct cndm_dev *cdev, void *cmd, void *rsp)
 {
+	bool done = false;
+	int ret = 0;
 	int k;
 
 	if (!cmd || !rsp)
@@ -31,22 +33,28 @@ int cndm_exec_mbox_cmd(struct cndm_dev *cdev, void *cmd, void *rsp)
 	iowrite32(0x00000001, cdev->hw_addr + 0x0200);
 
 	// wait for completion
-	for (k = 0; k < 10; k++) {
-		if ((ioread32(cdev->hw_addr + 0x0200) & 0x00000001) == 0) {
+	for (k = 0; k < 100; k++) {
+		done = (ioread32(cdev->hw_addr + 0x0200) & 0x00000001) == 0;
+		if (done)
 			break;
-		}
 
 		udelay(100);
 	}
 
-	// read response from mailbox
-	for (k = 0; k < 16; k++) {
-		*((u32 *)(rsp + k*4)) = ioread32(cdev->hw_addr + 0x10000 + 0x40 + k*4);
+	if (done) {
+		// read response from mailbox
+		for (k = 0; k < 16; k++) {
+			*((u32 *)(rsp + k*4)) = ioread32(cdev->hw_addr + 0x10000 + 0x40 + k*4);
+		}
+	} else {
+		dev_err(cdev->dev, "Command timed out");
+		print_hex_dump(KERN_ERR, "", DUMP_PREFIX_NONE, 16, 1,
+				cmd, sizeof(struct cndm_cmd_cfg), true);
+		ret = -ETIMEDOUT;
 	}
 
 	mutex_unlock(&cdev->mbox_lock);
-
-	return 0;
+	return ret;
 }
 
 int cndm_exec_cmd(struct cndm_dev *cdev, void *cmd, void *rsp)
@@ -58,6 +66,7 @@ int cndm_access_reg(struct cndm_dev *cdev, u32 reg, int raw, int write, u64 *dat
 {
 	struct cndm_cmd_reg cmd;
 	struct cndm_cmd_reg rsp;
+	int ret = 0;
 
 	cmd.opcode = CNDM_CMD_OP_ACCESS_REG;
 	cmd.flags = 0x00000000;
@@ -70,7 +79,12 @@ int cndm_access_reg(struct cndm_dev *cdev, u32 reg, int raw, int write, u64 *dat
 	if (raw)
 		cmd.flags |= CNDM_CMD_REG_FLG_RAW;
 
-	cndm_exec_cmd(cdev, &cmd, &rsp);
+	ret = cndm_exec_cmd(cdev, &cmd, &rsp);
+	if (ret)
+		return ret;
+
+	if (rsp.status)
+		return rsp.status;
 
 	if (!write)
 		*data = rsp.read_val;

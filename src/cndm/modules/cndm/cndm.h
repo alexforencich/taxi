@@ -258,7 +258,7 @@ extern const struct ethtool_ops cndm_ethtool_ops;
 
 // cndm_ptp.c
 ktime_t cndm_read_cpl_ts(struct cndm_ring *ring, const struct cndm_cpl *cpl);
-void cndm_register_phc(struct cndm_dev *cdev);
+int cndm_register_phc(struct cndm_dev *cdev);
 void cndm_unregister_phc(struct cndm_dev *cdev);
 
 // cndm_eq.c

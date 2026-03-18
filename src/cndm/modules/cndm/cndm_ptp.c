@@ -38,6 +38,7 @@ static int cndm_phc_adjfine(struct ptp_clock_info *ptp, long scaled_ppm)
 	struct cndm_dev *cdev = container_of(ptp, struct cndm_dev, ptp_clock_info);
 	struct cndm_cmd_ptp cmd;
 	struct cndm_cmd_ptp rsp;
+	int ret = 0;
 
 	bool neg = false;
 	u64 nom_per_fns, adj;
@@ -65,9 +66,18 @@ static int cndm_phc_adjfine(struct ptp_clock_info *ptp, long scaled_ppm)
 	cmd.flags = CNDM_CMD_PTP_FLG_SET_PERIOD;
 	cmd.period = adj;
 
-	cndm_exec_cmd(cdev, &cmd, &rsp);
-
 	dev_dbg(cdev->dev, "%s adj: 0x%llx", __func__, adj);
+
+	ret = cndm_exec_cmd(cdev, &cmd, &rsp);
+	if (ret) {
+		dev_err(cdev->dev, "Failed to execute command");
+		return ret;
+	}
+
+	if (rsp.status) {
+		dev_err(cdev->dev, "Failed to adjust PHC");
+		return rsp.status;
+	}
 
 	return 0;
 }
@@ -109,13 +119,23 @@ static int cndm_phc_settime(struct ptp_clock_info *ptp, const struct timespec64 
 	struct cndm_dev *cdev = container_of(ptp, struct cndm_dev, ptp_clock_info);
 	struct cndm_cmd_ptp cmd;
 	struct cndm_cmd_ptp rsp;
+	int ret = 0;
 
 	cmd.opcode = CNDM_CMD_OP_PTP;
 	cmd.flags = CNDM_CMD_PTP_FLG_SET_TOD;
 	cmd.tod_ns = ts->tv_nsec;
 	cmd.tod_sec = ts->tv_sec;
 
-	cndm_exec_cmd(cdev, &cmd, &rsp);
+	ret = cndm_exec_cmd(cdev, &cmd, &rsp);
+	if (ret) {
+		dev_err(cdev->dev, "Failed to execute command");
+		return ret;
+	}
+
+	if (rsp.status) {
+		dev_err(cdev->dev, "Failed to adjust PHC");
+		return rsp.status;
+	}
 
 	return 0;
 }
@@ -126,6 +146,7 @@ static int cndm_phc_adjtime(struct ptp_clock_info *ptp, s64 delta)
 	struct timespec64 ts;
 	struct cndm_cmd_ptp cmd;
 	struct cndm_cmd_ptp rsp;
+	int ret = 0;
 
 	dev_dbg(cdev->dev, "%s: delta: %lld", __func__, delta);
 
@@ -133,20 +154,29 @@ static int cndm_phc_adjtime(struct ptp_clock_info *ptp, s64 delta)
 		// for a large delta, perform a non-precision step
 		cndm_phc_gettime(ptp, &ts);
 		ts = timespec64_add(ts, ns_to_timespec64(delta));
-		cndm_phc_settime(ptp, &ts);
+		return cndm_phc_settime(ptp, &ts);
 	} else {
 		// for a small delta, perform a precision atomic offset
 		cmd.opcode = CNDM_CMD_OP_PTP;
 		cmd.flags = CNDM_CMD_PTP_FLG_OFFSET_TOD;
 		cmd.tod_ns = delta & 0xffffffff;
 
-		cndm_exec_cmd(cdev, &cmd, &rsp);
+		ret = cndm_exec_cmd(cdev, &cmd, &rsp);
+		if (ret) {
+			dev_err(cdev->dev, "Failed to execute command");
+			return ret;
+		}
+
+		if (rsp.status) {
+			dev_err(cdev->dev, "Failed to adjust PHC");
+			return rsp.status;
+		}
 	}
 
 	return 0;
 }
 
-static void cndm_phc_set_from_system_clock(struct ptp_clock_info *ptp)
+static int cndm_phc_set_from_system_clock(struct ptp_clock_info *ptp)
 {
 	struct timespec64 ts;
 
@@ -156,28 +186,33 @@ static void cndm_phc_set_from_system_clock(struct ptp_clock_info *ptp)
 	ts = ktime_to_timespec64(ktime_get_clocktai());
 #endif
 
-	cndm_phc_settime(ptp, &ts);
+	return cndm_phc_settime(ptp, &ts);
 }
 
-void cndm_register_phc(struct cndm_dev *cdev)
+int cndm_register_phc(struct cndm_dev *cdev)
 {
 	struct cndm_cmd_ptp cmd;
 	struct cndm_cmd_ptp rsp;
+	int ret = 0;
 
 	if (cdev->ptp_clock) {
 		dev_warn(cdev->dev, "PTP clock already registered");
-		return;
+		return 0;
 	}
 
 	cmd.opcode = CNDM_CMD_OP_PTP;
 	cmd.flags = 0x00000000;
 	cmd.nom_period = 0;
 
-	cndm_exec_cmd(cdev, &cmd, &rsp);
+	ret = cndm_exec_cmd(cdev, &cmd, &rsp);
+	if (ret) {
+		dev_err(cdev->dev, "Failed to execute command");
+		return ret;
+	}
 
-	if (rsp.nom_period == 0) {
+	if (rsp.status || rsp.nom_period == 0) {
 		dev_info(cdev->dev, "PTP clock not present");
-		return;
+		return rsp.status;
 	}
 
 	cdev->ptp_nom_period = rsp.nom_period;
@@ -203,13 +238,16 @@ void cndm_register_phc(struct cndm_dev *cdev)
 
 	if (IS_ERR(cdev->ptp_clock)) {
 		dev_err(cdev->dev, "failed to register PHC");
+		ret = PTR_ERR(cdev->ptp_clock);
 		cdev->ptp_clock = NULL;
-		return;
+		return ret;
 	}
 
 	dev_info(cdev->dev, "registered PHC (index %d)", ptp_clock_index(cdev->ptp_clock));
 
 	cndm_phc_set_from_system_clock(&cdev->ptp_clock_info);
+
+	return 0;
 }
 
 void cndm_unregister_phc(struct cndm_dev *cdev)

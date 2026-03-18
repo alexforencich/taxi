@@ -87,11 +87,15 @@ int cndm_open_rq(struct cndm_ring *rq, struct cndm_priv *priv, struct cndm_cq *c
 	cmd.ptr1 = rq->buf_dma_addr;
 	cmd.ptr2 = 0;
 
-	cndm_exec_cmd(rq->cdev, &cmd, &rsp);
+	ret = cndm_exec_cmd(rq->cdev, &cmd, &rsp);
+	if (ret) {
+		netdev_err(rq->priv->ndev, "Failed to execute command");
+		goto fail;
+	}
 
-	if (rsp.dboffs == 0) {
+	if (rsp.status || rsp.dboffs == 0) {
 		netdev_err(rq->priv->ndev, "Failed to allocate RQ");
-		ret = -1;
+		ret = rsp.status;
 		goto fail;
 	}
 

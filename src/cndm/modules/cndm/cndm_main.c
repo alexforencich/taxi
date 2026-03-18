@@ -64,7 +64,17 @@ static int cndm_common_probe(struct cndm_dev *cdev)
 	cmd.flags = 0x00000000;
 	cmd.cfg_page = 0;
 
-	cndm_exec_cmd(cdev, &cmd, &rsp);
+	ret = cndm_exec_cmd(cdev, &cmd, &rsp);
+	if (ret) {
+		dev_info(dev, "Failed to execute command");
+		goto fail;
+	}
+
+	if (rsp.status) {
+		dev_info(dev, "Command failed");
+		ret = rsp.status;
+		goto fail;
+	}
 
 	cdev->cfg_page_max = rsp.cfg_page_max;
 	cdev->cmd_ver = rsp.cmd_ver;
@@ -110,7 +120,17 @@ static int cndm_common_probe(struct cndm_dev *cdev)
 	cmd.flags = 0x00000000;
 	cmd.cfg_page = 1;
 
-	cndm_exec_cmd(cdev, &cmd, &rsp);
+	ret = cndm_exec_cmd(cdev, &cmd, &rsp);
+	if (ret) {
+		dev_info(dev, "Failed to execute command");
+		goto fail;
+	}
+
+	if (rsp.status) {
+		dev_info(dev, "Command failed");
+		ret = rsp.status;
+		goto fail;
+	}
 
 	// HW config
 	cdev->port_count = rsp.p1.port_count;
@@ -142,7 +162,17 @@ static int cndm_common_probe(struct cndm_dev *cdev)
 	cmd.flags = 0x00000000;
 	cmd.cfg_page = 2;
 
-	cndm_exec_cmd(cdev, &cmd, &rsp);
+	ret = cndm_exec_cmd(cdev, &cmd, &rsp);
+	if (ret) {
+		dev_info(dev, "Failed to execute command");
+		goto fail;
+	}
+
+	if (rsp.status) {
+		dev_info(dev, "Command failed");
+		ret = rsp.status;
+		goto fail;
+	}
 
 	// Resources
 	cdev->log_max_eq = rsp.p2.log_max_eq;

@@ -87,11 +87,15 @@ int cndm_open_sq(struct cndm_ring *sq, struct cndm_priv *priv, struct cndm_cq *c
 	cmd.ptr1 = sq->buf_dma_addr;
 	cmd.ptr2 = 0;
 
-	cndm_exec_cmd(sq->cdev, &cmd, &rsp);
+	ret = cndm_exec_cmd(sq->cdev, &cmd, &rsp);
+	if (ret) {
+		netdev_err(sq->priv->ndev, "Failed to execute command");
+		goto fail;
+	}
 
-	if (rsp.dboffs == 0) {
+	if (rsp.status || rsp.dboffs == 0) {
 		netdev_err(sq->priv->ndev, "Failed to allocate SQ");
-		ret = -1;
+		ret = rsp.status;
 		goto fail;
 	}
 

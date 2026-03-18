@@ -129,11 +129,31 @@ typedef enum logic [15:0] {
 
     CMD_BRD_OP_I2C_RD = 16'h8100,
     CMD_BRD_OP_I2C_WR = 16'h8101
-} cmd_opcode_t;
+} cmd_brd_opcode_t;
+
+typedef enum logic [15:0] {
+    CMD_STS_OK = 16'h0000,
+    CMD_STS_EPERM = 16'h0001,
+    CMD_STS_EIO = 16'h0005,
+    CMD_STS_ENXIO = 16'h0006,
+    CMD_STS_EAGAIN = 16'h000B,
+    CMD_STS_ENOMEM = 16'h000C,
+    CMD_STS_EACCESS = 16'h000D,
+    CMD_STS_EFAULT = 16'h000E,
+    CMD_STS_EBUSY = 16'h0010,
+    CMD_STS_ENODEV = 16'h0013,
+    CMD_STS_EINVAL = 16'h0016,
+    CMD_STS_ENOSPC = 16'h001C,
+    CMD_STS_EDOM = 16'h0021,
+    CMD_STS_ERANGE = 16'h0022,
+    CMD_STS_ENOTSUP = 16'h005F,
+    CMD_STS_ETIMEDOUT = 16'h006E
+} cmd_status_t;
 
 typedef enum logic [4:0] {
     STATE_IDLE,
     STATE_START,
+    STATE_OP_DONE,
     STATE_I2C_START,
     STATE_I2C_SET_MUX,
     STATE_I2C_SET_PAGE_1,
@@ -394,7 +414,8 @@ always_comb begin
             case (opcode_reg)
                 CMD_BRD_OP_NOP: begin
                     // NOP
-                    m_axis_rsp_tdata_next = '0; // TODO
+                    m_axis_rsp_tdata_next[15:0] = '0; // rsvd
+                    m_axis_rsp_tdata_next[31:16] = CMD_STS_OK;
                     m_axis_rsp_tvalid_next = 1'b1;
                     m_axis_rsp_tlast_next = 1'b0;
 
@@ -412,10 +433,11 @@ always_comb begin
 
                         mode_write_next = 1'b0;
 
-                        ret_state_next = STATE_SEND_RSP;
+                        ret_state_next = STATE_OP_DONE;
                         state_next = STATE_I2C_START;
                     end else begin
-                        m_axis_rsp_tdata_next = '0; // TODO error code
+                        m_axis_rsp_tdata_next[15:0] = '0; // rsvd
+                        m_axis_rsp_tdata_next[31:16] = CMD_STS_ENOTSUP;
                         m_axis_rsp_tvalid_next = 1'b1;
                         m_axis_rsp_tlast_next = 1'b0;
 
@@ -434,10 +456,11 @@ always_comb begin
 
                         mode_write_next = 1'b1;
 
-                        ret_state_next = STATE_SEND_RSP;
+                        ret_state_next = STATE_OP_DONE;
                         state_next = STATE_I2C_START;
                     end else begin
-                        m_axis_rsp_tdata_next = '0; // TODO error code
+                        m_axis_rsp_tdata_next[15:0] = '0; // rsvd
+                        m_axis_rsp_tdata_next[31:16] = CMD_STS_ENOTSUP;
                         m_axis_rsp_tvalid_next = 1'b1;
                         m_axis_rsp_tlast_next = 1'b0;
 
@@ -456,10 +479,11 @@ always_comb begin
 
                         mode_write_next = 1'b0;
 
-                        ret_state_next = STATE_SEND_RSP;
+                        ret_state_next = STATE_OP_DONE;
                         state_next = STATE_I2C_START;
                     end else begin
-                        m_axis_rsp_tdata_next = '0; // TODO error code
+                        m_axis_rsp_tdata_next[15:0] = '0; // rsvd
+                        m_axis_rsp_tdata_next[31:16] = CMD_STS_ENOTSUP;
                         m_axis_rsp_tvalid_next = 1'b1;
                         m_axis_rsp_tlast_next = 1'b0;
 
@@ -478,10 +502,11 @@ always_comb begin
 
                         mode_write_next = 1'b1;
 
-                        ret_state_next = STATE_SEND_RSP;
+                        ret_state_next = STATE_OP_DONE;
                         state_next = STATE_I2C_START;
                     end else begin
-                        m_axis_rsp_tdata_next = '0; // TODO error code
+                        m_axis_rsp_tdata_next[15:0] = '0; // rsvd
+                        m_axis_rsp_tdata_next[31:16] = CMD_STS_ENOTSUP;
                         m_axis_rsp_tvalid_next = 1'b1;
                         m_axis_rsp_tlast_next = 1'b0;
 
@@ -502,10 +527,11 @@ always_comb begin
 
                         mode_write_next = 1'b0;
 
-                        ret_state_next = STATE_SEND_RSP;
+                        ret_state_next = STATE_OP_DONE;
                         state_next = STATE_I2C_START;
                     end else begin
-                        m_axis_rsp_tdata_next = '0; // TODO error code
+                        m_axis_rsp_tdata_next[15:0] = '0; // rsvd
+                        m_axis_rsp_tdata_next[31:16] = CMD_STS_ENOTSUP;
                         m_axis_rsp_tvalid_next = 1'b1;
                         m_axis_rsp_tlast_next = 1'b0;
 
@@ -527,10 +553,11 @@ always_comb begin
 
                         mode_write_next = 1'b0;
 
-                        ret_state_next = STATE_SEND_RSP;
+                        ret_state_next = STATE_OP_DONE;
                         state_next = STATE_I2C_START;
                     end else begin
-                        m_axis_rsp_tdata_next = '0; // TODO error code
+                        m_axis_rsp_tdata_next[15:0] = '0; // rsvd
+                        m_axis_rsp_tdata_next[31:16] = CMD_STS_ENOTSUP;
                         m_axis_rsp_tvalid_next = 1'b1;
                         m_axis_rsp_tlast_next = 1'b0;
 
@@ -553,7 +580,7 @@ always_comb begin
 
                     mode_write_next = 1'b0;
 
-                    ret_state_next = STATE_SEND_RSP;
+                    ret_state_next = STATE_OP_DONE;
                     state_next = STATE_I2C_START;
                 end
                 CMD_BRD_OP_I2C_WR: begin
@@ -567,18 +594,28 @@ always_comb begin
 
                     mode_write_next = 1'b1;
 
-                    ret_state_next = STATE_SEND_RSP;
+                    ret_state_next = STATE_OP_DONE;
                     state_next = STATE_I2C_START;
                 end
                 default: begin
                     // unknown opcode
-                    m_axis_rsp_tdata_next = '0; // TODO error code
+                    m_axis_rsp_tdata_next[15:0] = '0; // rsvd
+                    m_axis_rsp_tdata_next[31:16] = CMD_STS_EINVAL;
                     m_axis_rsp_tvalid_next = 1'b1;
                     m_axis_rsp_tlast_next = 1'b0;
 
                     state_next = STATE_PAD_RSP;
                 end
             endcase
+        end
+        STATE_OP_DONE: begin
+            // return status code
+            m_axis_rsp_tdata_next[15:0] = '0; // rsvd
+            m_axis_rsp_tdata_next[31:16] = CMD_STS_OK;
+            m_axis_rsp_tvalid_next = 1'b1;
+            m_axis_rsp_tlast_next = 1'b0;
+
+            state_next = STATE_SEND_RSP;
         end
         STATE_I2C_START: begin
             mux_idx_next = '0;

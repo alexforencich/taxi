@@ -354,6 +354,14 @@ stat_mux_inst (
 );
 
 // I2C
+wire [1:0] i2c_scl_o_int;
+wire [1:0] i2c_sda_o_int;
+
+assign i2c_scl_o = &i2c_scl_o_int;
+assign i2c_sda_o = &i2c_sda_o_int;
+wire i2c_scl_i_int = i2c_scl_i & i2c_scl_o;
+wire i2c_sda_i_int = i2c_sda_i & i2c_sda_o;
+
 taxi_xfcp_mod_i2c_master #(
     .XFCP_EXT_ID_STR("I2C"),
     .DEFAULT_PRESCALE(16'(125000000/200000/4))
@@ -371,11 +379,42 @@ xfcp_mod_i2c_inst (
     /*
      * I2C interface
      */
-    .i2c_scl_i(i2c_scl_i),
-    .i2c_scl_o(i2c_scl_o),
-    .i2c_sda_i(i2c_sda_i),
-    .i2c_sda_o(i2c_sda_o)
+    .i2c_scl_i(i2c_scl_i_int),
+    .i2c_scl_o(i2c_scl_o_int[0]),
+    .i2c_sda_i(i2c_sda_i_int),
+    .i2c_sda_o(i2c_sda_o_int[0])
 );
+
+localparam logic OPTIC_EN = 1'b1;
+localparam OPTIC_CNT = 2;
+
+localparam logic EEPROM_EN = 1'b1;
+localparam EEPROM_IDX = OPTIC_EN ? OPTIC_CNT : 0;
+
+localparam logic MAC_EEPROM_EN = EEPROM_EN;
+localparam MAC_EEPROM_IDX = EEPROM_IDX;
+localparam MAC_EEPROM_OFFSET = 32;
+localparam MAC_COUNT = OPTIC_CNT;
+localparam logic MAC_FROM_BASE = 1'b1;
+
+localparam logic SN_EEPROM_EN = EEPROM_EN;
+localparam SN_EEPROM_IDX = EEPROM_IDX;
+localparam SN_EEPROM_OFFSET = 0;
+localparam SN_LEN = 32;
+
+localparam logic PLL_EN = 1'b1;
+localparam PLL_IDX = EEPROM_IDX + (EEPROM_EN ? 1 : 0);
+
+localparam logic MUX_EN = 1'b1;
+localparam MUX_CNT = 2;
+localparam logic [MUX_CNT-1:0][6:0] MUX_I2C_ADDR = {7'h75, 7'h74};
+
+localparam DEV_CNT = PLL_IDX + (PLL_EN ? 1 : 0);
+localparam logic [DEV_CNT-1:0][6:0] DEV_I2C_ADDR = {7'h5D, 7'h54, 7'h50, 7'h50};
+localparam logic [DEV_CNT-1:0][31:0] DEV_ADDR_CFG = {32'h00_00_0000, 32'h00_00_0040, 32'h7e_7f_0070, 32'h7e_7f_0070};
+localparam logic [DEV_CNT-1:0][MUX_CNT-1:0][7:0] DEV_MUX_MASK = {{8'h00, 8'h01}, {8'h07, 8'h00}, {8'h00, 8'h08}, {8'h00, 8'h04}};
+
+localparam I2C_PRESCALE = SIM ? 2 : 250000/(400*4);
 
 taxi_axis_if #(
     .DATA_W(32),
@@ -385,6 +424,60 @@ taxi_axis_if #(
     .USER_EN(1),
     .USER_W(1)
 ) axis_brd_ctrl_cmd(), axis_brd_ctrl_rsp();
+
+cndm_brd_ctrl_i2c #(
+    .OPTIC_EN(OPTIC_EN),
+    .OPTIC_CNT(OPTIC_CNT),
+
+    .EEPROM_EN(EEPROM_EN),
+    .EEPROM_IDX(EEPROM_IDX),
+
+    .MAC_EEPROM_EN(MAC_EEPROM_EN),
+    .MAC_EEPROM_IDX(MAC_EEPROM_IDX),
+    .MAC_EEPROM_OFFSET(MAC_EEPROM_OFFSET),
+    .MAC_COUNT(MAC_COUNT),
+    .MAC_FROM_BASE(MAC_FROM_BASE),
+
+    .SN_EEPROM_EN(SN_EEPROM_EN),
+    .SN_EEPROM_IDX(SN_EEPROM_IDX),
+    .SN_EEPROM_OFFSET(SN_EEPROM_OFFSET),
+    .SN_LEN(SN_LEN),
+
+    .PLL_EN(PLL_EN),
+    .PLL_IDX(PLL_IDX),
+
+    .MUX_EN(MUX_EN),
+    .MUX_CNT(MUX_CNT),
+    .MUX_I2C_ADDR(MUX_I2C_ADDR),
+
+    .DEV_CNT(DEV_CNT),
+    .DEV_I2C_ADDR(DEV_I2C_ADDR),
+    .DEV_ADDR_CFG(DEV_ADDR_CFG),
+    .DEV_MUX_MASK(DEV_MUX_MASK),
+
+    .I2C_PRESCALE(I2C_PRESCALE)
+)
+board_ctrl_i2c_ch_inst (
+    .clk(pcie_clk),
+    .rst(pcie_rst),
+
+    /*
+     * Board control command interface
+     */
+    .s_axis_cmd(axis_brd_ctrl_cmd),
+    .m_axis_rsp(axis_brd_ctrl_rsp),
+
+    /*
+     * I2C interface
+     */
+    .i2c_scl_i(i2c_scl_i_int),
+    .i2c_scl_o(i2c_scl_o_int[1]),
+    .i2c_sda_i(i2c_sda_i_int),
+    .i2c_sda_o(i2c_sda_o_int[1]),
+
+    .dev_sel(),
+    .dev_rst()
+);
 
 // BASE-T PHY
 assign phy_reset_n = !rst_125mhz;
@@ -841,7 +934,7 @@ cndm_micro_pcie_us #(
 
     // Structural configuration
     .PORTS($size(axis_sfp_tx)),
-    .BRD_CTRL_EN(1'b0),
+    .BRD_CTRL_EN(1'b1),
     .SYS_CLK_PER_NS_NUM(4),
     .SYS_CLK_PER_NS_DEN(1),
 

@@ -11,6 +11,7 @@ Authors:
 
 import logging
 import os
+import struct
 import sys
 
 import cocotb_test.simulator
@@ -23,6 +24,7 @@ from cocotbext.axi import AxiStreamBus
 from cocotbext.eth import GmiiFrame, GmiiSource, GmiiSink
 from cocotbext.eth import XgmiiFrame
 from cocotbext.uart import UartSource, UartSink
+from cocotbext.i2c import I2cMemory
 from cocotbext.pcie.core import RootComplex
 from cocotbext.pcie.xilinx.us import UltraScalePcieDevice
 
@@ -297,8 +299,60 @@ class TB:
                 gbx_cfg=gbx_cfg
             ))
 
+        # UART
         self.uart_source = UartSource(dut.uart_rxd, baud=921600, bits=8, stop_bits=1)
         self.uart_sink = UartSink(dut.uart_txd, baud=921600, bits=8, stop_bits=1)
+
+        # I2C
+        self.i2c_eeprom = I2cMemory(sda=dut.i2c_sda_o, sda_o=dut.i2c_sda_i,
+            scl=dut.i2c_scl_o, scl_o=dut.i2c_scl_i, addr=0x54, size=256)
+        self.sfp0 = I2cMemory(sda=dut.i2c_sda_o, sda_o=dut.i2c_sda_i,
+            scl=dut.i2c_scl_o, scl_o=dut.i2c_scl_i, addr=0x50, size=256)
+        self.si570 = I2cMemory(sda=dut.i2c_sda_o, sda_o=dut.i2c_sda_i,
+            scl=dut.i2c_scl_o, scl_o=dut.i2c_scl_i, addr=0x5D, size=256)
+
+        self.i2c_eeprom.write_mem(0, bytes.fromhex("""
+            37 35 37 35 31 39 32 37 31 37 33 32 2d 36 39 39
+            39 36 20 20 20 20 20 20 20 20 20 20 20 20 20 20
+            00 0a 35 03 72 c9 00 00 00 00 00 00 00 00 00 00
+            54 53 53 30 31 36 35 2d 30 32 20 20 20 20 20 20
+            5b 31 31 31 31 31 31 31 31 31 5d 20 20 20 20 20
+            57 65 64 2c 20 31 36 20 41 75 67 20 32 30 31 37
+            31 30 3a 33 35 3a 35 36 2b 30 38 30 30 20 20 20
+            ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff
+            ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff
+            ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff
+            ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff
+            ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff
+            ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff
+            4b 43 55 31 30 35 20 20 20 20 20 20 20 20 20 20
+            31 2e 31 20 20 20 20 20 20 20 20 20 20 20 20 20
+            ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff
+        """))
+
+        self.sfp0.write_mem(0, bytes.fromhex("""
+            03 04 21 00 00 00 00 00 04 00 00 00 67 00 00 00
+            00 00 03 00 41 6d 70 68 65 6e 6f 6c 20 20 20 20
+            20 20 20 20 00 41 50 48 35 37 31 35 34 30 30 30
+            32 20 20 20 20 20 20 20 4b 20 20 20 01 00 00 f7
+            00 00 00 00 41 50 46 30 39 34 38 30 30 32 30 32
+            37 39 20 20 30 39 31 31 32 34 20 20 00 00 00 c1
+            ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff
+            ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff 00
+        """ + " ff"*128))
+
+        self.si570.write_mem(0, bytes.fromhex("""
+            4f 02 32 a1 3d 20 00 01 c2 bb ff 84 82 07 c2 c0
+            00 00 00 00 c2 c0 00 00 00 07 c2 c0 00 00 00 0c
+            b9 09 80 00 00 00 00 00 00 00 00 00 00 00 00 00
+            00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+            00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+            00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+            00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+            00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+            20 7f 86 81 7b 81 03 00 10 08 00 00 00 00 02 bb
+            ff 84 82 00 00 00 62 00 00 00 00 00 00 00 00 00
+        """))
 
         dut.phy_gmii_clk_en.setimmediatevalue(1)
 
@@ -359,6 +413,28 @@ async def run_test(dut):
     await driver.init_pcie_dev(tb.rc.find_device(tb.dev.functions[0].pcie_id))
 
     tb.log.info("Init complete")
+
+    tb.log.info("Read MAC address")
+
+    rsp = await driver.exec_cmd(struct.pack("<HHLHHLbbbbLLL",
+        0, # rsvd
+        cndm.CNDM_CMD_OP_HWID, # opcode
+        0x00000000, # flags
+        0, # index
+        cndm.CNDM_CMD_BRD_OP_HWID_MAC_RD, # board op
+        0, # flags
+        0, # rsvd
+        0, # dev addr offset
+        0, # bank
+        0, # page
+        0, # addr
+        0, # len
+        0, # rsvd
+    ))
+
+    print(rsp)
+
+    tb.log.info("MAC address: %s", ':'.join(x.hex() for x in struct.unpack_from('6c', rsp, 32+2)))
 
     tb.log.info("Wait for block lock")
     for k in range(1200):
@@ -459,6 +535,7 @@ def test_fpga_core(request):
         os.path.join(tests_dir, f"{toplevel}.sv"),
         os.path.join(rtl_dir, f"{dut}.sv"),
         os.path.join(taxi_src_dir, "cndm", "rtl", "cndm_micro_pcie_us.f"),
+        os.path.join(taxi_src_dir, "cndm", "rtl", "cndm_brd_ctrl_i2c.f"),
         os.path.join(taxi_src_dir, "eth", "rtl", "taxi_eth_mac_1g_fifo.f"),
         os.path.join(taxi_src_dir, "eth", "rtl", "us", "taxi_eth_mac_25g_us.f"),
         os.path.join(taxi_src_dir, "xfcp", "rtl", "taxi_xfcp_if_uart.f"),

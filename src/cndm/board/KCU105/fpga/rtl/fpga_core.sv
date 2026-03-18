@@ -415,6 +415,7 @@ localparam logic [DEV_CNT-1:0][31:0] DEV_ADDR_CFG = {32'h00_00_0000, 32'h00_00_0
 localparam logic [DEV_CNT-1:0][MUX_CNT-1:0][7:0] DEV_MUX_MASK = {{8'h00, 8'h01}, {8'h07, 8'h00}, {8'h00, 8'h08}, {8'h00, 8'h04}};
 
 localparam I2C_PRESCALE = SIM ? 2 : 250000/(400*4);
+localparam I2C_TBUF_CYC = SIM ? 10 : 1000;
 
 taxi_axis_if #(
     .DATA_W(32),
@@ -455,7 +456,8 @@ cndm_brd_ctrl_i2c #(
     .DEV_ADDR_CFG(DEV_ADDR_CFG),
     .DEV_MUX_MASK(DEV_MUX_MASK),
 
-    .I2C_PRESCALE(I2C_PRESCALE)
+    .I2C_PRESCALE(I2C_PRESCALE),
+    .I2C_TBUF_CYC(I2C_TBUF_CYC)
 )
 board_ctrl_i2c_ch_inst (
     .clk(pcie_clk),

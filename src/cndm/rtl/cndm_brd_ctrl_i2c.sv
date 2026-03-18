@@ -74,7 +74,9 @@ module cndm_brd_ctrl_i2c #
     parameter logic [DEV_CNT-1:0][MUX_CNT-1:0][7:0] DEV_MUX_MASK = '0,
 
     // Prescaler for I2C master
-    parameter I2C_PRESCALE = 125000/(400*4)
+    parameter I2C_PRESCALE = 125000/(400*4),
+    // tBUF in I2C clock cycles
+    parameter I2C_TBUF_CYC = 10
 )
 (
     input  wire logic                clk,
@@ -243,6 +245,7 @@ i2c_master_inst (
     * Configuration
     */
     .prescale(16'(I2C_PRESCALE)),
+    .tbuf_cyc(16'(I2C_TBUF_CYC)),
     .stop_on_idle(1'b0)
 );
 

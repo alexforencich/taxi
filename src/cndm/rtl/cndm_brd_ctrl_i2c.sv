@@ -101,8 +101,8 @@ module cndm_brd_ctrl_i2c #
 // extract parameters
 localparam CMD_ID_W = s_axis_cmd.ID_W;
 
-localparam CL_DEV_IDX = $clog2(DEV_CNT);
-localparam CL_MUX_IDX = $clog2(MUX_CNT);
+localparam CL_DEV_IDX = DEV_CNT > 1 ? $clog2(DEV_CNT) : 1;
+localparam CL_MUX_IDX = MUX_CNT > 1 ? $clog2(MUX_CNT) : 1;
 
 typedef enum logic [15:0] {
     CMD_BRD_OP_NOP = 16'h0000,

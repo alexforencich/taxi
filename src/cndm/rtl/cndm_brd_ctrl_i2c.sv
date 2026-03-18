@@ -378,6 +378,8 @@ always_comb begin
 
     case (state_reg)
         STATE_IDLE: begin
+            dev_sel_next = '0;
+
             s_axis_cmd_tready_next = !m_axis_rsp_tvalid_reg && !rsp_frame_reg;
 
             cmd_ram_wr_data = s_axis_cmd.tdata;
@@ -619,6 +621,7 @@ always_comb begin
         end
         STATE_I2C_START: begin
             mux_idx_next = '0;
+            dev_sel_next = '0;
             dev_sel_next[dev_idx_reg] = 1'b1;
 
             dev_addr_cfg_next = DEV_ADDR_CFG[dev_idx_reg];

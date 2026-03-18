@@ -73,6 +73,10 @@ module cndm_brd_ctrl_i2c #
     // Mux settings for each device
     parameter logic [DEV_CNT-1:0][MUX_CNT-1:0][7:0] DEV_MUX_MASK = '0,
 
+    // Clock cycles per microsecond
+    parameter CYC_PER_US = 125,
+    // Page select delay in microseconds
+    parameter PAGE_SEL_DELAY_US = 2000,
     // Prescaler for I2C master
     parameter I2C_PRESCALE = 125000/(400*4),
     // tBUF in I2C clock cycles
@@ -105,6 +109,9 @@ localparam CMD_ID_W = s_axis_cmd.ID_W;
 
 localparam CL_DEV_IDX = DEV_CNT > 1 ? $clog2(DEV_CNT) : 1;
 localparam CL_MUX_IDX = MUX_CNT > 1 ? $clog2(MUX_CNT) : 1;
+
+localparam CL_US_CNT = $clog2(CYC_PER_US+1);
+localparam CL_PGSEL_DELAY = $clog2(PAGE_SEL_DELAY_US+1);
 
 typedef enum logic [15:0] {
     CMD_BRD_OP_NOP = 16'h0000,
@@ -312,6 +319,22 @@ logic [31:0] dev_addr_cfg_reg = '0, dev_addr_cfg_next;
 logic [1:0] addr_ptr_reg = '0, addr_ptr_next;
 logic mode_write_reg = 1'b0, mode_write_next;
 
+logic [CL_PGSEL_DELAY-1:0] pgsel_delay_cnt_reg = '0, pgsel_delay_cnt_next;
+logic pgsel_delay_reg = 1'b0, pgsel_delay_next;
+
+logic [CL_US_CNT-1:0] us_cnt_reg = '0;
+logic us_pulse_reg = 1'b0;
+
+always @(posedge clk) begin
+    us_pulse_reg <= 1'b0;
+    if (us_cnt_reg != 0) begin
+        us_cnt_reg <= us_cnt_reg - 1;
+    end else begin
+        us_cnt_reg <= CYC_PER_US;
+        us_pulse_reg <= 1'b1;
+    end
+end
+
 always_comb begin
     state_next = STATE_IDLE;
     ret_state_next = ret_state_reg;
@@ -369,6 +392,9 @@ always_comb begin
     addr_ptr_next = addr_ptr_reg;
     mode_write_next = mode_write_reg;
 
+    pgsel_delay_cnt_next = pgsel_delay_cnt_reg;
+    pgsel_delay_next = pgsel_delay_reg;
+
     if (s_axis_cmd.tready && s_axis_cmd.tvalid) begin
         if (s_axis_cmd.tlast) begin
             cmd_frame_next = 1'b0;
@@ -377,6 +403,18 @@ always_comb begin
             cmd_wr_ptr_next = cmd_wr_ptr_reg + 1;
             cmd_frame_next = 1'b1;
         end
+    end
+
+    if (pgsel_delay_reg) begin
+        if (us_pulse_reg) begin
+            if (pgsel_delay_cnt_reg != 0) begin
+                pgsel_delay_cnt_next = pgsel_delay_cnt_reg - 1;
+            end else begin
+                pgsel_delay_next = 1'b0;
+            end
+        end
+    end else begin
+        pgsel_delay_cnt_next = PAGE_SEL_DELAY_US;
     end
 
     case (state_reg)
@@ -694,6 +732,8 @@ always_comb begin
                 axis_i2c_tx_tlast_next = 1'b1;
                 axis_i2c_tx_tvalid_next = 1'b1;
 
+                pgsel_delay_next = 1'b1;
+
                 if (dev_addr_cfg_next[4]) begin
                     state_next = STATE_I2C_SET_PAGE_1;
                 end else begin
@@ -705,7 +745,7 @@ always_comb begin
         end
         STATE_I2C_SET_PAGE_1: begin
             // Select page register
-            if (!axis_i2c_cmd_tvalid_reg && !axis_i2c_tx_tvalid_reg) begin
+            if (!axis_i2c_cmd_tvalid_reg && !axis_i2c_tx_tvalid_reg && !pgsel_delay_reg) begin
                 axis_i2c_cmd_tdata_next = 12'(i2c_addr_reg) | I2C_CMD_START | I2C_CMD_WRITE;
                 axis_i2c_cmd_tvalid_next = 1'b1;
 
@@ -728,6 +768,8 @@ always_comb begin
                 axis_i2c_tx_tlast_next = 1'b1;
                 axis_i2c_tx_tvalid_next = 1'b1;
 
+                pgsel_delay_next = 1'b1;
+
                 state_next = STATE_I2C_SET_ADDR_1;
             end else begin
                 state_next = STATE_I2C_SET_PAGE_2;
@@ -735,7 +777,7 @@ always_comb begin
         end
         STATE_I2C_SET_ADDR_1: begin
             // Set device internal address
-            if (!axis_i2c_cmd_tvalid_reg && !axis_i2c_tx_tvalid_reg) begin
+            if (!axis_i2c_cmd_tvalid_reg && !axis_i2c_tx_tvalid_reg && !pgsel_delay_reg) begin
                 axis_i2c_cmd_tdata_next = 12'(i2c_addr_reg) | I2C_CMD_START | I2C_CMD_WRITE;
                 axis_i2c_cmd_tvalid_next = 1'b1;
 
@@ -964,6 +1006,9 @@ always_ff @(posedge clk) begin
     dev_addr_cfg_reg <= dev_addr_cfg_next;
     addr_ptr_reg <= addr_ptr_next;
     mode_write_reg <= mode_write_next;
+
+    pgsel_delay_cnt_reg <= pgsel_delay_cnt_next;
+    pgsel_delay_reg <= pgsel_delay_next;
 
     if (rst) begin
         state_reg <= STATE_IDLE;

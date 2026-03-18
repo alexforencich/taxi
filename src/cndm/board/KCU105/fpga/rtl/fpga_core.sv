@@ -414,8 +414,10 @@ localparam logic [DEV_CNT-1:0][6:0] DEV_I2C_ADDR = {7'h5D, 7'h54, 7'h50, 7'h50};
 localparam logic [DEV_CNT-1:0][31:0] DEV_ADDR_CFG = {32'h00_00_0000, 32'h00_00_0040, 32'h7e_7f_0070, 32'h7e_7f_0070};
 localparam logic [DEV_CNT-1:0][MUX_CNT-1:0][7:0] DEV_MUX_MASK = {{8'h00, 8'h01}, {8'h07, 8'h00}, {8'h00, 8'h08}, {8'h00, 8'h04}};
 
+localparam CYC_PER_US = 250;
+localparam PAGE_SEL_DELAY_US = SIM ? 20 : 2000;
 localparam I2C_PRESCALE = SIM ? 2 : 250000/(400*4);
-localparam I2C_TBUF_CYC = SIM ? 10 : 1000;
+localparam I2C_TBUF_CYC = 20;
 
 taxi_axis_if #(
     .DATA_W(32),
@@ -456,6 +458,8 @@ cndm_brd_ctrl_i2c #(
     .DEV_ADDR_CFG(DEV_ADDR_CFG),
     .DEV_MUX_MASK(DEV_MUX_MASK),
 
+    .CYC_PER_US(CYC_PER_US),
+    .PAGE_SEL_DELAY_US(PAGE_SEL_DELAY_US),
     .I2C_PRESCALE(I2C_PRESCALE),
     .I2C_TBUF_CYC(I2C_TBUF_CYC)
 )

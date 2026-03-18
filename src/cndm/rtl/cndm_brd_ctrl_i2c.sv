@@ -213,6 +213,9 @@ taxi_axis_if #(.DATA_W(12), .KEEP_W(1)) axis_i2c_cmd();
 taxi_axis_if #(.DATA_W(8)) axis_i2c_tx();
 taxi_axis_if #(.DATA_W(8)) axis_i2c_rx();
 
+wire i2c_busy;
+wire i2c_bus_control;
+
 localparam logic [11:0]
     I2C_CMD_START        = 12'h080,
     I2C_CMD_READ         = 12'h100,
@@ -243,8 +246,8 @@ i2c_master_inst (
     /*
     * Status
     */
-    .busy(),
-    .bus_control(),
+    .busy(i2c_busy),
+    .bus_control(i2c_bus_control),
     .bus_active(),
     .missed_ack(),
 
@@ -419,9 +422,11 @@ always_comb begin
 
     case (state_reg)
         STATE_IDLE: begin
-            dev_sel_next = '0;
+            if (!(i2c_busy || i2c_bus_control)) begin
+                dev_sel_next = '0;
+            end
+            s_axis_cmd_tready_next = !m_axis_rsp_tvalid_reg && !rsp_frame_reg && !(i2c_busy || i2c_bus_control);
 
-            s_axis_cmd_tready_next = !m_axis_rsp_tvalid_reg && !rsp_frame_reg;
 
             cmd_ram_wr_data = s_axis_cmd.tdata;
             cmd_ram_wr_strb = '1;

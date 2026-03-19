@@ -73,7 +73,7 @@ static int cndm_read_eeprom(struct net_device *ndev, u16 offset, u16 len, u8 *da
 	if (len > 32)
 		len = 32;
 
-	cmd.opcode = CNDM_CMD_OP_HWMON;
+	cmd.opcode = CNDM_CMD_OP_HWID;
 	cmd.flags = 0x00000000;
 	cmd.index = 0;
 	cmd.brd_opcode = CNDM_CMD_BRD_OP_EEPROM_RD;
@@ -97,6 +97,49 @@ static int cndm_read_eeprom(struct net_device *ndev, u16 offset, u16 len, u8 *da
 
 	if (data)
 		memcpy(data, ((void *)&rsp.data), len);
+
+	return len;
+}
+
+static int cndm_write_eeprom(struct net_device *ndev, u16 offset, u16 len, u8 *data)
+{
+	struct cndm_priv *priv = netdev_priv(ndev);
+	int ret = 0;
+
+	struct cndm_cmd_hwid cmd;
+	struct cndm_cmd_hwid rsp;
+
+	// limit length to 32
+	if (len > 32)
+		len = 32;
+
+	// do not cross 32-byte boundaries
+	if (len > 32 - (offset & 31))
+		len = 32 - (offset & 31);
+
+	cmd.opcode = CNDM_CMD_OP_HWID;
+	cmd.flags = 0x00000000;
+	cmd.index = 0;
+	cmd.brd_opcode = CNDM_CMD_BRD_OP_EEPROM_WR;
+	cmd.brd_flags = 0x00000000;
+	cmd.dev_addr_offset = 0;
+	cmd.page = 0;
+	cmd.bank = 0;
+	cmd.addr = offset;
+	cmd.len = len;
+
+	memcpy(((void *)&cmd.data), data, len);
+
+	ret = cndm_exec_cmd(priv->cdev, &cmd, &rsp);
+	if (ret) {
+		netdev_err(ndev, "Failed to execute command");
+		return -ret;
+	}
+
+	if (rsp.status || rsp.brd_status) {
+		netdev_warn(ndev, "Failed to write EEPROM");
+		return rsp.status ? -rsp.status : -rsp.brd_status;
+	}
 
 	return len;
 }
@@ -324,6 +367,36 @@ static int cndm_get_eeprom(struct net_device *ndev,
 	return 0;
 }
 
+static int cndm_set_eeprom(struct net_device *ndev,
+		struct ethtool_eeprom *eeprom, u8 *data)
+{
+	int i = 0;
+	int write_len;
+
+	if (eeprom->len == 0)
+		return -EINVAL;
+
+	if (eeprom->magic != 0x4d444e43)
+		return -EFAULT;
+
+	while (i < eeprom->len) {
+		write_len = cndm_write_eeprom(ndev, eeprom->offset + i,
+				eeprom->len - i, data + i);
+
+		if (write_len == 0)
+			return 0;
+
+		if (write_len < 0) {
+			netdev_err(ndev, "%s: Failed to write EEPROM (%d)", __func__, write_len);
+			return write_len;
+		}
+
+		i += write_len;
+	}
+
+	return 0;
+}
+
 static int cndm_get_module_eeprom(struct net_device *ndev,
 		struct ethtool_eeprom *eeprom, u8 *data)
 {
@@ -391,6 +464,7 @@ const struct ethtool_ops cndm_ethtool_ops = {
 	.get_link = ethtool_op_get_link,
 	.get_eeprom_len = cndm_get_eeprom_len,
 	.get_eeprom = cndm_get_eeprom,
+	.set_eeprom = cndm_set_eeprom,
 	.get_ts_info = cndm_get_ts_info,
 	.get_module_info = cndm_get_module_info,
 	.get_module_eeprom = cndm_get_module_eeprom,

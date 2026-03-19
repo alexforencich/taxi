@@ -11,6 +11,7 @@ Authors:
 
 import logging
 import os
+import struct
 import sys
 
 import pytest
@@ -22,6 +23,7 @@ from cocotb.triggers import RisingEdge, FallingEdge, Timer
 
 from cocotbext.axi import AxiStreamBus
 from cocotbext.eth import XgmiiFrame
+from cocotbext.i2c import I2cMemory
 from cocotbext.pcie.core import RootComplex
 from cocotbext.pcie.xilinx.us import UltraScalePlusPcieDevice
 
@@ -328,6 +330,41 @@ class TB:
         dut.sfp_tx_fault.setimmediatevalue(0)
         dut.sfp_los.setimmediatevalue(0)
 
+        # I2C
+        self.sfp0_i2c = I2cMemory(sda=dut.sfp_i2c_sda_o[0], sda_o=dut.sfp_i2c_sda_i[0],
+            scl=dut.sfp_i2c_scl_o[0], scl_o=dut.sfp_i2c_scl_i[0], addr=0x50, size=256)
+
+        self.sfp0_i2c.write_mem(0, bytes.fromhex("""
+            03 04 21 00 00 00 00 00 04 00 00 00 67 00 00 00
+            00 00 03 00 41 6d 70 68 65 6e 6f 6c 20 20 20 20
+            20 20 20 20 00 41 50 48 35 37 31 35 34 30 30 30
+            32 20 20 20 20 20 20 20 4b 20 20 20 01 00 00 f7
+            00 00 00 00 41 50 46 30 39 34 38 30 30 32 30 32
+            37 39 20 20 30 39 31 31 32 34 20 20 00 00 00 c1
+            ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff
+            ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff 00
+        """ + " ff"*128))
+
+        self.sfp1_i2c = I2cMemory(sda=dut.sfp_i2c_sda_o[1], sda_o=dut.sfp_i2c_sda_i[1],
+            scl=dut.sfp_i2c_scl_o[1], scl_o=dut.sfp_i2c_scl_i[1], addr=0x50, size=256)
+
+        self.sfp1_i2c.write_mem(0, bytes.fromhex("""
+            03 04 21 00 00 00 00 00 04 00 00 00 67 00 00 00
+            00 00 03 00 41 6d 70 68 65 6e 6f 6c 20 20 20 20
+            20 20 20 20 00 41 50 48 35 37 31 35 34 30 30 30
+            32 20 20 20 20 20 20 20 4b 20 20 20 01 00 00 f7
+            00 00 00 00 41 50 46 30 39 34 38 30 30 32 30 32
+            37 39 20 20 30 39 31 31 32 34 20 20 00 00 00 c1
+            ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff
+            ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff 00
+        """ + " ff"*128))
+
+        self.eeprom_i2c = I2cMemory(sda=dut.i2c_sda_o, sda_o=dut.i2c_sda_i,
+            scl=dut.i2c_scl_o, scl_o=dut.i2c_scl_i, addr=0x51, size=2**13)
+
+        self.eeprom_smb = I2cMemory(sda=dut.smbdat_o, sda_o=dut.smbdat_i,
+            scl=dut.smbclk_o, scl_o=dut.smbclk_i, addr=0x50, size=2**13)
+
         self.loopback_enable = False
         cocotb.start_soon(self._run_loopback())
 
@@ -374,6 +411,28 @@ async def run_test(dut):
     await driver.init_pcie_dev(tb.rc.find_device(tb.dev.functions[0].pcie_id))
 
     tb.log.info("Init complete")
+
+    tb.log.info("Read SFP0")
+
+    rsp = await driver.exec_cmd(struct.pack("<HHLHHLbbbbLLL",
+        0, # rsvd
+        cndm.CNDM_CMD_OP_HWMON, # opcode
+        0x00000000, # flags
+        0, # index
+        cndm.CNDM_CMD_BRD_OP_OPTIC_RD, # board op
+        0, # flags
+        0, # rsvd
+        0, # dev addr offset
+        0, # bank
+        0, # page
+        0x00, # addr
+        32, # len
+        0, # rsvd
+    ))
+
+    print(rsp)
+
+    tb.log.info("Data: %s", rsp[32:32+32].hex())
 
     tb.log.info("Wait for block lock")
     for k in range(1200):
@@ -475,6 +534,7 @@ def test_fpga_core(request, mac_data_w):
         os.path.join(tests_dir, f"{toplevel}.sv"),
         os.path.join(rtl_dir, f"{dut}.sv"),
         os.path.join(taxi_src_dir, "cndm", "rtl", "cndm_micro_pcie_us.f"),
+        os.path.join(taxi_src_dir, "cndm", "rtl", "cndm_brd_ctrl_i2c.f"),
         os.path.join(taxi_src_dir, "eth", "rtl", "us", "taxi_eth_mac_25g_us.f"),
         os.path.join(taxi_src_dir, "axis", "rtl", "taxi_axis_async_fifo.f"),
         os.path.join(taxi_src_dir, "sync", "rtl", "taxi_sync_reset.sv"),

@@ -25,6 +25,7 @@ TOPLEVEL = $(COCOTB_TOPLEVEL)
 VERILOG_SOURCES += $(COCOTB_TOPLEVEL).sv
 VERILOG_SOURCES += $(RTL_DIR)/$(DUT).sv
 VERILOG_SOURCES += $(TAXI_SRC_DIR)/cndm/rtl/cndm_micro_pcie_us.f
+VERILOG_SOURCES += $(TAXI_SRC_DIR)/cndm/rtl/cndm_brd_ctrl_i2c.f
 VERILOG_SOURCES += $(TAXI_SRC_DIR)/eth/rtl/us/taxi_eth_mac_25g_us.f
 VERILOG_SOURCES += $(TAXI_SRC_DIR)/axis/rtl/taxi_axis_async_fifo.f
 VERILOG_SOURCES += $(TAXI_SRC_DIR)/sync/rtl/taxi_sync_reset.sv

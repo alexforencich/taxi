@@ -19,6 +19,7 @@ TAXI_SRC_DIR = $(LIB_DIR)/taxi/src
 SYN_FILES = $(RTL_DIR)/fpga.sv
 SYN_FILES += $(RTL_DIR)/fpga_core.sv
 SYN_FILES += $(TAXI_SRC_DIR)/cndm/rtl/cndm_micro_pcie_us.f
+SYN_FILES += $(TAXI_SRC_DIR)/cndm/rtl/cndm_brd_ctrl_i2c.f
 SYN_FILES += $(TAXI_SRC_DIR)/eth/rtl/us/taxi_eth_mac_25g_us.f
 SYN_FILES += $(TAXI_SRC_DIR)/axis/rtl/taxi_axis_async_fifo.f
 SYN_FILES += $(TAXI_SRC_DIR)/sync/rtl/taxi_sync_reset.sv

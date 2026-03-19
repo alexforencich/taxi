@@ -66,6 +66,16 @@ logic        led_r;
 logic        led_g;
 logic        led_hb;
 
+logic i2c_scl_i;
+logic i2c_scl_o;
+logic i2c_sda_i;
+logic i2c_sda_o;
+
+logic smbclk_i;
+logic smbclk_o;
+logic smbdat_i;
+logic smbdat_o;
+
 logic sfp_mgt_refclk_p;
 logic sfp_mgt_refclk_n;
 logic sfp_mgt_refclk_out;
@@ -73,6 +83,11 @@ logic sfp_mgt_refclk_out;
 logic [1:0] sfp_npres;
 logic [1:0] sfp_tx_fault;
 logic [1:0] sfp_los;
+
+logic sfp_i2c_scl_i[2];
+logic sfp_i2c_scl_o[2];
+logic sfp_i2c_sda_i[2];
+logic sfp_i2c_sda_o[2];
 
 logic pcie_clk;
 logic pcie_rst;
@@ -216,6 +231,22 @@ uut (
     .led_hb(led_hb),
 
     /*
+     * I2C
+     */
+    .i2c_scl_i(i2c_scl_i),
+    .i2c_scl_o(i2c_scl_o),
+    .i2c_sda_i(i2c_sda_i),
+    .i2c_sda_o(i2c_sda_o),
+
+    /*
+     * SMBus
+     */
+    .smbclk_i(smbclk_i),
+    .smbclk_o(smbclk_o),
+    .smbdat_i(smbdat_i),
+    .smbdat_o(smbdat_o),
+
+    /*
      * PCIe
      */
     .pcie_clk(pcie_clk),
@@ -290,6 +321,11 @@ uut (
     .sfp_npres(sfp_npres),
     .sfp_tx_fault(sfp_tx_fault),
     .sfp_los(sfp_los),
+
+    .sfp_i2c_scl_i({sfp_i2c_scl_i[1], sfp_i2c_scl_i[0]}),
+    .sfp_i2c_scl_o({sfp_i2c_scl_o[1], sfp_i2c_scl_o[0]}),
+    .sfp_i2c_sda_i({sfp_i2c_sda_i[1], sfp_i2c_sda_i[0]}),
+    .sfp_i2c_sda_o({sfp_i2c_sda_o[1], sfp_i2c_sda_o[0]}),
 
     /*
      * QSPI flash

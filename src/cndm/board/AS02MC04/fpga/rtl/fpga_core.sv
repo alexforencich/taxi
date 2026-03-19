@@ -67,6 +67,22 @@ module fpga_core #
     output wire logic                     led_hb,
 
     /*
+     * I2C
+     */
+    input  wire logic                     i2c_scl_i,
+    output wire logic                     i2c_scl_o,
+    input  wire logic                     i2c_sda_i,
+    output wire logic                     i2c_sda_o,
+
+    /*
+     * SMBus
+     */
+    input  wire logic                     smbclk_i,
+    output wire logic                     smbclk_o,
+    input  wire logic                     smbdat_i,
+    output wire logic                     smbdat_o,
+
+    /*
      * Ethernet: SFP+
      */
     input  wire logic                     sfp_rx_p[2],
@@ -79,6 +95,11 @@ module fpga_core #
     input  wire logic [1:0]               sfp_npres,
     input  wire logic [1:0]               sfp_tx_fault,
     input  wire logic [1:0]               sfp_los,
+
+    input  wire logic [1:0]               sfp_i2c_scl_i,
+    output wire logic [1:0]               sfp_i2c_scl_o,
+    input  wire logic [1:0]               sfp_i2c_sda_i,
+    output wire logic [1:0]               sfp_i2c_sda_o,
 
     /*
      * PCIe
@@ -211,6 +232,42 @@ pyrite_inst (
     .qspi_1_cs()
 );
 
+// I2C
+localparam logic OPTIC_EN = 1'b1;
+localparam OPTIC_CNT = 2;
+
+localparam logic EEPROM_EN = 1'b1;
+localparam EEPROM_IDX = OPTIC_EN ? OPTIC_CNT : 0;
+
+localparam logic MAC_EEPROM_EN = EEPROM_EN;
+localparam MAC_EEPROM_IDX = EEPROM_IDX;
+localparam MAC_EEPROM_OFFSET = 32;
+localparam MAC_COUNT = OPTIC_CNT;
+localparam logic MAC_FROM_BASE = 1'b1;
+
+localparam logic SN_EEPROM_EN = EEPROM_EN;
+localparam SN_EEPROM_IDX = EEPROM_IDX;
+localparam SN_EEPROM_OFFSET = 0;
+localparam SN_LEN = 32;
+
+localparam logic PLL_EN = 1'b0;
+localparam PLL_IDX = EEPROM_IDX + (EEPROM_EN ? 1 : 0);
+
+localparam logic MUX_EN = 1'b0;
+localparam MUX_CNT = 1;
+localparam logic [MUX_CNT-1:0][6:0] MUX_I2C_ADDR = '0;
+
+// localparam DEV_CNT = PLL_IDX + (PLL_EN ? 1 : 0);
+localparam DEV_CNT = 4;
+localparam logic [DEV_CNT-1:0][6:0] DEV_I2C_ADDR = {7'h50, 7'h51, 7'h50, 7'h50};
+localparam logic [DEV_CNT-1:0][31:0] DEV_ADDR_CFG = {32'h00_00_0001, 32'h00_00_0001, 32'h00_00_0040, 32'h00_00_0040};
+localparam logic [DEV_CNT-1:0][MUX_CNT-1:0][7:0] DEV_MUX_MASK = '0;
+
+localparam CYC_PER_US = 250;
+localparam PAGE_SEL_DELAY_US = SIM ? 20 : 2000;
+localparam I2C_PRESCALE = SIM ? 2 : 250000/(400*4);
+localparam I2C_TBUF_CYC = 20;
+
 taxi_axis_if #(
     .DATA_W(32),
     .KEEP_EN(1),
@@ -219,6 +276,76 @@ taxi_axis_if #(
     .USER_EN(1),
     .USER_W(1)
 ) axis_brd_ctrl_cmd(), axis_brd_ctrl_rsp();
+
+wire [DEV_CNT-1:0] i2c_dev_sel;
+
+wire int_i2c_scl_i;
+wire int_i2c_scl_o;
+wire int_i2c_sda_i;
+wire int_i2c_sda_o;
+
+assign {smbclk_o, i2c_scl_o, sfp_i2c_scl_o} = {DEV_CNT{int_i2c_scl_o}} | ~i2c_dev_sel;
+assign {smbdat_o, i2c_sda_o, sfp_i2c_sda_o} = {DEV_CNT{int_i2c_sda_o}} | ~i2c_dev_sel;
+
+assign int_i2c_scl_i = &({smbclk_i, i2c_scl_i, sfp_i2c_scl_i} | ~i2c_dev_sel);
+assign int_i2c_sda_i = &({smbdat_i, i2c_sda_i, sfp_i2c_sda_i} | ~i2c_dev_sel);
+
+cndm_brd_ctrl_i2c #(
+    .OPTIC_EN(OPTIC_EN),
+    .OPTIC_CNT(OPTIC_CNT),
+
+    .EEPROM_EN(EEPROM_EN),
+    .EEPROM_IDX(EEPROM_IDX),
+
+    .MAC_EEPROM_EN(MAC_EEPROM_EN),
+    .MAC_EEPROM_IDX(MAC_EEPROM_IDX),
+    .MAC_EEPROM_OFFSET(MAC_EEPROM_OFFSET),
+    .MAC_COUNT(MAC_COUNT),
+    .MAC_FROM_BASE(MAC_FROM_BASE),
+
+    .SN_EEPROM_EN(SN_EEPROM_EN),
+    .SN_EEPROM_IDX(SN_EEPROM_IDX),
+    .SN_EEPROM_OFFSET(SN_EEPROM_OFFSET),
+    .SN_LEN(SN_LEN),
+
+    .PLL_EN(PLL_EN),
+    .PLL_IDX(PLL_IDX),
+
+    .MUX_EN(MUX_EN),
+    .MUX_CNT(MUX_CNT),
+    .MUX_I2C_ADDR(MUX_I2C_ADDR),
+
+    .DEV_CNT(DEV_CNT),
+    .DEV_I2C_ADDR(DEV_I2C_ADDR),
+    .DEV_ADDR_CFG(DEV_ADDR_CFG),
+    .DEV_MUX_MASK(DEV_MUX_MASK),
+
+    .CYC_PER_US(CYC_PER_US),
+    .PAGE_SEL_DELAY_US(PAGE_SEL_DELAY_US),
+    .I2C_PRESCALE(I2C_PRESCALE),
+    .I2C_TBUF_CYC(I2C_TBUF_CYC)
+)
+board_ctrl_i2c_ch_inst (
+    .clk(pcie_clk),
+    .rst(pcie_rst),
+
+    /*
+     * Board control command interface
+     */
+    .s_axis_cmd(axis_brd_ctrl_cmd),
+    .m_axis_rsp(axis_brd_ctrl_rsp),
+
+    /*
+     * I2C interface
+     */
+    .i2c_scl_i(int_i2c_scl_i),
+    .i2c_scl_o(int_i2c_scl_o),
+    .i2c_sda_i(int_i2c_sda_i),
+    .i2c_sda_o(int_i2c_sda_o),
+
+    .dev_sel(i2c_dev_sel),
+    .dev_rst()
+);
 
 // SFP+
 wire sfp_tx_clk[2];
@@ -576,7 +703,7 @@ cndm_micro_pcie_us #(
 
     // Structural configuration
     .PORTS($size(axis_sfp_tx)),
-    .BRD_CTRL_EN(1'b0),
+    .BRD_CTRL_EN(1'b1),
     .SYS_CLK_PER_NS_NUM(4),
     .SYS_CLK_PER_NS_DEN(1),
 

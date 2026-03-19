@@ -5,7 +5,7 @@
 This design targets the Alibaba AS02MC04 FPGA board.
 
 * SFP+ cages
-  * Looped-back 10GBASE-R or 25GBASE-R MAC via GTY transceiver
+  * 10GBASE-R or 25GBASE-R MAC via GTY transceiver
 
 ## Board details
 

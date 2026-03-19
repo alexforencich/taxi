@@ -65,6 +65,18 @@ module fpga #
     output wire logic        led_hb,
 
     /*
+     * I2C
+     */
+    inout  wire logic        i2c_scl,
+    inout  wire logic        i2c_sda,
+
+    /*
+     * SMBus
+     */
+    inout  wire logic        smbclk,
+    inout  wire logic        smbdat,
+
+    /*
      * Ethernet: SFP+
      */
     input  wire logic        sfp_rx_p[2],
@@ -76,6 +88,8 @@ module fpga #
     input  wire logic [1:0]  sfp_npres,
     input  wire logic [1:0]  sfp_tx_fault,
     input  wire logic [1:0]  sfp_los,
+    inout  wire logic [1:0]  sfp_i2c_scl,
+    inout  wire logic [1:0]  sfp_i2c_sda,
 
     /*
      * PCIe
@@ -206,6 +220,92 @@ sync_reset_125mhz_inst (
     .rst(~mmcm_locked),
     .out(rst_125mhz_int)
 );
+
+// GPIO
+wire [1:0] sfp_npres_int;
+wire [1:0] sfp_tx_fault_int;
+wire [1:0] sfp_los_int;
+wire [1:0] sfp_i2c_scl_i;
+wire [1:0] sfp_i2c_scl_o;
+wire [1:0] sfp_i2c_sda_i;
+wire [1:0] sfp_i2c_sda_o;
+
+reg [1:0] sfp_i2c_scl_o_reg;
+reg [1:0] sfp_i2c_sda_o_reg;
+
+always @(posedge pcie_user_clk) begin
+    sfp_i2c_scl_o_reg <= sfp_i2c_scl_o;
+    sfp_i2c_sda_o_reg <= sfp_i2c_sda_o;
+end
+
+taxi_sync_signal #(
+    .WIDTH(5*2),
+    .N(2)
+)
+sfp_sync_inst (
+    .clk(pcie_user_clk),
+    .in({sfp_npres, sfp_tx_fault, sfp_los,
+        sfp_i2c_scl, sfp_i2c_sda}),
+    .out({sfp_npres_int, sfp_tx_fault_int, sfp_los_int,
+        sfp_i2c_scl_i, sfp_i2c_sda_i})
+);
+
+for (genvar n = 0; n < 2; n = n + 1) begin
+    assign sfp_i2c_scl[n] = sfp_i2c_scl_o_reg[n] ? 1'bz : sfp_i2c_scl_o_reg[n];
+    assign sfp_i2c_sda[n] = sfp_i2c_sda_o_reg[n] ? 1'bz : sfp_i2c_sda_o_reg[n];
+end
+
+wire i2c_scl_i;
+wire i2c_scl_o;
+wire i2c_sda_i;
+wire i2c_sda_o;
+
+reg i2c_scl_o_reg;
+reg i2c_sda_o_reg;
+
+always @(posedge pcie_user_clk) begin
+    i2c_scl_o_reg <= i2c_scl_o;
+    i2c_sda_o_reg <= i2c_sda_o;
+end
+
+taxi_sync_signal #(
+    .WIDTH(2),
+    .N(2)
+)
+i2c_sync_inst (
+    .clk(pcie_user_clk),
+    .in({i2c_scl, i2c_sda}),
+    .out({i2c_scl_i, i2c_sda_i})
+);
+
+assign i2c_scl = i2c_scl_o_reg ? 1'bz : i2c_scl_o_reg;
+assign i2c_sda = i2c_sda_o_reg ? 1'bz : i2c_sda_o_reg;
+
+wire smbclk_i;
+wire smbclk_o;
+wire smbdat_i;
+wire smbdat_o;
+
+reg smbclk_o_reg;
+reg smbdat_o_reg;
+
+always @(posedge pcie_user_clk) begin
+    smbclk_o_reg <= smbclk_o;
+    smbdat_o_reg <= smbdat_o;
+end
+
+taxi_sync_signal #(
+    .WIDTH(2),
+    .N(2)
+)
+smb_sync_inst (
+    .clk(pcie_user_clk),
+    .in({smbclk, smbdat}),
+    .out({smbclk_i, smbdat_i})
+);
+
+assign smbclk = smbclk_o_reg ? 1'bz : smbclk_o_reg;
+assign smbdat = smbdat_o_reg ? 1'bz : smbdat_o_reg;
 
 // Flash
 wire qspi_clk_int;
@@ -739,6 +839,22 @@ core_inst (
     .led_hb(led_hb),
 
     /*
+     * I2C
+     */
+    .i2c_scl_i(i2c_scl_i),
+    .i2c_scl_o(i2c_scl_o),
+    .i2c_sda_i(i2c_sda_i),
+    .i2c_sda_o(i2c_sda_o),
+
+    /*
+     * SMBus
+     */
+    .smbclk_i(smbclk_i),
+    .smbclk_o(smbclk_o),
+    .smbdat_i(smbdat_i),
+    .smbdat_o(smbdat_o),
+
+    /*
      * Ethernet: SFP+
      */
     .sfp_rx_p(sfp_rx_p),
@@ -748,9 +864,14 @@ core_inst (
     .sfp_mgt_refclk_p(sfp_mgt_refclk_p),
     .sfp_mgt_refclk_n(sfp_mgt_refclk_n),
     .sfp_mgt_refclk_out(),
-    .sfp_npres(sfp_npres),
-    .sfp_tx_fault(sfp_tx_fault),
-    .sfp_los(sfp_los),
+    .sfp_npres(sfp_npres_int),
+    .sfp_tx_fault(sfp_tx_fault_int),
+    .sfp_los(sfp_los_int),
+
+    .sfp_i2c_scl_i(sfp_i2c_scl_i),
+    .sfp_i2c_scl_o(sfp_i2c_scl_o),
+    .sfp_i2c_sda_i(sfp_i2c_sda_i),
+    .sfp_i2c_sda_o(sfp_i2c_sda_o),
 
     /*
      * PCIe

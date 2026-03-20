@@ -107,7 +107,7 @@ taxi_apb_if #(
     .ADDR_W(14)
 ) vpd_apb_int[2]();
 
-taxi_apb_interconnect #(
+taxi_apb_interconnect_1s #(
     .M_CNT(2),
     .ADDR_W(15),
     .M_REGIONS(1),

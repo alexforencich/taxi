@@ -91,6 +91,8 @@ The Taxi transport library contains many smaller components that can be composed
     *  Width converter
     *  Synchronous FIFO
     *  Single-port RAM
+    *  Dual-port RAM
+    *  RAM interface
 *  AXI lite
     *  SV interface for AXI lite
     *  AXI lite to AXI adapter

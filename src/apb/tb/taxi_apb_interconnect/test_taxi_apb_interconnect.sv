@@ -18,6 +18,7 @@ Authors:
 module test_taxi_apb_interconnect #
 (
     /* verilator lint_off WIDTHTRUNC */
+    parameter S_CNT = 4,
     parameter M_CNT = 4,
     parameter DATA_W = 32,
     parameter ADDR_W = 32,
@@ -33,6 +34,8 @@ module test_taxi_apb_interconnect #
     parameter M_REGIONS = 1,
     parameter M_BASE_ADDR = '0,
     parameter M_ADDR_W = {M_CNT{{M_REGIONS{32'd24}}}},
+    parameter M_CONNECT_RD = {M_CNT{{S_CNT{1'b1}}}},
+    parameter M_CONNECT_WR = {M_CNT{{S_CNT{1'b1}}}},
     parameter M_SECURE = {M_CNT{1'b0}}
     /* verilator lint_on WIDTHTRUNC */
 )
@@ -53,14 +56,17 @@ taxi_apb_if #(
     .PRUSER_W(PRUSER_W),
     .PBUSER_EN(PBUSER_EN),
     .PBUSER_W(PBUSER_W)
-) s_apb(), m_apb[M_CNT]();
+) s_apb[S_CNT](), m_apb[M_CNT]();
 
 taxi_apb_interconnect #(
+    .S_CNT(S_CNT),
     .M_CNT(M_CNT),
     .ADDR_W(ADDR_W),
     .M_REGIONS(M_REGIONS),
     .M_BASE_ADDR(M_BASE_ADDR),
     .M_ADDR_W(M_ADDR_W),
+    .M_CONNECT_RD(M_CONNECT_RD),
+    .M_CONNECT_WR(M_CONNECT_WR),
     .M_SECURE(M_SECURE)
 )
 uut (

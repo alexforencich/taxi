@@ -32,7 +32,10 @@ class TB(object):
 
         cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
 
-        self.apb_master = ApbMaster(ApbBus.from_entity(dut.s_apb), dut.clk, dut.rst)
+        self.apb_master = [
+            ApbMaster(ApbBus.from_entity(ch), dut.clk, dut.rst)
+            for ch in dut.s_apb
+        ]
         self.apb_ram = [
             ApbRam(ApbBus.from_entity(ch), dut.clk, dut.rst, size=2**16)
             for ch in dut.m_apb
@@ -40,7 +43,8 @@ class TB(object):
 
     def set_idle_generator(self, generator=None):
         if generator:
-            self.apb_master.set_pause_generator(generator())
+            for master in self.apb_master:
+                master.set_pause_generator(generator())
 
     def set_backpressure_generator(self, generator=None):
         if generator:
@@ -60,11 +64,11 @@ class TB(object):
 
 
 async def run_test_write(
-    dut, data_in=None, idle_inserter=None, backpressure_inserter=None, m=0
+    dut, data_in=None, idle_inserter=None, backpressure_inserter=None, s=0, m=0
 ):
     tb = TB(dut)
 
-    byte_lanes = tb.apb_master.byte_lanes
+    byte_lanes = tb.apb_master[s].byte_lanes
 
     await tb.cycle_reset()
 
@@ -80,7 +84,7 @@ async def run_test_write(
 
             tb.apb_ram[m].write(ram_addr - 128, b"\xaa" * (length + 256))
 
-            await tb.apb_master.write(addr, test_data)
+            await tb.apb_master[s].write(addr, test_data)
 
             tb.log.debug(
                 "%s",
@@ -99,11 +103,11 @@ async def run_test_write(
 
 
 async def run_test_read(
-    dut, data_in=None, idle_inserter=None, backpressure_inserter=None, m=0
+    dut, data_in=None, idle_inserter=None, backpressure_inserter=None, s=0, m=0
 ):
     tb = TB(dut)
 
-    byte_lanes = tb.apb_master.byte_lanes
+    byte_lanes = tb.apb_master[s].byte_lanes
 
     await tb.cycle_reset()
 
@@ -119,7 +123,7 @@ async def run_test_read(
 
             tb.apb_ram[m].write(ram_addr, test_data)
 
-            data = await tb.apb_master.read(addr, length)
+            data = await tb.apb_master[s].read(addr, length)
 
             assert data.data == test_data
 
@@ -157,7 +161,7 @@ async def run_stress_test(dut, idle_inserter=None, backpressure_inserter=None):
         workers.append(
             cocotb.start_soon(
                 worker(
-                    tb.apb_master,
+                    tb.apb_master[k % len(tb.apb_master)],
                     k * 0x1000,
                     0x1000,
                     count=16,
@@ -177,12 +181,14 @@ def cycle_pause():
 
 
 if getattr(cocotb, "top", None) is not None:
+    s_cnt = len(cocotb.top.s_apb)
     m_cnt = len(cocotb.top.m_apb)
 
     for test in [run_test_write, run_test_read]:
         factory = TestFactory(test)
         factory.add_option("idle_inserter", [None, cycle_pause])
         factory.add_option("backpressure_inserter", [None, cycle_pause])
+        factory.add_option("s", range(min(s_cnt, 2)))
         factory.add_option("m", range(min(m_cnt, 2)))
         factory.generate_tests()
 
@@ -215,15 +221,15 @@ def process_f_files(files):
 
 @pytest.mark.parametrize("data_w", [8, 16, 32])
 @pytest.mark.parametrize("m_cnt", [1, 4])
-def test_taxi_apb_interconnect(request, m_cnt, data_w):
+@pytest.mark.parametrize("s_cnt", [1, 4])
+def test_taxi_apb_interconnect(request, s_cnt, m_cnt, data_w):
     dut = "taxi_apb_interconnect"
     module = os.path.splitext(os.path.basename(__file__))[0]
     toplevel = module
 
     verilog_sources = [
         os.path.join(tests_dir, f"{toplevel}.sv"),
-        os.path.join(rtl_dir, f"{dut}.sv"),
-        os.path.join(rtl_dir, "taxi_apb_if.sv"),
+        os.path.join(rtl_dir, f"{dut}.f"),
     ]
 
     verilog_sources = process_f_files(verilog_sources)
@@ -231,6 +237,7 @@ def test_taxi_apb_interconnect(request, m_cnt, data_w):
     parameters = {}
 
     parameters["M_CNT"] = m_cnt
+    parameters["S_CNT"] = s_cnt
     parameters["DATA_W"] = data_w
     parameters["ADDR_W"] = 32
     parameters["STRB_W"] = parameters["DATA_W"] // 8

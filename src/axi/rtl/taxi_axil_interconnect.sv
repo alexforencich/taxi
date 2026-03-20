@@ -23,11 +23,9 @@ module taxi_axil_interconnect #
     parameter M_COUNT = 4,
     // Address width in bits for address decoding
     parameter ADDR_W = 32,
-    // TODO fix parametrization once verilator issue 5890 is fixed
-    // Number of concurrent operations for each slave interface
-    // S_COUNT concatenated fields of 32 bits
     // Number of regions per master interface
     parameter M_REGIONS = 1,
+    // TODO fix parametrization once verilator issue 5890 is fixed
     // Master interface base addresses
     // M_COUNT concatenated fields of M_REGIONS concatenated fields of ADDR_W bits
     // set to zero for default addressing based on M_ADDR_W

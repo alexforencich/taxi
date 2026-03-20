@@ -300,7 +300,7 @@ taxi_apb_if #(
 )
 ch_apb_ctrl[CNT]();
 
-taxi_apb_interconnect #(
+taxi_apb_interconnect_1s #(
     .M_CNT(CNT),
     .ADDR_W(s_apb_ctrl.ADDR_W),
     .M_REGIONS(1),

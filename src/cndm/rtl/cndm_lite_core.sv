@@ -389,7 +389,7 @@ taxi_apb_if #(
 )
 apb_port_dp_ctrl[PORT_OFFSET_DP+PORTS]();
 
-taxi_apb_interconnect #(
+taxi_apb_interconnect_1s #(
     .M_CNT($size(apb_port_dp_ctrl)),
     .ADDR_W(APB_DP_ADDR_W),
     .M_REGIONS(1),

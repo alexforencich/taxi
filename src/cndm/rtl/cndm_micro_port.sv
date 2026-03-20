@@ -136,7 +136,7 @@ taxi_apb_if #(
 )
 apb_dp_ctrl[3]();
 
-taxi_apb_interconnect #(
+taxi_apb_interconnect_1s #(
     .M_CNT($size(apb_dp_ctrl)),
     .ADDR_W(s_apb_dp_ctrl.ADDR_W),
     .M_REGIONS(1),

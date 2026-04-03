@@ -24,7 +24,7 @@ To facilitate the dual-license model, contributions to the project can only be a
 
 ## Corundum NIC
 
-Corundum is an open-source, high-performance FPGA-based NIC and platform for in-network compute.  Features include a high performance datapath, 10G/25G/100G Ethernet, PCI express gen 3+, a custom, high performance, tightly-integrated PCIe DMA engine, many (1000+) transmit, receive, completion, and event queues, scatter/gather DMA, MSI/MSI-X interrupts, per-port transmit scheduling, flow hashing, RSS, checksum offloading, and native IEEE 1588 PTP timestamping.  A Linux driver is included that integrates with the Linux networking stack.  Development and debugging is facilitated by an extensive simulation framework that covers the entire system from a simulation model of the driver and PCI express interface on the host side and Ethernet interfaces on the network side.
+Corundum is an open-source, high-performance FPGA-based NIC and platform for in-network compute.  Features include a high performance datapath, 10G/25G/100G Ethernet, PCI express gen 3+, a custom, high performance, tightly-integrated PCIe DMA engine, many (1000+) transmit, receive, completion, and event queues, scatter/gather DMA, MSI/MSI-X interrupts, per-port transmit scheduling, flow hashing, RSS, checksum offloading, and native IEEE 1588 PTP timestamping.  A Linux driver is included that integrates with the Linux networking stack, as well as a DPDK PMD.  Development and debugging is facilitated by an extensive simulation framework that covers the entire system from a simulation model of the driver and PCI express interface on the host side and Ethernet interfaces on the network side.
 
 Several variants of Corundum are planned, sharing the same host interface and device driver but targeting different optimization points:
 
@@ -33,7 +33,7 @@ Several variants of Corundum are planned, sharing the same host interface and de
 *  corundum-ng: intended for high-performance packet processing with deep pipelines and segmented internal interfaces, supporting operation at up to 400 Gbps aggregate
 *  corundum-proto: simplified design with simplified driver, intended for educational purposes only
 
-Planned features include a DPDK driver, SR-IOV, AF_XDP, white rabbit/IEEE 1588 HA, and Zircon stack integration.
+Planned features include SR-IOV, AF_XDP, white rabbit/IEEE 1588 HA, and Zircon stack integration.
 
 Note that Corundum is still under active development and may not ready for production use; additional functionality and improvements to performance and flexibility will be made over time.
 

@@ -287,7 +287,7 @@ def test_fpga_core(request, phy_type):
 
     parameters['SIM'] = "1'b1"
     parameters['VENDOR'] = "\"XILINX\""
-    parameters['FAMILY'] = "\"artix7\""
+    parameters['FAMILY'] = "\"kintex7\""
     parameters['USE_CLK90'] = "1'b1"
     parameters['BASET_PHY_TYPE'] = f"\"{phy_type}\""
     parameters['SFP_INVERT'] = "1'b1"

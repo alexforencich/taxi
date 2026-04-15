@@ -24,7 +24,9 @@ SYN_FILES += $(TAXI_SRC_DIR)/sync/rtl/taxi_sync_reset.sv
 SYN_FILES += $(TAXI_SRC_DIR)/sync/rtl/taxi_sync_signal.sv
 
 # XDC files
-XDC_FILES = ../fpga_k35.xdc
+XDC_FILES += ../syn/K35/fpga.xdc
+XDC_FILES += ../syn/K35/gpio.xdc
+XDC_FILES += ../syn/K35/sfp.xdc
 XDC_FILES += $(TAXI_SRC_DIR)/eth/syn/vivado/taxi_eth_mac_fifo.tcl
 XDC_FILES += $(TAXI_SRC_DIR)/axis/syn/vivado/taxi_axis_async_fifo.tcl
 XDC_FILES += $(TAXI_SRC_DIR)/sync/syn/vivado/taxi_sync_reset.tcl

@@ -101,7 +101,7 @@ async def run_test(dut, payload_lengths=None, payload_data=None, ifg=12):
 
     for test_data in test_frames:
         await tb.source.send(AxiStreamFrame(test_data, tid=0, tuser=0))
-        total_bytes += max(len(test_data), 60)+4
+        total_bytes += len(test_data)+4
         total_pkts += 1
 
     for test_data in test_frames:
@@ -120,7 +120,7 @@ async def run_test(dut, payload_lengths=None, payload_data=None, ifg=12):
         tb.log.info("RX frame SFD sim time: %f ns", rx_frame_sfd_ns)
         tb.log.info("Difference: %f ns", abs(rx_frame_sfd_ns - ptp_ts_ns))
 
-        assert rx_frame.get_payload() == test_data.ljust(60, b'\x00')
+        assert rx_frame.get_payload() == test_data
         assert rx_frame.check_fcs()
         assert rx_frame.ctrl is None
         assert abs(rx_frame_sfd_ns - ptp_ts_ns - 6.4) < 0.01
@@ -296,8 +296,8 @@ async def run_test_underrun(dut, ifg=12):
     for stat, val in tb.stats.items():
         tb.log.info("%s: %d", stat, val)
 
-    assert tb.stats["stat_tx_byte"] > 64*2 + 32
-    assert tb.stats["stat_tx_pkt_len"] > 64*2 + 32
+    assert tb.stats["stat_tx_byte"] > 64*2 + 8
+    assert tb.stats["stat_tx_pkt_len"] > 64*2 + 8
     assert tb.stats["stat_tx_pkt_ucast"] == 3
     assert tb.stats["stat_tx_pkt_mcast"] == 0
     assert tb.stats["stat_tx_pkt_bcast"] == 0
@@ -524,9 +524,7 @@ def test_taxi_axis_xgmii_tx_64(request, enable_dic):
     parameters['DATA_W'] = 64
     parameters['GBX_IF_EN'] = 0
     parameters['GBX_CNT'] = 1
-    parameters['PADDING_EN'] = 1
     parameters['DIC_EN'] = enable_dic
-    parameters['MIN_FRAME_LEN'] = 64
     parameters['PTP_TS_EN'] = 1
     parameters['PTP_TS_FMT_TOD'] = 1
     parameters['PTP_TS_W'] = 96 if parameters['PTP_TS_FMT_TOD'] else 64

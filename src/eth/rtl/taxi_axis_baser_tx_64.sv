@@ -21,9 +21,7 @@ module taxi_axis_baser_tx_64 #
     parameter HDR_W = 2,
     parameter logic GBX_IF_EN = 1'b0,
     parameter GBX_CNT = 1,
-    parameter logic PADDING_EN = 1'b1,
     parameter logic DIC_EN = 1'b1,
-    parameter MIN_FRAME_LEN = 64,
     parameter logic PTP_TS_EN = 1'b0,
     parameter logic PTP_TS_FMT_TOD = 1'b1,
     parameter PTP_TS_W = PTP_TS_FMT_TOD ? 96 : 64,
@@ -85,7 +83,6 @@ localparam USER_W = TX_CPL_CTRL_IN_TUSER ? 2 : 1;
 localparam TX_TAG_W = s_axis_tx.ID_W;
 
 localparam EMPTY_W = $clog2(KEEP_W);
-localparam MIN_LEN_W = $clog2(MIN_FRAME_LEN-4-KEEP_W+1);
 
 // check configuration
 if (DATA_W != 64)
@@ -167,7 +164,6 @@ typedef enum logic [3:0] {
 typedef enum logic [2:0] {
     STATE_IDLE,
     STATE_PAYLOAD,
-    STATE_PAD,
     STATE_FCS_1,
     STATE_FCS_2,
     STATE_ERR,
@@ -200,7 +196,6 @@ logic frame_start_reg = 1'b0, frame_start_next;
 logic frame_reg = 1'b0, frame_next;
 logic frame_error_reg = 1'b0, frame_error_next;
 logic frame_oversize_reg = 1'b0, frame_oversize_next;
-logic [MIN_LEN_W-1:0] frame_min_count_reg = '0, frame_min_count_next;
 logic [1:0] hdr_ptr_reg = '0, hdr_ptr_next;
 logic is_mcast_reg = 1'b0, is_mcast_next;
 logic is_bcast_reg = 1'b0, is_bcast_next;
@@ -399,7 +394,6 @@ always_comb begin
     frame_next = frame_reg;
     frame_error_next = frame_error_reg;
     frame_oversize_next = frame_oversize_reg;
-    frame_min_count_next = frame_min_count_reg;
     hdr_ptr_next = hdr_ptr_reg;
     is_mcast_next = is_mcast_reg;
     is_bcast_next = is_bcast_reg;
@@ -445,13 +439,6 @@ always_comb begin
         frame_start_next = frame_start_reg;
         s_axis_tx_tready_next = s_axis_tx_tready_reg;
     end else begin
-        // counter for min frame length enforcement
-        if (frame_min_count_reg > MIN_LEN_W'(KEEP_W)) begin
-            frame_min_count_next = MIN_LEN_W'(frame_min_count_reg - KEEP_W);
-        end else begin
-            frame_min_count_next = 0;
-        end
-
         // counter to measure frame length
         if (&frame_len_reg[15:3] == 0) begin
             frame_len_next = frame_len_reg + 16'(KEEP_W);
@@ -503,7 +490,6 @@ always_comb begin
                 // idle state - wait for data
                 frame_error_next = 1'b0;
                 frame_oversize_next = 1'b0;
-                frame_min_count_next = MIN_LEN_W'(MIN_FRAME_LEN-4-KEEP_W);
                 hdr_ptr_next = 0;
                 frame_len_next = 0;
                 {frame_len_lim_cyc_next, frame_len_lim_last_next} = cfg_tx_max_pkt_len ^ 4;
@@ -559,56 +545,19 @@ always_comb begin
                     end
                 end
 
-                if (PADDING_EN && frame_min_count_reg != 0) begin
-                    if (frame_min_count_reg > MIN_LEN_W'(KEEP_W)) begin
-                        s_empty_next = 0;
-                    end else if (keep2empty(s_axis_tx.tkeep) > 3'(KEEP_W-frame_min_count_reg)) begin
-                        s_empty_next = 3'(KEEP_W-frame_min_count_reg);
-                    end
-                end
-
                 if (!s_axis_tx.tvalid || s_axis_tx.tlast || frame_oversize_next) begin
                     s_axis_tx_tready_next = frame_next; // drop frame
                     frame_error_next = !s_axis_tx.tvalid || s_axis_tx.tuser[0] || frame_oversize_next;
                     stat_tx_err_user_next = s_axis_tx.tuser[0];
                     stat_tx_err_underflow_next = !s_axis_tx.tvalid;
 
-                    if (PADDING_EN && frame_min_count_reg != 0 && frame_min_count_reg > MIN_LEN_W'(KEEP_W)) begin
-                        state_next = STATE_PAD;
-                    end else begin
-                        if (frame_error_next) begin
-                            state_next = STATE_ERR;
-                        end else begin
-                            state_next = STATE_FCS_1;
-                        end
-                    end
-                end else begin
-                    state_next = STATE_PAYLOAD;
-                end
-            end
-            STATE_PAD: begin
-                // pad frame to MIN_FRAME_LEN
-                s_axis_tx_tready_next = frame_next; // drop frame
-
-                output_data_next = s_tdata_reg;
-                output_type_next = OUTPUT_TYPE_DATA;
-
-                s_tdata_next = 64'd0;
-                s_empty_next = 0;
-
-                stat_tx_byte_next = 4'(KEEP_W);
-
-                update_crc = 1'b1;
-
-                if (frame_min_count_reg > MIN_LEN_W'(KEEP_W)) begin
-                    state_next = STATE_PAD;
-                end else begin
-                    s_empty_next = 3'(KEEP_W-frame_min_count_reg);
-                    if (frame_error_reg) begin
+                    if (frame_error_next) begin
                         state_next = STATE_ERR;
                     end else begin
                         state_next = STATE_FCS_1;
                     end
+                end else begin
+                    state_next = STATE_PAYLOAD;
                 end
             end
             STATE_FCS_1: begin
@@ -762,7 +711,6 @@ always_ff @(posedge clk) begin
     frame_reg <= frame_next;
     frame_error_reg <= frame_error_next;
     frame_oversize_reg <= frame_oversize_next;
-    frame_min_count_reg <= frame_min_count_next;
     hdr_ptr_reg <= hdr_ptr_next;
     is_mcast_reg <= is_mcast_next;
     is_bcast_reg <= is_bcast_next;

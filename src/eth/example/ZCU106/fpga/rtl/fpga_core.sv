@@ -210,8 +210,6 @@ if (SFP_RATE == 0) begin : sfp_mac
     taxi_axis_if #(.DATA_W(96), .KEEP_W(1), .ID_W(8)) axis_sfp1_tx_cpl();
 
     taxi_eth_mac_1g_fifo #(
-        .PADDING_EN(1),
-        .MIN_FRAME_LEN(64),
         .STAT_EN(1),
         .STAT_TX_LEVEL(1),
         .STAT_RX_LEVEL(1),
@@ -284,16 +282,16 @@ if (SFP_RATE == 0) begin : sfp_mac
         /*
          * Configuration
          */
-        .cfg_tx_max_pkt_len(16'd9218),
+        .cfg_tx_pad_en(1'b1),
+        .cfg_tx_min_pkt_len(8'd60-1),
+        .cfg_tx_max_pkt_len(16'd9218-1),
         .cfg_tx_ifg(8'd12),
         .cfg_tx_enable(1'b1),
-        .cfg_rx_max_pkt_len(16'd9218),
+        .cfg_rx_max_pkt_len(16'd9218-1),
         .cfg_rx_enable(1'b1)
     );
 
     taxi_eth_mac_1g_fifo #(
-        .PADDING_EN(1),
-        .MIN_FRAME_LEN(64),
         .STAT_EN(1),
         .STAT_TX_LEVEL(1),
         .STAT_RX_LEVEL(1),
@@ -366,10 +364,12 @@ if (SFP_RATE == 0) begin : sfp_mac
         /*
          * Configuration
          */
-        .cfg_tx_max_pkt_len(16'd9218),
+        .cfg_tx_pad_en(1'b1),
+        .cfg_tx_min_pkt_len(8'd60-1),
+        .cfg_tx_max_pkt_len(16'd9218-1),
         .cfg_tx_ifg(8'd12),
         .cfg_tx_enable(1'b1),
-        .cfg_rx_max_pkt_len(16'd9218),
+        .cfg_rx_max_pkt_len(16'd9218-1),
         .cfg_rx_enable(1'b1)
     );
 
@@ -472,9 +472,7 @@ end else begin : sfp_mac
         // PHY parameters
         .COMBINED_MAC_PCS(COMBINED_MAC_PCS),
         .DATA_W(MAC_DATA_W),
-        .PADDING_EN(1'b1),
         .DIC_EN(1'b1),
-        .MIN_FRAME_LEN(64),
         .PTP_TS_EN(1'b0),
         .PTP_TD_EN(1'b0),
         .PTP_TS_FMT_TOD(1'b1),
@@ -610,6 +608,7 @@ end else begin : sfp_mac
         .stat_tx_pkt_vlan(),
         .stat_tx_pkt_good(),
         .stat_tx_pkt_bad(),
+        .stat_tx_pad_frame(),
         .stat_tx_err_oversize(),
         .stat_tx_err_user(),
         .stat_tx_err_underflow(),
@@ -656,10 +655,12 @@ end else begin : sfp_mac
         /*
          * Configuration
          */
-        .cfg_tx_max_pkt_len('{2{16'd9218}}),
+        .cfg_tx_pad_en('{2{1'b1}}),
+        .cfg_tx_min_pkt_len('{2{8'd60-1}}),
+        .cfg_tx_max_pkt_len('{2{16'd9218-1}}),
         .cfg_tx_ifg('{2{8'd12}}),
         .cfg_tx_enable('{2{1'b1}}),
-        .cfg_rx_max_pkt_len('{2{16'd9218}}),
+        .cfg_rx_max_pkt_len('{2{16'd9218-1}}),
         .cfg_rx_enable('{2{1'b1}}),
         .cfg_tx_prbs31_enable('{2{1'b0}}),
         .cfg_rx_prbs31_enable('{2{1'b0}}),

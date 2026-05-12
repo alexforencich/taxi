@@ -164,8 +164,6 @@ taxi_eth_mac_mii_fifo #(
     .SIM(SIM),
     .VENDOR(VENDOR),
     .FAMILY(FAMILY),
-    .PADDING_EN(1),
-    .MIN_FRAME_LEN(64),
     .STAT_EN(1),
     .STAT_TX_LEVEL(1),
     .STAT_RX_LEVEL(1),
@@ -229,10 +227,12 @@ eth_mac_inst (
     /*
      * Configuration
      */
-    .cfg_tx_max_pkt_len(16'd9218),
+    .cfg_tx_pad_en(1'b1),
+    .cfg_tx_min_pkt_len(8'd60-1),
+    .cfg_tx_max_pkt_len(16'd9218-1),
     .cfg_tx_ifg(8'd12),
     .cfg_tx_enable(1'b1),
-    .cfg_rx_max_pkt_len(16'd9218),
+    .cfg_rx_max_pkt_len(16'd9218-1),
     .cfg_rx_enable(1'b1)
 );
 

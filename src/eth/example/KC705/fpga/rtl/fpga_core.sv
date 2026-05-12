@@ -254,8 +254,6 @@ if (BASET_PHY_TYPE == "GMII") begin : baset_mac_gmii
         .SIM(SIM),
         .VENDOR(VENDOR),
         .FAMILY(FAMILY),
-        .PADDING_EN(1),
-        .MIN_FRAME_LEN(64),
         .STAT_EN(1),
         .STAT_TX_LEVEL(1),
         .STAT_RX_LEVEL(1),
@@ -322,10 +320,12 @@ if (BASET_PHY_TYPE == "GMII") begin : baset_mac_gmii
         /*
          * Configuration
          */
-        .cfg_tx_max_pkt_len(16'd9218),
+        .cfg_tx_pad_en(1'b1),
+        .cfg_tx_min_pkt_len(8'd60-1),
+        .cfg_tx_max_pkt_len(16'd9218-1),
         .cfg_tx_ifg(8'd12),
         .cfg_tx_enable(1'b1),
-        .cfg_rx_max_pkt_len(16'd9218),
+        .cfg_rx_max_pkt_len(16'd9218-1),
         .cfg_rx_enable(1'b1)
     );
 
@@ -344,8 +344,6 @@ end else if (BASET_PHY_TYPE == "RGMII") begin : baset_mac_rgmii
         .VENDOR(VENDOR),
         .FAMILY(FAMILY),
         .USE_CLK90(USE_CLK90),
-        .PADDING_EN(1),
-        .MIN_FRAME_LEN(64),
         .STAT_EN(1),
         .STAT_TX_LEVEL(1),
         .STAT_RX_LEVEL(1),
@@ -410,10 +408,12 @@ end else if (BASET_PHY_TYPE == "RGMII") begin : baset_mac_rgmii
         /*
          * Configuration
          */
-        .cfg_tx_max_pkt_len(16'd9218),
+        .cfg_tx_pad_en(1'b1),
+        .cfg_tx_min_pkt_len(8'd60-1),
+        .cfg_tx_max_pkt_len(16'd9218-1),
         .cfg_tx_ifg(8'd12),
         .cfg_tx_enable(1'b1),
-        .cfg_rx_max_pkt_len(16'd9218),
+        .cfg_rx_max_pkt_len(16'd9218-1),
         .cfg_rx_enable(1'b1)
     );
 
@@ -429,8 +429,6 @@ end else if (BASET_PHY_TYPE == "RGMII") begin : baset_mac_rgmii
 end else if (BASET_PHY_TYPE == "SGMII") begin : baset_mac_sgmii
 
     taxi_eth_mac_1g_fifo #(
-        .PADDING_EN(1),
-        .MIN_FRAME_LEN(64),
         .STAT_EN(1),
         .STAT_TX_LEVEL(1),
         .STAT_RX_LEVEL(1),
@@ -503,10 +501,12 @@ end else if (BASET_PHY_TYPE == "SGMII") begin : baset_mac_sgmii
         /*
          * Configuration
          */
-        .cfg_tx_max_pkt_len(16'd9218),
+        .cfg_tx_pad_en(1'b1),
+        .cfg_tx_min_pkt_len(8'd60-1),
+        .cfg_tx_max_pkt_len(16'd9218-1),
         .cfg_tx_ifg(8'd12),
         .cfg_tx_enable(1'b1),
-        .cfg_rx_max_pkt_len(16'd9218),
+        .cfg_rx_max_pkt_len(16'd9218-1),
         .cfg_rx_enable(1'b1)
     );
 
@@ -528,8 +528,6 @@ taxi_axis_if #(.DATA_W(8), .ID_W(8), .USER_EN(1), .USER_W(1)) axis_sfp_eth();
 taxi_axis_if #(.DATA_W(96), .KEEP_W(1), .ID_W(8)) axis_sfp_tx_cpl();
 
 taxi_eth_mac_1g_fifo #(
-    .PADDING_EN(1),
-    .MIN_FRAME_LEN(64),
     .STAT_EN(1),
     .STAT_TX_LEVEL(1),
     .STAT_RX_LEVEL(1),
@@ -602,10 +600,12 @@ eth_mac_inst (
     /*
      * Configuration
      */
-    .cfg_tx_max_pkt_len(16'd9218),
+    .cfg_tx_pad_en(1'b1),
+    .cfg_tx_min_pkt_len(8'd60-1),
+    .cfg_tx_max_pkt_len(16'd9218-1),
     .cfg_tx_ifg(8'd12),
     .cfg_tx_enable(1'b1),
-    .cfg_rx_max_pkt_len(16'd9218),
+    .cfg_rx_max_pkt_len(16'd9218-1),
     .cfg_rx_enable(1'b1)
 );
 

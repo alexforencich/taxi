@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: CERN-OHL-S-2.0
 /*
 
-Copyright (c) 2019-2025 FPGA Ninja, LLC
+Copyright (c) 2019-2026 FPGA Ninja, LLC
 
 Authors:
 - Alex Forencich
@@ -172,10 +172,6 @@ typedef enum logic [2:0] {
 
 state_t state_reg = STATE_IDLE, state_next;
 
-// datapath control signals
-logic reset_crc;
-logic update_crc;
-
 logic swap_lanes_reg = 1'b0, swap_lanes_next;
 logic swap_lanes_d1_reg = 1'b0;
 logic [31:0] swap_data_reg = 32'd0;
@@ -217,9 +213,6 @@ logic [TX_TAG_W-1:0] m_axis_tx_cpl_tag_reg = '0, m_axis_tx_cpl_tag_next;
 logic m_axis_tx_cpl_valid_reg = 1'b0;
 logic m_axis_tx_cpl_valid_int_reg = 1'b0;
 logic m_axis_tx_cpl_ts_borrow_reg = 1'b0;
-
-logic [31:0] crc_state_reg[8];
-wire [31:0] crc_state[8];
 
 logic [DATA_W-1:0] encoded_tx_data_reg = {{8{CTRL_IDLE}}, BLOCK_TYPE_CTRL};
 logic encoded_tx_data_valid_reg = 1'b0;
@@ -278,26 +271,28 @@ assign stat_tx_err_oversize = stat_tx_err_oversize_reg;
 assign stat_tx_err_user = stat_tx_err_user_reg;
 assign stat_tx_err_underflow = stat_tx_err_underflow_reg;
 
-for (genvar n = 0; n < 8; n = n + 1) begin : crc
+logic [DATA_W+24-1:0] crc_data_reg, crc_data_next;
+reg [31:0] crc_state_reg = '0;
+wire [31:0] crc_state;
 
-    taxi_lfsr #(
-        .LFSR_W(32),
-        .LFSR_POLY(32'h4c11db7),
-        .LFSR_GALOIS(1),
-        .LFSR_FEED_FORWARD(0),
-        .REVERSE(1),
-        .DATA_W(8*(n+1)),
-        .DATA_IN_EN(1'b1),
-        .DATA_OUT_EN(1'b0)
-    )
-    eth_crc (
-        .data_in(s_tdata_reg[0 +: 8*(n+1)]),
-        .state_in(crc_state_reg[7]),
-        .data_out(),
-        .state_out(crc_state[n])
-    );
-
-end
+taxi_lfsr #(
+    .LFSR_W(32),
+    .LFSR_POLY(32'h4c11db7),
+    .LFSR_GALOIS(1),
+    .LFSR_FEED_FORWARD(0),
+    .REVERSE(1),
+    .DATA_W(DATA_W+24),
+    .DATA_IN_EN(1'b1),
+    .DATA_OUT_EN(1'b0),
+    .STATE_SHIFT_PRE(0),
+    .STATE_SHIFT_POST(-24)
+)
+eth_crc (
+    .data_in(crc_data_reg),
+    .state_in('0),
+    .data_out(),
+    .state_out(crc_state)
+);
 
 function [2:0] keep2empty(input [7:0] k);
     casez (k)
@@ -313,68 +308,61 @@ function [2:0] keep2empty(input [7:0] k);
     endcase
 endfunction
 
-// Mask input data
-wire [DATA_W-1:0] s_axis_tx_tdata_masked;
-
-for (genvar n = 0; n < KEEP_W; n = n + 1) begin
-    assign s_axis_tx_tdata_masked[n*8 +: 8] = (n == 0 || s_axis_tx.tkeep[n]) ? s_axis_tx.tdata[n*8 +: 8] : 8'd0;
-end
-
 // FCS cycle calculation
 always_comb begin
     casez (s_empty_reg)
         3'd7: begin
-            fcs_output_data_0 = {24'd0, ~crc_state[0][31:0], s_tdata_reg[7:0]};
+            fcs_output_data_0 = {24'd0, ~crc_state[31:0], s_tdata_reg[7:0]};
             fcs_output_data_1 = 64'd0;
             fcs_output_type_0 = OUTPUT_TYPE_TERM_5;
             fcs_output_type_1 = OUTPUT_TYPE_IDLE;
             ifg_offset = 8'd3;
         end
         3'd6: begin
-            fcs_output_data_0 = {16'd0, ~crc_state[1][31:0], s_tdata_reg[15:0]};
+            fcs_output_data_0 = {16'd0, ~crc_state[31:0], s_tdata_reg[15:0]};
             fcs_output_data_1 = 64'd0;
             fcs_output_type_0 = OUTPUT_TYPE_TERM_6;
             fcs_output_type_1 = OUTPUT_TYPE_IDLE;
             ifg_offset = 8'd2;
         end
         3'd5: begin
-            fcs_output_data_0 = {8'd0, ~crc_state[2][31:0], s_tdata_reg[23:0]};
+            fcs_output_data_0 = {8'd0, ~crc_state[31:0], s_tdata_reg[23:0]};
             fcs_output_data_1 = 64'd0;
             fcs_output_type_0 = OUTPUT_TYPE_TERM_7;
             fcs_output_type_1 = OUTPUT_TYPE_IDLE;
             ifg_offset = 8'd1;
         end
         3'd4: begin
-            fcs_output_data_0 = {~crc_state[3][31:0], s_tdata_reg[31:0]};
+            fcs_output_data_0 = {~crc_state[31:0], s_tdata_reg[31:0]};
             fcs_output_data_1 = 64'd0;
             fcs_output_type_0 = OUTPUT_TYPE_DATA;
             fcs_output_type_1 = OUTPUT_TYPE_TERM_0;
             ifg_offset = 8'd8;
         end
         3'd3: begin
-            fcs_output_data_0 = {~crc_state[4][23:0], s_tdata_reg[39:0]};
-            fcs_output_data_1 = {56'd0, ~crc_state_reg[4][31:24]};
+            fcs_output_data_0 = {~crc_state[23:0], s_tdata_reg[39:0]};
+            fcs_output_data_1 = {56'd0, ~crc_state_reg[31:24]};
             fcs_output_type_0 = OUTPUT_TYPE_DATA;
             fcs_output_type_1 = OUTPUT_TYPE_TERM_1;
             ifg_offset = 8'd7;
         end
         3'd2: begin
-            fcs_output_data_0 = {~crc_state[5][15:0], s_tdata_reg[47:0]};
-            fcs_output_data_1 = {48'd0, ~crc_state_reg[5][31:16]};
+            fcs_output_data_0 = {~crc_state[15:0], s_tdata_reg[47:0]};
+            fcs_output_data_1 = {48'd0, ~crc_state_reg[31:16]};
             fcs_output_type_0 = OUTPUT_TYPE_DATA;
             fcs_output_type_1 = OUTPUT_TYPE_TERM_2;
             ifg_offset = 8'd6;
         end
         3'd1: begin
-            fcs_output_data_0 = {~crc_state[6][7:0], s_tdata_reg[55:0]};
-            fcs_output_data_1 = {40'd0, ~crc_state_reg[6][31:8]};
+            fcs_output_data_0 = {~crc_state[7:0], s_tdata_reg[55:0]};
+            fcs_output_data_1 = {40'd0, ~crc_state_reg[31:8]};
             fcs_output_type_0 = OUTPUT_TYPE_DATA;
             fcs_output_type_1 = OUTPUT_TYPE_TERM_3;
             ifg_offset = 8'd5;
         end
         3'd0: begin
             fcs_output_data_0 = s_tdata_reg;
-            fcs_output_data_1 = {32'd0, ~crc_state_reg[7][31:0]};
+            fcs_output_data_1 = {32'd0, ~crc_state_reg[31:0]};
             fcs_output_type_0 = OUTPUT_TYPE_DATA;
             fcs_output_type_1 = OUTPUT_TYPE_TERM_4;
             ifg_offset = 8'd4;
@@ -385,8 +373,6 @@ end
 always_comb begin
     state_next = STATE_IDLE;
 
-    reset_crc = 1'b0;
-    update_crc = 1'b0;
 
     swap_lanes_next = swap_lanes_reg;
 
@@ -411,6 +397,8 @@ always_comb begin
 
     s_tdata_next = s_tdata_reg;
     s_empty_next = s_empty_reg;
+
+    crc_data_next = crc_data_reg;
 
     m_axis_tx_cpl_tag_next = m_axis_tx_cpl_tag_reg;
 
@@ -485,6 +473,18 @@ always_comb begin
             ifg_cnt_next = '0;
         end
 
+        // FCS
+        casez (s_axis_tx.tkeep)
+            8'b11111111: crc_data_next = {24'd0, s_axis_tx.tdata}              ^ {56'd0, crc_state};
+            8'b01111111: crc_data_next = {24'd0, s_axis_tx.tdata[55:0], 8'd0}  ^ {48'd0, crc_state, 8'd0};
+            8'bz0111111: crc_data_next = {24'd0, s_axis_tx.tdata[47:0], 16'd0} ^ {40'd0, crc_state, 16'd0};
+            8'bz0011111: crc_data_next = {24'd0, s_axis_tx.tdata[39:0], 24'd0} ^ {32'd0, crc_state, 24'd0};
+            8'bzzz01111: crc_data_next = {24'd0, s_axis_tx.tdata[31:0], 32'd0} ^ {24'd0, crc_state, 32'd0};
+            8'bzzzz0111: crc_data_next = {24'd0, s_axis_tx.tdata[23:0], 40'd0} ^ {16'd0, crc_state, 40'd0};
+            8'bzzzzz011: crc_data_next = {24'd0, s_axis_tx.tdata[15:0], 48'd0} ^ {8'd0, crc_state, 48'd0};
+            default:     crc_data_next = {24'd0, s_axis_tx.tdata[7:0],  56'd0} ^ {crc_state, 56'd0};
+        endcase
+
         case (state_reg)
             STATE_IDLE: begin
                 // idle state - wait for data
@@ -494,14 +494,15 @@ always_comb begin
                 frame_len_next = 0;
                 {frame_len_lim_cyc_next, frame_len_lim_last_next} = cfg_tx_max_pkt_len ^ 4;
                 frame_len_lim_check_next = 1'b0;
-                reset_crc = 1'b1;
                 s_axis_tx_tready_next = cfg_tx_enable;
 
                 output_data_next = s_tdata_reg;
                 output_type_next = OUTPUT_TYPE_IDLE;
 
-                s_tdata_next = s_axis_tx_tdata_masked;
+                s_tdata_next = s_axis_tx.tdata;
                 s_empty_next = keep2empty(s_axis_tx.tkeep);
+
+                crc_data_next = {24'd0, s_axis_tx.tdata} ^ {56'd0, 32'hffffffff};
 
                 m_axis_tx_cpl_tag_next = s_axis_tx.tid;
 
@@ -521,13 +522,12 @@ always_comb begin
             end
             STATE_PAYLOAD: begin
                 // transfer payload
-                update_crc = 1'b1;
                 s_axis_tx_tready_next = 1'b1;
 
                 output_data_next = s_tdata_reg;
                 output_type_next = OUTPUT_TYPE_DATA;
 
-                s_tdata_next = s_axis_tx_tdata_masked;
+                s_tdata_next = s_axis_tx.tdata;
                 s_empty_next = keep2empty(s_axis_tx.tkeep);
 
                 stat_tx_byte_next = 4'(KEEP_W);
@@ -567,8 +567,6 @@ always_comb begin
                 output_data_next = fcs_output_data_0;
                 output_type_next = fcs_output_type_0;
 
-                update_crc = 1'b1;
-
                 ifg_count_next = (cfg_tx_ifg > 8'd12 ? cfg_tx_ifg : 8'd12) - ifg_offset + (swap_lanes_reg ? 8'd4 : 8'd0) + 8'(deficit_idle_count_reg);
                 if (s_empty_reg <= 4) begin
                     stat_tx_byte_next = 4'(KEEP_W);
@@ -598,8 +596,6 @@ always_comb begin
                 stat_tx_byte_next = 4-s_empty_reg;
                 frame_len_next = frame_len_reg + 16'(4-s_empty_reg);
 
-                reset_crc = 1'b1;
-
                 stat_tx_pkt_len_next = frame_len_next;
                 stat_tx_pkt_good_next = !frame_error_reg;
                 stat_tx_pkt_bad_next = frame_error_reg;
@@ -608,6 +604,8 @@ always_comb begin
                 stat_tx_pkt_bcast_next = is_bcast_reg;
                 stat_tx_pkt_vlan_next = is_8021q_reg;
                 stat_tx_err_oversize_next = frame_oversize_reg;
+
+                crc_data_next = {24'd0, s_axis_tx.tdata} ^ {56'd0, 32'hffffffff};
 
                 if (DIC_EN) begin
                     if (ifg_count_next > 8'd7) begin
@@ -661,13 +659,13 @@ always_comb begin
                 output_data_next = s_tdata_reg;
                 output_type_next = OUTPUT_TYPE_IDLE;
 
+                crc_data_next = {24'd0, s_axis_tx.tdata} ^ {56'd0, 32'hffffffff};
+
                 if (ifg_count_reg > 8'd8) begin
                     ifg_count_next = ifg_count_reg - 8'd8;
                 end else begin
                     ifg_count_next = 8'd0;
                 end
-
-                reset_crc = 1'b1;
 
                 if (DIC_EN) begin
                     if (ifg_count_next > 8'd7 || frame_reg) begin
@@ -726,6 +724,8 @@ always_ff @(posedge clk) begin
 
     s_tdata_reg <= s_tdata_next;
     s_empty_reg <= s_empty_next;
+
+    crc_data_reg <= crc_data_next;
 
     s_axis_tx_tready_reg <= s_axis_tx_tready_next;
 
@@ -955,17 +955,7 @@ always_ff @(posedge clk) begin
         encoded_tx_data_valid_reg <= 1'b1;
         encoded_tx_hdr_valid_reg <= 1'b1;
 
-        for (integer i = 0; i < 7; i = i + 1) begin
-            crc_state_reg[i] <= crc_state[i];
-        end
-
-        if (update_crc) begin
-            crc_state_reg[7] <= crc_state[7];
-        end
-
-        if (reset_crc) begin
-            crc_state_reg[7] <= '1;
-        end
+        crc_state_reg <= crc_state;
     end
 
     tx_gbx_sync_reg <= tx_gbx_req_sync;

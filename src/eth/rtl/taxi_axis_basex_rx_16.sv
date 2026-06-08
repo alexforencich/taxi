@@ -18,7 +18,7 @@ Authors:
 module taxi_axis_basex_rx_16 #
 (
     parameter DATA_W = 16,
-    parameter CTRL_W = 2,
+    parameter CTRL_W = (DATA_W/8),
     parameter logic GBX_IF_EN = 1'b0,
     parameter logic PTP_TS_EN = 1'b0,
     parameter logic PTP_TS_FMT_TOD = 1'b1,

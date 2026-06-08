@@ -18,7 +18,7 @@ Authors:
 module taxi_axis_basex_tx_8 #
 (
     parameter DATA_W = 8,
-    parameter CTRL_W = 1,
+    parameter CTRL_W = (DATA_W/8),
     parameter logic PADDING_EN = 1'b1,
     parameter MIN_FRAME_LEN = 64,
     parameter logic GBX_IF_EN = 1'b0,

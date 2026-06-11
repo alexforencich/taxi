@@ -278,10 +278,6 @@ always_comb begin
         gmii_tx_en_next = gmii_tx_en_reg;
         gmii_tx_er_next = gmii_tx_er_reg;
         state_next = state_reg;
-        if (start_packet_int_reg) begin
-            start_packet_int_next = 1'b0;
-            start_packet_next = 1'b1;
-        end
     end else begin
         // counter for min frame length enforcement
         if (frame_min_count_reg != 0) begin
@@ -386,11 +382,7 @@ always_comb begin
                         s_tdata_next = s_axis_tx.tdata;
                     end
                     gmii_txd_next = ETH_SFD;
-                    if (mii_select) begin
-                        start_packet_int_next = 1'b1;
-                    end else begin
-                        start_packet_next = 1'b1;
-                    end
+                    start_packet_int_next = 1'b1;
                     state_next = STATE_PAYLOAD;
                 end else begin
                     state_next = STATE_PREAMBLE;
@@ -410,6 +402,9 @@ always_comb begin
                 s_tdata_next = s_axis_tx.tdata;
 
                 stat_tx_byte_next = 1'b1;
+
+                start_packet_next = start_packet_int_reg;
+                start_packet_int_next = 1'b0;
 
                 if (!s_axis_tx.tvalid || s_axis_tx.tlast || frame_len_lim_reg < 6) begin
                     s_axis_tx_tready_next = frame_next; // drop frame

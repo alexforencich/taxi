@@ -281,6 +281,10 @@ always_comb begin
             // ordered set in lane 4
             encoded_tx_data_next = {xgmii_txd_int[63:40], O_SEQ_OS, encoded_ctrl[27:0], BLOCK_TYPE_OS_4};
             tx_bad_block_next = encode_err[3:0] != 0;
+        end else if (xgmii_txc_int == 8'h1f && xgmii_txd_int[39:32] == XGMII_SIG_OS) begin
+            // ordered set in lane 4
+            encoded_tx_data_next = {xgmii_txd_int[63:40], O_SIG_OS, encoded_ctrl[27:0], BLOCK_TYPE_OS_4};
+            tx_bad_block_next = encode_err[3:0] != 0;
         end else if (xgmii_txc_int == 8'h1f && xgmii_txd_int[39:32] == XGMII_START) begin
             // start in lane 4
             encoded_tx_data_next = {xgmii_txd_int[63:40], 4'd0, encoded_ctrl[27:0], BLOCK_TYPE_START_4};
@@ -289,9 +293,17 @@ always_comb begin
             // ordered set in lane 0, start in lane 4
             encoded_tx_data_next = {xgmii_txd_int[63:40], 4'd0, O_SEQ_OS, xgmii_txd_int[31:8], BLOCK_TYPE_OS_START};
             tx_bad_block_next = 1'b0;
+        end else if (xgmii_txc_int == 8'h11 && xgmii_txd_int[7:0] == XGMII_SIG_OS && xgmii_txd_int[39:32] == XGMII_START) begin
+            // ordered set in lane 0, start in lane 4
+            encoded_tx_data_next = {xgmii_txd_int[63:40], 4'd0, O_SIG_OS, xgmii_txd_int[31:8], BLOCK_TYPE_OS_START};
+            tx_bad_block_next = 1'b0;
         end else if (xgmii_txc_int == 8'h11 && xgmii_txd_int[7:0] == XGMII_SEQ_OS && xgmii_txd_int[39:32] == XGMII_SEQ_OS) begin
             // ordered set in lane 0 and lane 4
             encoded_tx_data_next = {xgmii_txd_int[63:40], O_SEQ_OS, O_SEQ_OS, xgmii_txd_int[31:8], BLOCK_TYPE_OS_04};
+            tx_bad_block_next = 1'b0;
+        end else if (xgmii_txc_int == 8'h11 && xgmii_txd_int[7:0] == XGMII_SIG_OS && xgmii_txd_int[39:32] == XGMII_SIG_OS) begin
+            // ordered set in lane 0 and lane 4
+            encoded_tx_data_next = {xgmii_txd_int[63:40], O_SIG_OS, O_SIG_OS, xgmii_txd_int[31:8], BLOCK_TYPE_OS_04};
             tx_bad_block_next = 1'b0;
         end else if (xgmii_txc_int == 8'h01 && xgmii_txd_int[7:0] == XGMII_START) begin
             // start in lane 0
@@ -300,6 +312,10 @@ always_comb begin
         end else if (xgmii_txc_int == 8'hf1 && xgmii_txd_int[7:0] == XGMII_SEQ_OS) begin
             // ordered set in lane 0
             encoded_tx_data_next = {encoded_ctrl[55:28], O_SEQ_OS, xgmii_txd_int[31:8], BLOCK_TYPE_OS_0};
+            tx_bad_block_next = encode_err[7:4] != 0;
+        end else if (xgmii_txc_int == 8'hf1 && xgmii_txd_int[7:0] == XGMII_SIG_OS) begin
+            // ordered set in lane 0
+            encoded_tx_data_next = {encoded_ctrl[55:28], O_SIG_OS, xgmii_txd_int[31:8], BLOCK_TYPE_OS_0};
             tx_bad_block_next = encode_err[7:4] != 0;
         end else if (xgmii_txc_int == 8'hff && xgmii_txd_int[7:0] == XGMII_TERM) begin
             // terminate in lane 0

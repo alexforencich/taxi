@@ -44,9 +44,9 @@ module taxi_xgmii_baser_dec #
     /*
      * Ordered sets
      */
-    output wire logic [23:0]       rx_os = '0,
-    output wire logic              rx_os_sig = 1'b0,
-    output wire logic              rx_os_valid = 1'b0,
+    output wire logic [23:0]       rx_os,
+    output wire logic              rx_os_sig,
+    output wire logic              rx_os_valid,
 
     /*
      * Status

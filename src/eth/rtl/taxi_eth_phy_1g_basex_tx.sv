@@ -20,6 +20,7 @@ module taxi_eth_phy_1g_basex_tx #
     parameter DATA_W = 16,
     parameter CTRL_W = (DATA_W/8),
     parameter logic GBX_IF_EN = 1'b0,
+    parameter logic AN_EN = 1'b1,
     parameter logic BIT_REVERSE = 1'b0,
     parameter logic ENC_8B10B_EN = 1'b0,
     parameter logic PRBS31_EN = 1'b0,
@@ -53,6 +54,13 @@ module taxi_eth_phy_1g_basex_tx #
     output wire logic               serdes_tx_gbx_sync,
 
     /*
+     * AN config register
+     */
+    input  wire logic [15:0]        tx_an_cfg = '0,
+    input  wire logic               tx_an_cfg_valid = 1'b0,
+    output wire logic               tx_an_cfg_ready,
+
+    /*
      * Configuration
      */
     input  wire logic               cfg_tx_prbs31_enable
@@ -71,7 +79,7 @@ taxi_gmii_basex_enc #(
     .CTRL_W(CTRL_W),
     .GBX_IF_EN(GBX_IF_EN),
     .GBX_CNT(1),
-    .AN_EN(1'b0)
+    .AN_EN(AN_EN)
 )
 enc_inst (
     .clk(clk),
@@ -99,9 +107,9 @@ enc_inst (
     /*
      * AN config register
      */
-    .tx_an_cfg('0),
-    .tx_an_cfg_valid(1'b0),
-    .tx_an_cfg_ready()
+    .tx_an_cfg(tx_an_cfg),
+    .tx_an_cfg_valid(tx_an_cfg_valid),
+    .tx_an_cfg_ready(tx_an_cfg_ready)
 );
 
 taxi_eth_phy_1g_basex_tx_if #(

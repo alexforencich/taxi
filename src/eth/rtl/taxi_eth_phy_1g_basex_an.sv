@@ -1,0 +1,256 @@
+// SPDX-License-Identifier: CERN-OHL-S-2.0
+/*
+
+Copyright (c) 2026 FPGA Ninja, LLC
+
+Authors:
+- Alex Forencich
+
+*/
+
+`resetall
+`timescale 1ns / 1ps
+`default_nettype none
+
+/*
+ * 1000BASE-X Ethernet PHY autonegotiation
+ */
+module taxi_eth_phy_1g_basex_an #
+(
+    parameter DATA_W = 16
+)
+(
+    input  wire logic         clk,
+    input  wire logic         rst,
+
+    /*
+     * AN config register
+     */
+    input  wire logic [15:0]  rx_an_cfg,
+    input  wire logic         rx_an_cfg_valid,
+    input  wire logic         rx_an_ability_match,
+    input  wire logic         rx_an_ack_match,
+    input  wire logic         rx_an_idle_match,
+
+    output wire logic [15:0]  tx_an_cfg,
+    output wire logic         tx_an_cfg_valid,
+    input  wire logic         tx_an_cfg_ready,
+
+    /*
+     * Autonegotiation
+     */
+    input  wire logic         an_en = 1'b1,
+    input  wire logic         an_restart = 1'b0,
+    input  wire logic         an_speedup = 1'b0,
+    output wire logic         an_intr,
+    output wire logic         an_complete,
+    input  wire logic [15:0]  an_adv_ability = 16'h0020,
+    output wire logic [15:0]  an_lp_adv_ability
+);
+
+localparam logic [15:0] AN_ACK = 16'h4000;
+localparam logic [15:0] AN_NP  = 16'h8000;
+
+typedef enum logic [2:0] {
+    STATE_START,
+    STATE_AN_RESTART,
+    STATE_ABILITY_DET,
+    STATE_ACK_DET,
+    STATE_ACK_CPL,
+    STATE_IDLE_DET,
+    STATE_DONE
+} state_t;
+
+state_t state_reg = STATE_START, state_next;
+
+logic [20:0] delay_count_reg = '0, delay_count_next;
+logic delay_run_reg = 1'b0, delay_run_next;
+
+logic [15:0]  tx_an_cfg_reg = '0, tx_an_cfg_next;
+logic         tx_an_cfg_valid_reg = 1'b0, tx_an_cfg_valid_next;
+
+logic         an_intr_reg = 1'b0, an_intr_next;
+logic         an_complete_reg = 1'b0, an_complete_next;
+logic [15:0]  an_lp_adv_ability_reg = '0, an_lp_adv_ability_next;
+
+assign tx_an_cfg = tx_an_cfg_reg;
+assign tx_an_cfg_valid = tx_an_cfg_valid_reg;
+
+assign an_intr = an_intr_reg;
+assign an_complete = an_complete_reg;
+assign an_lp_adv_ability = an_lp_adv_ability_reg;
+
+always_comb begin
+    state_next = STATE_START;
+
+    delay_count_next = delay_count_reg;
+    delay_run_next = delay_run_reg;
+
+    tx_an_cfg_next = tx_an_cfg_reg;
+    tx_an_cfg_valid_next = tx_an_cfg_valid_reg && !tx_an_cfg_ready;
+
+    an_intr_next = 1'b0;
+    an_complete_next = an_complete_reg;
+    an_lp_adv_ability_next = an_lp_adv_ability_reg;
+
+    if (delay_run_reg) begin
+        if (delay_count_reg != 0) begin
+            delay_count_next = delay_count_reg - 1;
+        end else begin
+            delay_run_next = 1'b0;
+        end
+    end else begin
+        // 10 ms timer
+        if (DATA_W == 16) begin
+            delay_count_next = an_speedup ? 625 : 625000;
+        end else begin
+            delay_count_next = an_speedup ? 1250 : 1250000;
+        end
+    end
+
+    case (state_reg)
+        STATE_START: begin
+            // start
+            an_complete_next = 1'b0;
+
+            tx_an_cfg_next = '0;
+
+            if (an_en) begin
+                tx_an_cfg_valid_next = 1'b1;
+                if (delay_run_reg) begin
+                    // restart link timer
+                    delay_run_next = 1'b0;
+                    state_next = STATE_START;
+                end else begin
+                    // AN restart state
+                    delay_run_next = 1'b1;
+                    state_next = STATE_AN_RESTART;
+                end
+            end else begin
+                // AN disabled
+                state_next = STATE_START;
+            end
+        end
+        STATE_AN_RESTART: begin
+            // AN restart - send zeroed config reg to trigger link partner to restart the AN process
+            tx_an_cfg_next = '0;
+            tx_an_cfg_valid_next = 1'b1;
+
+            if (!delay_run_reg) begin
+                // link timer expired
+                state_next = STATE_ABILITY_DET;
+            end else begin
+                state_next = STATE_AN_RESTART;
+            end
+        end
+        STATE_ABILITY_DET: begin
+            // ability detect state - transfer AN ability value with ACK clear
+            tx_an_cfg_next = an_adv_ability & ~AN_ACK;
+            tx_an_cfg_valid_next = 1'b1;
+
+            if (rx_an_ability_match && rx_an_cfg != 0) begin
+                // got ability advertisement from link partner
+                an_lp_adv_ability_next = rx_an_cfg;
+                state_next = STATE_ACK_DET;
+            end else begin
+                state_next = STATE_ABILITY_DET;
+            end
+        end
+        STATE_ACK_DET: begin
+            // acknowledge detect - wait for ACK from link partner
+            tx_an_cfg_next = an_adv_ability | AN_ACK;
+            tx_an_cfg_valid_next = 1'b1;
+
+            if (rx_an_ability_match && rx_an_cfg == 0) begin
+                // restart request from link partner
+                state_next = STATE_START;
+            end else if (rx_an_ack_match) begin
+                // acknowledge match
+                an_lp_adv_ability_next = rx_an_cfg;
+                if (rx_an_cfg == (an_lp_adv_ability_reg | AN_ACK)) begin
+                    // consistent with previously-seen value
+                    delay_run_next = 1'b1;
+                    state_next = STATE_ACK_CPL;
+                end else begin
+                    // inconsistent, restart AN
+                    state_next = STATE_START;
+                end
+            end else begin
+                state_next = STATE_ACK_DET;
+            end
+        end
+        STATE_ACK_CPL: begin
+            // complete acknowledge - give link partner time to detect our ACK
+            tx_an_cfg_next = an_adv_ability | AN_ACK;
+            tx_an_cfg_valid_next = 1'b1;
+
+            if (rx_an_ability_match && rx_an_cfg == 0) begin
+                // restart request from link partner
+                state_next = STATE_START;
+            end else if (!delay_run_reg) begin
+                // link timer expired
+                delay_run_next = 1'b1;
+                state_next = STATE_IDLE_DET;
+            end else begin
+                state_next = STATE_ACK_CPL;
+            end
+        end
+        STATE_IDLE_DET: begin
+            if (rx_an_ability_match && rx_an_cfg == 0) begin
+                // restart request from link partner
+                state_next = STATE_START;
+            end else if (rx_an_idle_match && !delay_run_reg) begin
+                // idle match and link timer expired
+                an_complete_next = 1'b1;
+                state_next = STATE_DONE;
+            end else begin
+                state_next = STATE_IDLE_DET;
+            end
+        end
+        STATE_DONE: begin
+            if (rx_an_ability_match && rx_an_cfg == 0) begin
+                // restart request from link partner
+                state_next = STATE_START;
+            end else begin
+                state_next = STATE_DONE;
+            end
+        end
+        default: begin
+            state_next = STATE_START;
+        end
+    endcase
+
+    if (!an_en || an_restart) begin
+        state_next = STATE_START;
+    end
+end
+
+always @(posedge clk) begin
+    state_reg <= state_next;
+
+    delay_count_reg <= delay_count_next;
+    delay_run_reg <= delay_run_next;
+
+    tx_an_cfg_reg <= tx_an_cfg_next;
+    tx_an_cfg_valid_reg <= tx_an_cfg_valid_next;
+
+    an_intr_reg <= an_intr_next;
+    an_complete_reg <= an_complete_next;
+    an_lp_adv_ability_reg <= an_lp_adv_ability_next;
+
+    if (rst) begin
+        state_reg <= STATE_START;
+
+        delay_count_reg <= '0;
+        delay_run_reg <= 1'b0;
+
+        tx_an_cfg_valid_reg <= 1'b0;
+
+        an_intr_reg <= 1'b0;
+        an_complete_reg <= 1'b0;
+    end
+end
+
+endmodule
+
+`resetall

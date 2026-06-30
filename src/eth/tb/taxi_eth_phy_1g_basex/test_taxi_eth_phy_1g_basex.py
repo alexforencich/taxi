@@ -75,6 +75,11 @@ class TB:
             gbx_cfg=gbx_cfg
         )
 
+        dut.an_en.value = 0
+        dut.an_restart.value = 0
+        dut.an_speedup.value = 1
+        dut.an_adv_ability.value = 0x0020
+
         dut.cfg_tx_prbs31_enable.setimmediatevalue(0)
         dut.cfg_rx_prbs31_enable.setimmediatevalue(0)
 
@@ -154,6 +159,73 @@ async def run_test_tx(dut, payload_lengths=None, payload_data=None, ifg=12):
     await RisingEdge(dut.tx_clk)
 
 
+async def run_test_an(dut):
+
+    tb = TB(dut)
+
+    tb.dut.an_en.value = 1
+    tb.dut.an_restart.value = 0
+    tb.dut.an_speedup.value = 1
+    tb.dut.an_adv_ability.value = 0x0020
+
+    await tb.reset()
+
+    for k in range(100):
+        await RisingEdge(dut.tx_clk)
+
+    tb.log.info("AN_RESTART")
+    tb.serdes_source.set_an_cfg(0x0000)
+
+    # link timer
+    for k in range(1250):
+        await RisingEdge(dut.tx_clk)
+
+    tb.log.info("ABILITY_DETECT")
+    tb.serdes_source.set_an_cfg(0x002A)
+
+    lp_cfg = None
+    while True:
+        await RisingEdge(dut.tx_clk)
+        lp_cfg = tb.serdes_sink.get_an_cfg()
+        if tb.serdes_sink.get_an_ability_match() and lp_cfg is not None and lp_cfg != 0:
+            break
+
+    assert lp_cfg & 0xbfff == int(tb.dut.an_adv_ability.value) & 0xbfff
+
+    tb.log.info("ACKNOWLEDGE_DETECT")
+    tb.serdes_source.set_an_cfg(0x402A)
+
+    while True:
+        await RisingEdge(dut.tx_clk)
+        cfg = tb.serdes_sink.get_an_cfg()
+        if tb.serdes_sink.get_an_ack_match():
+            if lp_cfg | 0x4000 == cfg:
+                break
+
+    tb.log.info("COMPLETE_ACKNOWLEDGE")
+    # link timer
+    for k in range(1250):
+        await RisingEdge(dut.tx_clk)
+
+    assert lp_cfg & 0xbfff == int(tb.dut.an_adv_ability.value) & 0xbfff
+    assert int(tb.dut.an_lp_adv_ability) & 0xbfff == 0x002A
+
+    tb.log.info("IDLE_DETECT")
+    tb.serdes_source.set_an_cfg(None)
+
+    # link timer
+    for k in range(1250):
+        await RisingEdge(dut.tx_clk)
+
+    while True:
+        await RisingEdge(dut.tx_clk)
+        if tb.serdes_sink.get_an_idle_match():
+            break
+
+    for k in range(10):
+        await RisingEdge(dut.tx_clk)
+
+
 def size_list():
     return list(range(60, 128)) + [512, 1514, 9214] + [60]*10
 
@@ -175,6 +247,11 @@ if getattr(cocotb, 'top', None) is not None:
         factory.add_option("payload_data", [incrementing_payload])
         factory.add_option("ifg", [12])
         factory.generate_tests()
+
+    if cocotb.top.AN_EN.value:
+        for test in [run_test_an]:
+            factory = TestFactory(test)
+            factory.generate_tests()
 
 
 # cocotb-test
@@ -217,6 +294,7 @@ def test_taxi_eth_phy_1g_basex(request, data_w):
     parameters['CTRL_W'] = parameters['DATA_W'] // 8
     parameters['TX_GBX_IF_EN'] = 0
     parameters['RX_GBX_IF_EN'] = parameters['TX_GBX_IF_EN']
+    parameters['AN_EN'] = "1'b1"
     parameters['BIT_REVERSE'] = "1'b0"
     parameters['ENC_8B10B_EN'] = "1'b0"
     parameters['DEC_8B10B_EN'] = parameters['ENC_8B10B_EN']

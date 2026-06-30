@@ -20,6 +20,7 @@ module taxi_eth_phy_1g_basex_rx #
     parameter DATA_W = 16,
     parameter CTRL_W = (DATA_W/8),
     parameter logic GBX_IF_EN = 1'b0,
+    parameter logic AN_EN = 1'b1,
     parameter logic BIT_REVERSE = 1'b0,
     parameter logic DEC_8B10B_EN = 1'b0,
     parameter logic PRBS31_EN = 1'b0,
@@ -45,6 +46,15 @@ module taxi_eth_phy_1g_basex_rx #
     input  wire logic [CTRL_W-1:0]  serdes_rx_data_k,
     input  wire logic               serdes_rx_data_valid = 1'b1,
     output wire logic               serdes_rx_reset_req,
+
+    /*
+     * AN config register
+     */
+    output wire logic [15:0]        rx_an_cfg,
+    output wire logic               rx_an_cfg_valid,
+    output wire logic               rx_an_ability_match,
+    output wire logic               rx_an_ack_match,
+    output wire logic               rx_an_idle_match,
 
     /*
      * Status
@@ -115,7 +125,7 @@ taxi_gmii_basex_dec #(
     .DATA_W(DATA_W),
     .CTRL_W(CTRL_W),
     .GBX_IF_EN(GBX_IF_EN),
-    .AN_EN(1'b0)
+    .AN_EN(AN_EN)
 )
 dec_inst (
     .clk(clk),
@@ -139,11 +149,11 @@ dec_inst (
     /*
      * AN config register
      */
-    .rx_an_cfg(),
-    .rx_an_cfg_valid(),
-    .rx_an_ability_match(),
-    .rx_an_ack_match(),
-    .rx_an_idle_match(),
+    .rx_an_cfg(rx_an_cfg),
+    .rx_an_cfg_valid(rx_an_cfg_valid),
+    .rx_an_ability_match(rx_an_ability_match),
+    .rx_an_ack_match(rx_an_ack_match),
+    .rx_an_idle_match(rx_an_idle_match),
 
     /*
      * Status

@@ -63,7 +63,13 @@ typedef enum logic [2:0] {
 
 state_t state_reg = STATE_START, state_next;
 
-logic [20:0] delay_count_reg = '0, delay_count_next;
+// 1 pulse per 100 us for timers
+localparam CYC_PER_US = DATA_W == 16 ? 62.5 : 125;
+localparam PRESC_CYC = CYC_PER_US*100;
+
+logic [16:0] presc_cnt_reg = '0;
+logic presc_pulse_reg = 1'b0;
+logic [7:0] delay_cnt_reg = '0, delay_cnt_next;
 logic delay_run_reg = 1'b0, delay_run_next;
 
 logic [15:0]  tx_an_cfg_reg = '0, tx_an_cfg_next;
@@ -83,7 +89,7 @@ assign an_lp_adv_ability = an_lp_adv_ability_reg;
 always_comb begin
     state_next = STATE_START;
 
-    delay_count_next = delay_count_reg;
+    delay_cnt_next = delay_cnt_reg;
     delay_run_next = delay_run_reg;
 
     tx_an_cfg_next = tx_an_cfg_reg;
@@ -94,18 +100,16 @@ always_comb begin
     an_lp_adv_ability_next = an_lp_adv_ability_reg;
 
     if (delay_run_reg) begin
-        if (delay_count_reg != 0) begin
-            delay_count_next = delay_count_reg - 1;
-        end else begin
-            delay_run_next = 1'b0;
+        if (presc_pulse_reg) begin
+            if (delay_cnt_reg != 0) begin
+                    delay_cnt_next = delay_cnt_reg - 1;
+            end else begin
+                delay_run_next = 1'b0;
+            end
         end
     end else begin
         // 10 ms timer
-        if (DATA_W == 16) begin
-            delay_count_next = an_speedup ? 625 : 625000;
-        end else begin
-            delay_count_next = an_speedup ? 1250 : 1250000;
-        end
+        delay_cnt_next = 100;
     end
 
     case (state_reg)
@@ -228,7 +232,7 @@ end
 always @(posedge clk) begin
     state_reg <= state_next;
 
-    delay_count_reg <= delay_count_next;
+    delay_cnt_reg <= delay_cnt_next;
     delay_run_reg <= delay_run_next;
 
     tx_an_cfg_reg <= tx_an_cfg_next;
@@ -238,10 +242,20 @@ always @(posedge clk) begin
     an_complete_reg <= an_complete_next;
     an_lp_adv_ability_reg <= an_lp_adv_ability_next;
 
+    presc_pulse_reg <= 1'b0;
+    if (presc_cnt_reg != 0) begin
+        presc_cnt_reg <= presc_cnt_reg - 1;
+    end else begin
+        presc_pulse_reg <= 1'b1;
+        presc_cnt_reg <= 17'($rtoi(an_speedup ? PRESC_CYC / 1000 : PRESC_CYC));
+    end
+
     if (rst) begin
         state_reg <= STATE_START;
 
-        delay_count_reg <= '0;
+        presc_cnt_reg <= '0;
+        presc_pulse_reg <= 1'b0;
+        delay_cnt_reg <= '0;
         delay_run_reg <= 1'b0;
 
         tx_an_cfg_valid_reg <= 1'b0;

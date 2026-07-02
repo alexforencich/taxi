@@ -137,8 +137,11 @@ module taxi_eth_mac_1g_basex_us #
     input  wire logic                 an_en[CNT] = '{CNT{1'b1}},
     input  wire logic                 an_restart[CNT] = '{CNT{1'b0}},
     input  wire logic                 an_speedup[CNT] = '{CNT{1'b0}},
+    input  wire logic                 an_timeout_en[CNT] = '{CNT{1'b1}},
     output wire logic                 an_intr[CNT],
+    output wire logic                 an_running[CNT],
     output wire logic                 an_complete[CNT],
+    output wire logic                 an_timeout[CNT],
     input  wire logic [15:0]          an_adv_ability[CNT] = '{CNT{16'h0020}},
     output wire logic [15:0]          an_lp_adv_ability[CNT],
 
@@ -532,8 +535,11 @@ for (genvar n = 0; n < CNT; n = n + 1) begin : ch
         .an_en(an_en[n]),
         .an_restart(an_restart[n]),
         .an_speedup(an_speedup[n]),
+        .an_timeout_en(an_timeout_en[n]),
         .an_intr(an_intr[n]),
+        .an_running(an_running[n]),
         .an_complete(an_complete[n]),
+        .an_timeout(an_timeout[n]),
         .an_adv_ability(an_adv_ability[n]),
         .an_lp_adv_ability(an_lp_adv_ability[n]),
 

@@ -77,8 +77,11 @@ logic serdes_rx_reset_req;
 logic an_en;
 logic an_restart;
 logic an_speedup;
+logic an_timeout_en;
 logic an_intr;
+logic an_running;
 logic an_complete;
+logic an_timeout;
 logic [15:0] an_adv_ability;
 logic [15:0] an_lp_adv_ability;
 
@@ -276,8 +279,11 @@ uut (
     .an_en(an_en),
     .an_restart(an_restart),
     .an_speedup(an_speedup),
+    .an_timeout_en(an_timeout_en),
     .an_intr(an_intr),
+    .an_running(an_running),
     .an_complete(an_complete),
+    .an_timeout(an_timeout),
     .an_adv_ability(an_adv_ability),
     .an_lp_adv_ability(an_lp_adv_ability),
 

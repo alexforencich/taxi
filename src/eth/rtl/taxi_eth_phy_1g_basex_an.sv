@@ -42,8 +42,11 @@ module taxi_eth_phy_1g_basex_an #
     input  wire logic         an_en = 1'b1,
     input  wire logic         an_restart = 1'b0,
     input  wire logic         an_speedup = 1'b0,
+    input  wire logic         an_timeout_en = 1'b1,
     output wire logic         an_intr,
+    output wire logic         an_running,
     output wire logic         an_complete,
+    output wire logic         an_timeout,
     input  wire logic [15:0]  an_adv_ability = 16'h0020,
     output wire logic [15:0]  an_lp_adv_ability
 );
@@ -71,19 +74,25 @@ logic [16:0] presc_cnt_reg = '0;
 logic presc_pulse_reg = 1'b0;
 logic [7:0] delay_cnt_reg = '0, delay_cnt_next;
 logic delay_run_reg = 1'b0, delay_run_next;
+logic [9:0] timeout_cnt_reg = '0, timeout_cnt_next;
+logic timeout_run_reg = 1'b0, timeout_run_next;
 
 logic [15:0]  tx_an_cfg_reg = '0, tx_an_cfg_next;
 logic         tx_an_cfg_valid_reg = 1'b0, tx_an_cfg_valid_next;
 
 logic         an_intr_reg = 1'b0, an_intr_next;
+logic         an_running_reg = 1'b0, an_running_next;
 logic         an_complete_reg = 1'b0, an_complete_next;
+logic         an_timeout_reg = 1'b0, an_timeout_next;
 logic [15:0]  an_lp_adv_ability_reg = '0, an_lp_adv_ability_next;
 
 assign tx_an_cfg = tx_an_cfg_reg;
 assign tx_an_cfg_valid = tx_an_cfg_valid_reg;
 
 assign an_intr = an_intr_reg;
+assign an_running = an_running_reg;
 assign an_complete = an_complete_reg;
+assign an_timeout = an_timeout_reg;
 assign an_lp_adv_ability = an_lp_adv_ability_reg;
 
 always_comb begin
@@ -91,12 +100,16 @@ always_comb begin
 
     delay_cnt_next = delay_cnt_reg;
     delay_run_next = delay_run_reg;
+    timeout_cnt_next = timeout_cnt_reg;
+    timeout_run_next = timeout_run_reg;
 
     tx_an_cfg_next = tx_an_cfg_reg;
     tx_an_cfg_valid_next = tx_an_cfg_valid_reg && !tx_an_cfg_ready;
 
     an_intr_next = 1'b0;
+    an_running_next = an_running_reg;
     an_complete_next = an_complete_reg;
+    an_timeout_next = an_timeout_reg;
     an_lp_adv_ability_next = an_lp_adv_ability_reg;
 
     if (delay_run_reg) begin
@@ -112,10 +125,26 @@ always_comb begin
         delay_cnt_next = 100;
     end
 
+    if (timeout_run_reg) begin
+        if (presc_pulse_reg) begin
+            if (timeout_cnt_reg != 0) begin
+                    timeout_cnt_next = timeout_cnt_reg - 1;
+            end else begin
+                timeout_run_next = 1'b0;
+            end
+        end
+    end else begin
+        // 100 ms timer
+        timeout_cnt_next = 1000;
+    end
+
     case (state_reg)
         STATE_START: begin
             // start
+            an_running_next = 1'b0;
             an_complete_next = 1'b0;
+            an_timeout_next = 1'b0;
+            timeout_run_next = 1'b0;
 
             tx_an_cfg_next = '0;
 
@@ -128,6 +157,7 @@ always_comb begin
                 end else begin
                     // AN restart state
                     delay_run_next = 1'b1;
+                    an_running_next = 1'b1;
                     state_next = STATE_AN_RESTART;
                 end
             end else begin
@@ -142,6 +172,7 @@ always_comb begin
 
             if (!delay_run_reg) begin
                 // link timer expired
+                timeout_run_next = 1'b1;
                 state_next = STATE_ABILITY_DET;
             end else begin
                 state_next = STATE_AN_RESTART;
@@ -156,6 +187,10 @@ always_comb begin
                 // got ability advertisement from link partner
                 an_lp_adv_ability_next = rx_an_cfg;
                 state_next = STATE_ACK_DET;
+            end else if (!timeout_run_reg) begin
+                // timed out, no AN response from link partner
+                an_timeout_next = 1'b1;
+                state_next = STATE_DONE;
             end else begin
                 state_next = STATE_ABILITY_DET;
             end
@@ -200,6 +235,7 @@ always_comb begin
             end
         end
         STATE_IDLE_DET: begin
+            // idle detect - wait for link to go idle
             if (rx_an_ability_match && rx_an_cfg == 0) begin
                 // restart request from link partner
                 state_next = STATE_START;
@@ -212,6 +248,10 @@ always_comb begin
             end
         end
         STATE_DONE: begin
+            // AN operation complete
+            an_running_next = 1'b0;
+            timeout_run_next = 1'b0;
+
             if (rx_an_ability_match && rx_an_cfg == 0) begin
                 // restart request from link partner
                 state_next = STATE_START;
@@ -234,12 +274,16 @@ always @(posedge clk) begin
 
     delay_cnt_reg <= delay_cnt_next;
     delay_run_reg <= delay_run_next;
+    timeout_cnt_reg <= timeout_cnt_next;
+    timeout_run_reg <= timeout_run_next;
 
     tx_an_cfg_reg <= tx_an_cfg_next;
     tx_an_cfg_valid_reg <= tx_an_cfg_valid_next;
 
     an_intr_reg <= an_intr_next;
+    an_running_reg <= an_running_next;
     an_complete_reg <= an_complete_next;
+    an_timeout_reg <= an_timeout_next;
     an_lp_adv_ability_reg <= an_lp_adv_ability_next;
 
     presc_pulse_reg <= 1'b0;
@@ -257,11 +301,15 @@ always @(posedge clk) begin
         presc_pulse_reg <= 1'b0;
         delay_cnt_reg <= '0;
         delay_run_reg <= 1'b0;
+        timeout_cnt_reg <= '0;
+        timeout_run_reg <= 1'b0;
 
         tx_an_cfg_valid_reg <= 1'b0;
 
         an_intr_reg <= 1'b0;
+        an_running_reg <= 1'b0;
         an_complete_reg <= 1'b0;
+        an_timeout_reg <= 1'b0;
     end
 end
 

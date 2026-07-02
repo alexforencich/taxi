@@ -115,8 +115,11 @@ taxi_axis_if #(.DATA_W(DATA_W), .USER_EN(1), .USER_W(RX_USER_W)) m_axis_rx[CNT](
 logic an_en[CNT];
 logic an_restart[CNT];
 logic an_speedup[CNT];
+logic an_timeout_en[CNT];
 logic an_intr[CNT];
+logic an_running[CNT];
 logic an_complete[CNT];
+logic an_timeout[CNT];
 logic [15:0] an_adv_ability[CNT];
 logic [15:0] an_lp_adv_ability[CNT];
 
@@ -356,8 +359,11 @@ uut (
     .an_en(an_en),
     .an_restart(an_restart),
     .an_speedup(an_speedup),
+    .an_timeout_en(an_timeout_en),
     .an_intr(an_intr),
+    .an_running(an_running),
     .an_complete(an_complete),
+    .an_timeout(an_timeout),
     .an_adv_ability(an_adv_ability),
     .an_lp_adv_ability(an_lp_adv_ability),
 

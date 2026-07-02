@@ -106,6 +106,7 @@ class TB:
         dut.an_en.setimmediatevalue(0)
         dut.an_restart.setimmediatevalue(0)
         dut.an_speedup.setimmediatevalue(1)
+        dut.an_timeout_en.setimmediatevalue(1)
         dut.an_adv_ability.setimmediatevalue(0x0020)
 
         dut.cfg_tx_pad_en.setimmediatevalue(0)
@@ -274,6 +275,7 @@ async def run_test_an(dut, gbx_cfg=None):
     tb.dut.an_en.value = 1
     tb.dut.an_restart.value = 0
     tb.dut.an_speedup.value = 1
+    tb.dut.an_timeout_en.value = 1
     tb.dut.an_adv_ability.value = 0x0020
 
     await tb.reset()

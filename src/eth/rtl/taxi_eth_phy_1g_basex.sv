@@ -73,8 +73,11 @@ module taxi_eth_phy_1g_basex #
     input  wire logic               an_en = 1'b1,
     input  wire logic               an_restart = 1'b0,
     input  wire logic               an_speedup = 1'b0,
+    input  wire logic               an_timeout_en = 1'b1,
     output wire logic               an_intr,
+    output wire logic               an_running,
     output wire logic               an_complete,
+    output wire logic               an_timeout,
     input  wire logic [15:0]        an_adv_ability = 16'h0020,
     output wire logic [15:0]        an_lp_adv_ability,
 
@@ -164,8 +167,11 @@ if (AN_EN) begin : an
         .an_en(an_en),
         .an_restart(an_restart),
         .an_speedup(an_speedup),
+        .an_timeout_en(an_timeout_en),
         .an_intr(an_intr),
+        .an_running(an_running),
         .an_complete(an_complete),
+        .an_timeout(an_timeout),
         .an_adv_ability(an_adv_ability),
         .an_lp_adv_ability(an_lp_adv_ability)
     );

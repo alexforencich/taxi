@@ -669,12 +669,13 @@ always_comb begin
                     // send config register
                     if (!odd_reg) begin
                         encoded_tx_data_next = tx_an_cfg[7:0];
-                        encoded_tx_data_k_next = 1'b0;
-                        state_next = STATE_AN;
-                    end else begin
-                        encoded_tx_data_next = tx_an_cfg[15:8];
+                        s_tdata_next = tx_an_cfg[15:8];
                         encoded_tx_data_k_next = 1'b0;
                         tx_an_cfg_ready_next = 1'b1;
+                        state_next = STATE_AN;
+                    end else begin
+                        encoded_tx_data_next = s_tdata_reg;
+                        encoded_tx_data_k_next = 1'b0;
                         an_phase_next = !an_phase_reg;
                         state_next = STATE_IDLE;
                     end

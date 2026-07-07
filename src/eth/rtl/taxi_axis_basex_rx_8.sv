@@ -164,7 +164,6 @@ logic m_axis_rx_tuser_reg = 1'b0, m_axis_rx_tuser_next;
 
 logic [15:0] rx_an_cfg_reg = '0;
 logic rx_an_cfg_valid_reg = 1'b0;
-logic an_cfg_match_reg = 1'b0;
 logic [1:0] an_ability_match_reg = '0;
 logic [1:0] an_ack_match_reg = '0;
 logic [1:0] an_idle_match_reg = '0;
@@ -541,21 +540,19 @@ always_ff @(posedge clk) begin
         end
 
         if (AN_EN && input_c_d0_reg) begin
-            rx_an_cfg_reg[7:0] <= encoded_rx_data;
-            an_cfg_match_reg <= rx_an_cfg_reg[7:0] == encoded_rx_data;
             input_c_d1_reg <= encoded_rx_data_k == 1'b0;
             an_idle_match_reg <= '0;
         end
 
         if (AN_EN && input_c_d1_reg) begin
-            rx_an_cfg_reg[15:8] <= encoded_rx_data;
+            rx_an_cfg_reg <= {encoded_rx_data, encoded_rx_data_d0_reg};
             rx_an_cfg_valid_reg <= encoded_rx_data_k == 1'b0;
-            if (an_cfg_match_reg && ((rx_an_cfg_reg[15:8] ^ encoded_rx_data) & ~8'h40) == 0) begin
+            if (((rx_an_cfg_reg ^ {encoded_rx_data, encoded_rx_data_d0_reg}) & ~16'h4000) == 0) begin
                 an_ability_match_reg <= {an_ability_match_reg[0], 1'b1};
             end else begin
                 an_ability_match_reg <= '0;
             end
-            if (an_cfg_match_reg && rx_an_cfg_reg[14] && rx_an_cfg_reg[15:8] == encoded_rx_data) begin
+            if (rx_an_cfg_reg[14] && rx_an_cfg_reg == {encoded_rx_data, encoded_rx_data_d0_reg}) begin
                 an_ack_match_reg <= {an_ack_match_reg[0], 1'b1};
             end else begin
                 an_ack_match_reg <= '0;

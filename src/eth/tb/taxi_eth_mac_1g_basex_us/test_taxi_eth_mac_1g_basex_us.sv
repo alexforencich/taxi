@@ -42,7 +42,8 @@ module test_taxi_eth_mac_1g_basex_us #
     parameter logic [CNT-1:0] GT_RX_LPM_EN = '0,
     parameter logic [CNT-1:0] GT_RX_POLARITY = '0,
     parameter logic COMBINED_MAC_PCS = 1'b1,
-    parameter logic AN_EN = 1'b1,
+    parameter logic SGMII_EN = 1'b1,
+    parameter logic AN_EN = SGMII_EN,
     parameter logic DIC_EN = 1'b1,
     parameter logic PTP_TS_EN = 1'b0,
     parameter logic PTP_TD_EN = PTP_TS_EN,
@@ -116,13 +117,19 @@ logic an_en[CNT];
 logic an_restart[CNT];
 logic an_speedup[CNT];
 logic an_timeout_en[CNT];
+logic an_sgmii_en[CNT];
+logic an_sgmii_auto[CNT];
 logic an_intr[CNT];
 logic an_running[CNT];
 logic an_complete[CNT];
 logic an_timeout[CNT];
-logic [15:0] an_adv_ability[CNT];
+logic an_sgmii_mode[CNT];
+logic [15:0] an_adv_ability_basex[CNT];
+logic [15:0] an_adv_ability_sgmii[CNT];
 logic [15:0] an_lp_adv_ability[CNT];
 logic [1:0] an_lp_remote_fault[CNT];
+logic an_lp_sgmii_link[CNT];
+logic [1:0] an_lp_sgmii_speed[CNT];
 logic an_res_full_duplex[CNT];
 logic an_res_tx_pause[CNT];
 logic an_res_rx_pause[CNT];
@@ -279,6 +286,7 @@ taxi_eth_mac_1g_basex_us #(
     .GT_RX_LPM_EN(GT_RX_LPM_EN),
     .GT_RX_POLARITY(GT_RX_POLARITY),
     .COMBINED_MAC_PCS(COMBINED_MAC_PCS),
+    .SGMII_EN(SGMII_EN),
     .AN_EN(AN_EN),
     .DIC_EN(DIC_EN),
     .PTP_TS_EN(PTP_TS_EN),
@@ -364,13 +372,19 @@ uut (
     .an_restart(an_restart),
     .an_speedup(an_speedup),
     .an_timeout_en(an_timeout_en),
+    .an_sgmii_en(an_sgmii_en),
+    .an_sgmii_auto(an_sgmii_auto),
     .an_intr(an_intr),
     .an_running(an_running),
     .an_complete(an_complete),
     .an_timeout(an_timeout),
-    .an_adv_ability(an_adv_ability),
+    .an_sgmii_mode(an_sgmii_mode),
+    .an_adv_ability_basex(an_adv_ability_basex),
+    .an_adv_ability_sgmii(an_adv_ability_sgmii),
     .an_lp_adv_ability(an_lp_adv_ability),
     .an_lp_remote_fault(an_lp_remote_fault),
+    .an_lp_sgmii_link(an_lp_sgmii_link),
+    .an_lp_sgmii_speed(an_lp_sgmii_speed),
     .an_res_full_duplex(an_res_full_duplex),
     .an_res_tx_pause(an_res_tx_pause),
     .an_res_rx_pause(an_res_rx_pause),

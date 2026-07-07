@@ -22,7 +22,8 @@ module test_taxi_eth_mac_phy_1g_basex #
     parameter CTRL_W = DATA_W/8,
     parameter logic TX_GBX_IF_EN = 1'b0,
     parameter logic RX_GBX_IF_EN = TX_GBX_IF_EN,
-    parameter logic AN_EN = 1'b1,
+    parameter logic SGMII_EN = 1'b1,
+    parameter logic AN_EN = SGMII_EN,
     parameter logic DIC_EN = 1'b1,
     parameter logic PTP_TS_EN = 1'b0,
     parameter logic PTP_TD_EN = PTP_TS_EN,
@@ -78,13 +79,19 @@ logic an_en;
 logic an_restart;
 logic an_speedup;
 logic an_timeout_en;
+logic an_sgmii_en;
+logic an_sgmii_auto;
 logic an_intr;
 logic an_running;
 logic an_complete;
 logic an_timeout;
-logic [15:0] an_adv_ability;
+logic an_sgmii_mode;
+logic [15:0] an_adv_ability_basex;
+logic [15:0] an_adv_ability_sgmii;
 logic [15:0] an_lp_adv_ability;
 logic [1:0] an_lp_remote_fault;
+logic an_lp_sgmii_link;
+logic [1:0] an_lp_sgmii_speed;
 logic an_res_full_duplex;
 logic an_res_tx_pause;
 logic an_res_rx_pause;
@@ -221,6 +228,7 @@ taxi_eth_mac_phy_1g_basex #(
     .CTRL_W(CTRL_W),
     .TX_GBX_IF_EN(TX_GBX_IF_EN),
     .RX_GBX_IF_EN(RX_GBX_IF_EN),
+    .SGMII_EN(SGMII_EN),
     .AN_EN(AN_EN),
     .DIC_EN(DIC_EN),
     .PTP_TS_EN(PTP_TS_EN),
@@ -284,13 +292,19 @@ uut (
     .an_restart(an_restart),
     .an_speedup(an_speedup),
     .an_timeout_en(an_timeout_en),
+    .an_sgmii_en(an_sgmii_en),
+    .an_sgmii_auto(an_sgmii_auto),
     .an_intr(an_intr),
     .an_running(an_running),
     .an_complete(an_complete),
     .an_timeout(an_timeout),
-    .an_adv_ability(an_adv_ability),
+    .an_sgmii_mode(an_sgmii_mode),
+    .an_adv_ability_basex(an_adv_ability_basex),
+    .an_adv_ability_sgmii(an_adv_ability_sgmii),
     .an_lp_adv_ability(an_lp_adv_ability),
     .an_lp_remote_fault(an_lp_remote_fault),
+    .an_lp_sgmii_link(an_lp_sgmii_link),
+    .an_lp_sgmii_speed(an_lp_sgmii_speed),
     .an_res_full_duplex(an_res_full_duplex),
     .an_res_tx_pause(an_res_tx_pause),
     .an_res_rx_pause(an_res_rx_pause),

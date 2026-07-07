@@ -22,7 +22,7 @@ import cocotb_test.simulator
 
 import cocotb
 from cocotb.clock import Clock
-from cocotb.triggers import RisingEdge
+from cocotb.triggers import RisingEdge, Timer
 from cocotb.utils import get_time_from_sim_steps
 from cocotb.regression import TestFactory
 
@@ -131,7 +131,10 @@ class TB:
         dut.an_restart.setimmediatevalue([0]*4)
         dut.an_speedup.setimmediatevalue([1]*4)
         dut.an_timeout_en.setimmediatevalue([1]*4)
-        dut.an_adv_ability.setimmediatevalue([0x0020]*4)
+        dut.an_sgmii_en.setimmediatevalue([0]*4)
+        dut.an_sgmii_auto.setimmediatevalue([1]*4)
+        dut.an_adv_ability_basex.setimmediatevalue([0x0020]*4)
+        dut.an_adv_ability_sgmii.setimmediatevalue([0x0001]*4)
 
         dut.stat_rx_fifo_drop.setimmediatevalue([0]*4)
 
@@ -780,7 +783,75 @@ async def run_test_pfc(dut, port=0, ifg=12):
         await RisingEdge(dut.xcvr_ctrl_clk)
 
 
-async def run_test_an(dut, port=0):
+async def run_basex_an(tb, port=0, cfg=0x0020, sgmii=False):
+    # link timer scaled by 1000x for faster simulation
+    link_timer = Timer(10, 'us')
+
+    if sgmii:
+        link_timer = Timer(1.6, 'us')
+
+    dut = tb.dut
+
+    for k in range(10):
+        tb.log.info("AN_RESTART")
+        tb.serdes_sources[port].set_an_cfg(0x0000)
+
+        await link_timer
+
+        tb.log.info("ABILITY_DETECT")
+        tb.serdes_sources[port].set_an_cfg(cfg & ~0x4000)
+        tb.serdes_sinks[port].get_an_cfg()
+
+        lp_cfg = None
+        while True:
+            await RisingEdge(dut.tx_clk[port])
+            lp_cfg = tb.serdes_sinks[port].get_an_cfg()
+            if tb.serdes_sinks[port].get_an_ability_match() and lp_cfg is not None and lp_cfg != 0:
+                break
+
+        tb.log.info("ACKNOWLEDGE_DETECT")
+        tb.serdes_sources[port].set_an_cfg(cfg | 0x4000)
+        tb.serdes_sinks[port].get_an_cfg()
+
+        lp_cfg_ack = None
+        while True:
+            await RisingEdge(dut.tx_clk[port])
+            lp_cfg_ack = tb.serdes_sinks[port].get_an_cfg()
+            if tb.serdes_sinks[port].get_an_ack_match():
+                if lp_cfg | 0x4000 == lp_cfg_ack:
+                    break
+            elif tb.serdes_sinks[port].get_an_ability_match() and lp_cfg_ack is not None and lp_cfg_ack == 0:
+                break
+
+        if lp_cfg | 0x4000 != lp_cfg_ack:
+            tb.log.warning("AN inconsistent, restarting")
+            continue
+
+        if lp_cfg_ack == 0:
+            tb.log.warning("AN restart requested")
+            continue
+
+        tb.log.info("COMPLETE_ACKNOWLEDGE")
+        await link_timer
+
+        tb.log.info("IDLE_DETECT")
+        tb.serdes_sources[port].set_an_cfg(None)
+
+        await link_timer
+
+        while True:
+            await RisingEdge(dut.tx_clk[port])
+            if tb.serdes_sinks[port].get_an_idle_match():
+                break
+
+        return lp_cfg_ack
+
+    tb.log.warning("AN timed out")
+    tb.serdes_sources[port].set_an_cfg(None)
+    return None
+
+
+async def run_test_an(dut, port=0, sgmii_en=False, sgmii_auto=False):
 
     tb = TB(dut)
 
@@ -788,7 +859,10 @@ async def run_test_an(dut, port=0):
     tb.dut.an_restart[port].value = 0
     tb.dut.an_speedup[port].value = 1
     tb.dut.an_timeout_en[port].value = 1
-    tb.dut.an_adv_ability[port].value = 0x0020
+    tb.dut.an_sgmii_en[port].value = sgmii_en
+    tb.dut.an_sgmii_auto[port].value = sgmii_auto
+    tb.dut.an_adv_ability_basex[port].value = 0x0020
+    tb.dut.an_adv_ability_sgmii[port].value = 0x0001
 
     await tb.reset()
 
@@ -803,54 +877,92 @@ async def run_test_an(dut, port=0):
     for k in range(100):
         await RisingEdge(dut.xcvr_ctrl_clk)
 
-    tb.log.info("AN_RESTART")
-    tb.serdes_sources[port].set_an_cfg(0x0000)
+    tb.log.info("Link partner is 1000BASE-X")
 
-    # link timer
-    for k in range(1250):
-        await RisingEdge(dut.tx_clk[port])
+    if not sgmii_en:
+        for x in range(16):
+            cfg1 = 0x000A | ((x & 3) << 5) | ((x & 3) << 7) | ((x & 3) << 12)
+            cfg2 = 0x000C | (((x >> 2) & 3) << 5) | (((x >> 2) & 3) << 7) | (((x >> 2) & 3) << 12)
+            cfg1 = 0x002A
+            cfg2 = 0x0020
+            dut.an_adv_ability_basex[port].value = cfg2
 
-    tb.log.info("ABILITY_DETECT")
-    tb.serdes_sources[port].set_an_cfg(0x002A)
+            lp_cfg = await run_basex_an(tb, port, cfg1, False)
 
-    lp_cfg = None
-    while True:
-        await RisingEdge(dut.tx_clk[port])
-        lp_cfg = tb.serdes_sinks[port].get_an_cfg()
-        if tb.serdes_sinks[port].get_an_ability_match() and lp_cfg is not None and lp_cfg != 0:
-            break
+            for k in range(2000):
+                if not dut.an_running[port].value:
+                    break
+                await RisingEdge(dut.tx_clk[port])
 
-    assert lp_cfg & 0xbfff == int(tb.dut.an_adv_ability[port].value) & 0xbfff
+            assert lp_cfg == cfg2 | 0x4000
+            assert not int(dut.an_running[port].value)
+            assert int(dut.an_complete[port].value)
+            assert not int(dut.an_timeout[port].value)
+            assert not int(dut.an_sgmii_mode[port].value)
+            assert int(dut.an_lp_adv_ability[port].value) == cfg1 | 0x4000
+            assert int(dut.an_lp_remote_fault[port].value) == (cfg1 >> 12) & 0x3
+            assert bool(dut.an_res_full_duplex[port].value) == ((((cfg1 & cfg2) >> 5) & 0x3) != 0x2)
+            if ((cfg1 & cfg2) >> 7) & 0x1 == 0x1:
+                # both ends support symmetric pause
+                assert bool(dut.an_res_tx_pause[port].value)
+                assert bool(dut.an_res_rx_pause[port].value)
+            elif ((cfg1 >> 7) & 3) & 2 == 3 and ((cfg2 >> 7) & 3) & 2 == 2:
+                # asymmetric towards local
+                assert not bool(dut.an_res_tx_pause[port].value)
+                assert bool(dut.an_res_rx_pause[port].value)
+            elif ((cfg1 >> 7) & 3) & 2 == 2 and ((cfg2 >> 7) & 3) & 2 == 3:
+                # asymmetric towards partner
+                assert bool(dut.an_res_tx_pause[port].value)
+                assert not bool(dut.an_res_rx_pause[port].value)
+            else:
+                assert not bool(dut.an_res_tx_pause[port].value)
+                assert not bool(dut.an_res_rx_pause[port].value)
+    else:
+        lp_cfg = await run_basex_an(tb, port, 0x002A, False)
 
-    tb.log.info("ACKNOWLEDGE_DETECT")
-    tb.serdes_sources[port].set_an_cfg(0x402A)
-
-    while True:
-        await RisingEdge(dut.tx_clk[port])
-        cfg = tb.serdes_sinks[port].get_an_cfg()
-        if tb.serdes_sinks[port].get_an_ack_match():
-            if lp_cfg | 0x4000 == cfg:
+        for k in range(2000):
+            if not dut.an_running[port].value:
                 break
+            await RisingEdge(dut.tx_clk[port])
 
-    tb.log.info("COMPLETE_ACKNOWLEDGE")
-    # link timer
-    for k in range(1250):
+        assert lp_cfg is None
+
+    for k in range(100):
         await RisingEdge(dut.tx_clk[port])
 
-    assert lp_cfg & 0xbfff == int(tb.dut.an_adv_ability[port].value) & 0xbfff
-    assert int(tb.dut.an_lp_adv_ability[port].value) & 0xbfff == 0x002A
+    tb.log.info("Link partner is SGMII")
 
-    tb.log.info("IDLE_DETECT")
-    tb.serdes_sources[port].set_an_cfg(None)
+    if sgmii_en or sgmii_auto:
+        for x in range(4):
+            cfg1 = 0x0001 | (x << 10) | ((x & 1) << 12) | ((x & 2) << 14)
+            cfg2 = cfg1
+            dut.an_adv_ability_sgmii[port].value = cfg2
 
-    # link timer
-    for k in range(1250):
-        await RisingEdge(dut.tx_clk[port])
+            lp_cfg = await run_basex_an(tb, port, cfg1, True)
 
-    while True:
-        await RisingEdge(dut.tx_clk[port])
-        if tb.serdes_sinks[port].get_an_idle_match():
-            break
+            for k in range(2000):
+                if not dut.an_running[port].value:
+                    break
+                await RisingEdge(dut.tx_clk[port])
+
+            assert lp_cfg == cfg2 | 0x4000
+            assert not int(dut.an_running[port].value)
+            assert int(dut.an_complete[port].value)
+            assert not int(dut.an_timeout[port].value)
+            assert int(dut.an_sgmii_mode[port].value)
+            assert int(dut.an_lp_adv_ability[port].value) == cfg1 | 0x4000
+            assert bool(dut.an_lp_sgmii_link[port].value) == bool((cfg1 >> 15) & 1)
+            assert int(dut.an_lp_sgmii_speed[port].value) == (cfg1 >> 10) & 0x3
+            assert bool(dut.an_res_full_duplex[port].value) == bool((cfg1 >> 12) & 1)
+    else:
+        lp_cfg = await run_basex_an(tb, port, 0x9801, True)
+
+        for k in range(2000):
+            if not dut.an_running[port].value:
+                break
+            await RisingEdge(dut.tx_clk[port])
+
+        assert lp_cfg is None
 
     for k in range(10):
         await RisingEdge(dut.tx_clk[port])
@@ -896,6 +1008,8 @@ if getattr(cocotb, 'top', None) is not None:
     if cocotb.top.AN_EN.value:
         for test in [run_test_an]:
             factory = TestFactory(test)
+            factory.add_option(("sgmii_en", "sgmii_auto"),
+                [(False, False), (True, False), (False, True)])
             factory.generate_tests()
 
 
@@ -947,6 +1061,8 @@ def test_taxi_eth_mac_1g_basex_us(request, low_latency, dic_en, pfc_en):
     parameters['QPLL0_EXT_CTRL'] = 0
     parameters['QPLL1_EXT_CTRL'] = 0
     parameters['COMBINED_MAC_PCS'] = 1
+    parameters['SGMII_EN'] = 1
+    parameters['AN_EN'] = parameters['SGMII_EN']
     parameters['DIC_EN'] = dic_en
     parameters['PTP_TS_EN'] = 1
     parameters['PTP_TD_EN'] = parameters['PTP_TS_EN']

@@ -17,7 +17,8 @@ Authors:
  */
 module taxi_eth_phy_1g_basex_an #
 (
-    parameter DATA_W = 16
+    parameter DATA_W = 16,
+    parameter logic SGMII_EN = 1'b1
 )
 (
     input  wire logic         clk,
@@ -43,13 +44,19 @@ module taxi_eth_phy_1g_basex_an #
     input  wire logic         an_restart = 1'b0,
     input  wire logic         an_speedup = 1'b0,
     input  wire logic         an_timeout_en = 1'b1,
+    input  wire logic         an_sgmii_en = 1'b0,
+    input  wire logic         an_sgmii_auto = 1'b1,
     output wire logic         an_intr,
     output wire logic         an_running,
     output wire logic         an_complete,
     output wire logic         an_timeout,
-    input  wire logic [15:0]  an_adv_ability = 16'h0020,
+    output wire logic         an_sgmii_mode,
+    input  wire logic [15:0]  an_adv_ability_basex = 16'h0020,
+    input  wire logic [15:0]  an_adv_ability_sgmii = 16'h0001,
     output wire logic [15:0]  an_lp_adv_ability,
     output wire logic [1:0]   an_lp_remote_fault,
+    output wire logic         an_lp_sgmii_link,
+    output wire logic [1:0]   an_lp_sgmii_speed,
     output wire logic         an_res_full_duplex,
     output wire logic         an_res_tx_pause,
     output wire logic         an_res_rx_pause
@@ -80,6 +87,7 @@ logic [7:0] delay_cnt_reg = '0, delay_cnt_next;
 logic delay_run_reg = 1'b0, delay_run_next;
 logic [9:0] timeout_cnt_reg = '0, timeout_cnt_next;
 logic timeout_run_reg = 1'b0, timeout_run_next;
+logic [1:0] mode_mismatch_cnt_reg = '0, mode_mismatch_cnt_next;
 
 logic [15:0]  tx_an_cfg_reg = '0, tx_an_cfg_next;
 logic         tx_an_cfg_valid_reg = 1'b0, tx_an_cfg_valid_next;
@@ -88,6 +96,7 @@ logic         an_intr_reg = 1'b0, an_intr_next;
 logic         an_running_reg = 1'b0, an_running_next;
 logic         an_complete_reg = 1'b0, an_complete_next;
 logic         an_timeout_reg = 1'b0, an_timeout_next;
+logic         an_sgmii_mode_reg = 1'b0, an_sgmii_mode_next;
 logic [15:0]  an_lp_adv_ability_reg = '0, an_lp_adv_ability_next;
 
 assign tx_an_cfg = tx_an_cfg_reg;
@@ -97,16 +106,19 @@ assign an_intr = an_intr_reg;
 assign an_running = an_running_reg;
 assign an_complete = an_complete_reg;
 assign an_timeout = an_timeout_reg;
+assign an_sgmii_mode = an_sgmii_mode_reg;
 assign an_lp_adv_ability = an_lp_adv_ability_reg;
 
 // extract remote fault bits from link partner ability value
-assign an_lp_remote_fault = an_lp_adv_ability_reg[13:12];
+assign an_lp_remote_fault = an_sgmii_mode_reg ? 2'b00 : an_lp_adv_ability_reg[13:12];
+assign an_lp_sgmii_link = an_sgmii_mode_reg ? an_lp_adv_ability_reg[15] : 1'b1;
+assign an_lp_sgmii_speed = an_sgmii_mode_reg ? an_lp_adv_ability_reg[11:10] : 2'b10;
 // fall back to half duplex only if both ends support it and at least one end does not support full duplex
-assign an_res_full_duplex = !((an_adv_ability[6] && an_lp_adv_ability_reg[6]) && (!an_adv_ability[5] || !an_lp_adv_ability_reg[5]));
+assign an_res_full_duplex = an_sgmii_mode_reg ? an_lp_adv_ability_reg[12] : !((an_adv_ability_basex[6] && an_lp_adv_ability_reg[6]) && (!an_adv_ability_basex[5] || !an_lp_adv_ability_reg[5]));
 // both sides support symmetric pause, or asymmetric pause towards link partner
-assign an_res_tx_pause = (an_adv_ability[7] && an_lp_adv_ability_reg[7]) || (an_adv_ability[8:7] == 2'b10 && an_lp_adv_ability_reg[8:7] == 2'b11);
+assign an_res_tx_pause = an_sgmii_mode_reg ? 1'b0 : (an_adv_ability_basex[7] && an_lp_adv_ability_reg[7]) || (an_adv_ability_basex[8:7] == 2'b10 && an_lp_adv_ability_reg[8:7] == 2'b11);
 // both sides support symmetric pause, or asymmetric pause towards local device
-assign an_res_rx_pause = (an_adv_ability[7] && an_lp_adv_ability_reg[7]) || (an_adv_ability[8:7] == 2'b11 && an_lp_adv_ability_reg[8:7] == 2'b10);
+assign an_res_rx_pause = an_sgmii_mode_reg ? 1'b0 : (an_adv_ability_basex[7] && an_lp_adv_ability_reg[7]) || (an_adv_ability_basex[8:7] == 2'b11 && an_lp_adv_ability_reg[8:7] == 2'b10);
 
 always_comb begin
     state_next = STATE_START;
@@ -115,6 +127,7 @@ always_comb begin
     delay_run_next = delay_run_reg;
     timeout_cnt_next = timeout_cnt_reg;
     timeout_run_next = timeout_run_reg;
+    mode_mismatch_cnt_next = mode_mismatch_cnt_reg;
 
     tx_an_cfg_next = tx_an_cfg_reg;
     tx_an_cfg_valid_next = tx_an_cfg_valid_reg && !tx_an_cfg_ready;
@@ -123,19 +136,21 @@ always_comb begin
     an_running_next = an_running_reg;
     an_complete_next = an_complete_reg;
     an_timeout_next = an_timeout_reg;
+    an_sgmii_mode_next = an_sgmii_mode_reg;
     an_lp_adv_ability_next = an_lp_adv_ability_reg;
 
     if (delay_run_reg) begin
         if (presc_pulse_reg) begin
             if (delay_cnt_reg != 0) begin
-                    delay_cnt_next = delay_cnt_reg - 1;
+                delay_cnt_next = delay_cnt_reg - 1;
             end else begin
                 delay_run_next = 1'b0;
             end
         end
     end else begin
-        // 10 ms timer
-        delay_cnt_next = 100;
+        // 1000BASE-X: 10 ms timer
+        // SGMII: 1.6 ms timer
+        delay_cnt_next = an_sgmii_mode_reg ? 16 : 100;
     end
 
     if (timeout_run_reg) begin
@@ -158,6 +173,14 @@ always_comb begin
             an_complete_next = 1'b0;
             an_timeout_next = 1'b0;
             timeout_run_next = 1'b0;
+
+            if (an_sgmii_en) begin
+                an_sgmii_mode_next = 1'b1;
+                mode_mismatch_cnt_next = '0;
+            end else if (!an_sgmii_auto) begin
+                an_sgmii_mode_next = 1'b0;
+                mode_mismatch_cnt_next = '0;
+            end
 
             tx_an_cfg_next = '0;
 
@@ -193,16 +216,35 @@ always_comb begin
         end
         STATE_ABILITY_DET: begin
             // ability detect state - transfer AN ability value with ACK clear
-            tx_an_cfg_next = an_adv_ability & ~AN_ACK;
+            tx_an_cfg_next = (an_sgmii_mode_reg ? an_adv_ability_sgmii : an_adv_ability_basex) & ~AN_ACK;
             tx_an_cfg_valid_next = 1'b1;
 
             if (rx_an_ability_match && rx_an_cfg != 0) begin
                 // got ability advertisement from link partner
                 an_lp_adv_ability_next = rx_an_cfg;
-                state_next = STATE_ACK_DET;
-            end else if (!timeout_run_reg) begin
+                if (rx_an_cfg[0] == an_sgmii_mode_reg) begin
+                    // mode matches
+                    state_next = STATE_ACK_DET;
+                end else begin
+                    // mode mismatch, restart
+                    if (an_sgmii_auto) begin
+                        // in SGMII auto mode, switch modes after a few mismatches
+                        if (&mode_mismatch_cnt_reg) begin
+                            mode_mismatch_cnt_next = '0;
+                            an_sgmii_mode_next = rx_an_cfg[0];
+                        end else begin
+                            mode_mismatch_cnt_next = mode_mismatch_cnt_reg + 1;
+                        end
+                    end
+                    state_next = STATE_START;
+                end
+            end else if (!timeout_run_reg && an_timeout_en) begin
                 // timed out, no AN response from link partner
                 an_timeout_next = 1'b1;
+                if (!an_sgmii_en) begin
+                    an_sgmii_mode_next = 1'b0;
+                end
+                mode_mismatch_cnt_next = '0;
                 state_next = STATE_DONE;
             end else begin
                 state_next = STATE_ABILITY_DET;
@@ -210,7 +252,7 @@ always_comb begin
         end
         STATE_ACK_DET: begin
             // acknowledge detect - wait for ACK from link partner
-            tx_an_cfg_next = an_adv_ability | AN_ACK;
+            tx_an_cfg_next = tx_an_cfg_reg | AN_ACK;
             tx_an_cfg_valid_next = 1'b1;
 
             if (rx_an_ability_match && rx_an_cfg == 0) begin
@@ -233,7 +275,7 @@ always_comb begin
         end
         STATE_ACK_CPL: begin
             // complete acknowledge - give link partner time to detect our ACK
-            tx_an_cfg_next = an_adv_ability | AN_ACK;
+            tx_an_cfg_next = tx_an_cfg_reg | AN_ACK;
             tx_an_cfg_valid_next = 1'b1;
 
             if (rx_an_ability_match && rx_an_cfg == 0) begin
@@ -264,6 +306,7 @@ always_comb begin
             // AN operation complete
             an_running_next = 1'b0;
             timeout_run_next = 1'b0;
+            mode_mismatch_cnt_next = '0;
 
             if (rx_an_ability_match && rx_an_cfg == 0) begin
                 // restart request from link partner
@@ -289,6 +332,7 @@ always @(posedge clk) begin
     delay_run_reg <= delay_run_next;
     timeout_cnt_reg <= timeout_cnt_next;
     timeout_run_reg <= timeout_run_next;
+    mode_mismatch_cnt_reg <= mode_mismatch_cnt_next;
 
     tx_an_cfg_reg <= tx_an_cfg_next;
     tx_an_cfg_valid_reg <= tx_an_cfg_valid_next;
@@ -297,6 +341,7 @@ always @(posedge clk) begin
     an_running_reg <= an_running_next;
     an_complete_reg <= an_complete_next;
     an_timeout_reg <= an_timeout_next;
+    an_sgmii_mode_reg <= an_sgmii_mode_next;
     an_lp_adv_ability_reg <= an_lp_adv_ability_next;
 
     presc_pulse_reg <= 1'b0;
@@ -316,6 +361,7 @@ always @(posedge clk) begin
         delay_run_reg <= 1'b0;
         timeout_cnt_reg <= '0;
         timeout_run_reg <= 1'b0;
+        mode_mismatch_cnt_reg <= '0;
 
         tx_an_cfg_valid_reg <= 1'b0;
 
@@ -323,6 +369,7 @@ always @(posedge clk) begin
         an_running_reg <= 1'b0;
         an_complete_reg <= 1'b0;
         an_timeout_reg <= 1'b0;
+        an_sgmii_mode_reg <= 1'b0;
     end
 end
 

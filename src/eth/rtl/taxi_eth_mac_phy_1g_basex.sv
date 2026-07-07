@@ -21,7 +21,8 @@ module taxi_eth_mac_phy_1g_basex #
     parameter CTRL_W = (DATA_W/8),
     parameter logic TX_GBX_IF_EN = 1'b0,
     parameter logic RX_GBX_IF_EN = TX_GBX_IF_EN,
-    parameter logic AN_EN = 1'b1,
+    parameter logic SGMII_EN = 1'b1,
+    parameter logic AN_EN = SGMII_EN,
     parameter logic DIC_EN = 1'b1,
     parameter logic PTP_TS_EN = 1'b0,
     parameter logic PTP_TD_EN = PTP_TS_EN,
@@ -84,13 +85,19 @@ module taxi_eth_mac_phy_1g_basex #
     input  wire logic                 an_restart = 1'b0,
     input  wire logic                 an_speedup = 1'b0,
     input  wire logic                 an_timeout_en = 1'b1,
+    input  wire logic                 an_sgmii_en = 1'b0,
+    input  wire logic                 an_sgmii_auto = 1'b1,
     output wire logic                 an_intr,
     output wire logic                 an_running,
     output wire logic                 an_complete,
     output wire logic                 an_timeout,
-    input  wire logic [15:0]          an_adv_ability = 16'h0020,
+    output wire logic                 an_sgmii_mode,
+    input  wire logic [15:0]          an_adv_ability_basex = 16'h0020,
+    input  wire logic [15:0]          an_adv_ability_sgmii = 16'h0001,
     output wire logic [15:0]          an_lp_adv_ability,
     output wire logic [1:0]           an_lp_remote_fault,
+    output wire logic                 an_lp_sgmii_link,
+    output wire logic [1:0]           an_lp_sgmii_speed,
     output wire logic                 an_res_full_duplex,
     output wire logic                 an_res_tx_pause,
     output wire logic                 an_res_rx_pause,
@@ -416,7 +423,8 @@ if (AN_EN) begin : an
     );
 
     taxi_eth_phy_1g_basex_an #(
-        .DATA_W(DATA_W)
+        .DATA_W(DATA_W),
+        .SGMII_EN(SGMII_EN)
     )
     an_inst (
         .clk(tx_clk),
@@ -442,13 +450,19 @@ if (AN_EN) begin : an
         .an_restart(an_restart),
         .an_speedup(an_speedup),
         .an_timeout_en(an_timeout_en),
+        .an_sgmii_en(an_sgmii_en),
+        .an_sgmii_auto(an_sgmii_auto),
         .an_intr(an_intr),
         .an_running(an_running),
         .an_complete(an_complete),
         .an_timeout(an_timeout),
-        .an_adv_ability(an_adv_ability),
+        .an_sgmii_mode(an_sgmii_mode),
+        .an_adv_ability_basex(an_adv_ability_basex),
+        .an_adv_ability_sgmii(an_adv_ability_sgmii),
         .an_lp_adv_ability(an_lp_adv_ability),
         .an_lp_remote_fault(an_lp_remote_fault),
+        .an_lp_sgmii_link(an_lp_sgmii_link),
+        .an_lp_sgmii_speed(an_lp_sgmii_speed),
         .an_res_full_duplex(an_res_full_duplex),
         .an_res_tx_pause(an_res_tx_pause),
         .an_res_rx_pause(an_res_rx_pause)

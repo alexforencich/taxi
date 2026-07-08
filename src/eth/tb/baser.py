@@ -561,6 +561,8 @@ class BaseRSerdesSink:
         self.queue_occupancy_bytes = 0
         self.queue_occupancy_frames = 0
 
+        self.xgmii_rep_count = 0
+
         self.os = None
         self.os_sig = False
 
@@ -631,6 +633,12 @@ class BaseRSerdesSink:
                 continue
             self.gbx_bit_cnt += in_bits
 
+    def set_xgmii_rep_count(self, rep=0):
+        self.xgmii_rep_count = int(rep)
+
+    def get_xgmii_rep_count(self):
+        return self.xgmii_rep_count
+
     def get_os(self):
         ret = (self.os, self.os_sig)
         self.os = None
@@ -692,6 +700,8 @@ class BaseRSerdesSink:
 
         data = 0
         hdr = 0
+
+        skip_cnt = 0
 
         while True:
             await clock_edge_event
@@ -934,6 +944,20 @@ class BaseRSerdesSink:
             for k in range(8):
                 d_val = dl[k]
                 c_val = cl[k]
+
+                # USXGMII sync
+                if self.xgmii_rep_count:
+                    if c_val and d_val == XgmiiCtrl.START:
+                        skip_cnt = 0
+
+                # USXGMII skip
+                if skip_cnt > 0:
+                    if k == 3 or k == 7:
+                        skip_cnt -= 1
+                    continue
+                elif self.xgmii_rep_count:
+                    if k == 3 or k == 7:
+                        skip_cnt = self.xgmii_rep_count
 
                 if frame is None:
                     if c_val and d_val == XgmiiCtrl.START:

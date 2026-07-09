@@ -158,7 +158,6 @@ logic is_8021q_reg = 1'b0, is_8021q_next;
 logic [15:0] frame_len_reg = '0, frame_len_next;
 logic [15:0] frame_len_lim_reg = '0, frame_len_lim_next;
 logic frame_len_lim_check_reg = '0, frame_len_lim_check_next;
-logic odd_reg = 1'b0, odd_next;
 
 logic [6:0] rep_cnt_reg = '0;
 logic rep_stall_reg = 1'b0;
@@ -269,7 +268,6 @@ always_comb begin
     frame_len_next = frame_len_reg;
     frame_len_lim_next = frame_len_lim_reg;
     frame_len_lim_check_next = frame_len_lim_check_reg;
-    odd_next = odd_reg;
 
     m_axis_rx_tdata_next = '0;
     m_axis_rx_tvalid_next = 1'b0;
@@ -299,8 +297,6 @@ always_comb begin
         // SGMII stall - hold state
         state_next = state_reg;
     end else begin
-
-        odd_next = !odd_reg;
 
         // counter to measure frame length
         if (&frame_len_reg == 0) begin
@@ -489,7 +485,6 @@ always_ff @(posedge clk) begin
     frame_len_reg <= frame_len_next;
     frame_len_lim_reg <= frame_len_lim_next;
     frame_len_lim_check_reg <= frame_len_lim_check_next;
-    odd_reg <= odd_next;
 
     m_axis_rx_tdata_reg <= m_axis_rx_tdata_next;
     m_axis_rx_tvalid_reg <= m_axis_rx_tvalid_next;
@@ -592,16 +587,13 @@ always_ff @(posedge clk) begin
         end
 
         if (SGMII_EN && cfg_rx_sgmii_en) begin
-            if (encoded_rx_data != encoded_rx_data_d0_reg || encoded_rx_data_k) begin
-                rep_stall_reg <= !rep_stall_reg;
+            if ((encoded_rx_data != encoded_rx_data_d0_reg && rep_stall_reg) || encoded_rx_data_k) begin
                 case (cfg_rx_sgmii_speed)
                     2'b00: rep_cnt_reg <= 98; // 10 Mbps
                     2'b01: rep_cnt_reg <= 8; // 100 Mbps
-                    default: begin
-                        rep_cnt_reg <= 0;
-                        rep_stall_reg <= 1'b0;
-                    end
+                    default: rep_cnt_reg <= 0;
                 endcase
+                rep_stall_reg <= 1'b0;
             end else if (rep_cnt_reg == 0) begin
                 case (cfg_rx_sgmii_speed)
                     2'b00: rep_cnt_reg <= 99; // 10 Mbps

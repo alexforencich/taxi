@@ -155,6 +155,8 @@ class BaseXSerdesSource():
         self.queue_occupancy_limit_bytes = -1
         self.queue_occupancy_limit_frames = -1
 
+        self.gmii_rep_count = 0
+
         self.an_cfg = None
 
         self.width = len(self.data)
@@ -279,6 +281,12 @@ class BaseXSerdesSource():
     async def wait(self):
         await self.idle_event.wait()
 
+    def set_gmii_rep_count(self, rep=0):
+        self.gmii_rep_count = int(rep)
+
+    def get_gmii_rep_count(self):
+        return self.gmii_rep_count
+
     def set_an_cfg(self, cfg=None):
         self.an_cfg = cfg
 
@@ -288,6 +296,7 @@ class BaseXSerdesSource():
         rd = False
         odd = False
         carrier_extend = False
+        sof = False
         in_pre = False
         ifg_cnt = 0
         deficit_idle_cnt = 0
@@ -305,6 +314,8 @@ class BaseXSerdesSource():
 
         an_cfg = []
         an_phase = False
+
+        rep_cnt = 0
 
         while True:
             await clock_edge_event
@@ -372,7 +383,7 @@ class BaseXSerdesSource():
                         carrier_extend = False
 
                 if frame is None:
-                    if ifg_cnt > 1 or (not self.enable_dic and ifg_cnt > 0) or odd:
+                    if ifg_cnt > 1 or (not self.enable_dic and ifg_cnt > 0) or odd or rep_cnt != 0:
                         # in IFG
                         pass
 
@@ -397,6 +408,7 @@ class BaseXSerdesSource():
                             ifg_cnt = 0
                             self.active = True
                             frame_offset = 0
+                            sof = True
                             in_pre = True
                         else:
                             # nothing to send
@@ -405,7 +417,9 @@ class BaseXSerdesSource():
 
                     if frame is None:
                         # idle
-                        if ifg_cnt > 0:
+                        if rep_cnt > 0:
+                            pass
+                        elif ifg_cnt > 0:
                             ifg_cnt -= 1
                         elif deficit_idle_cnt > 0:
                             deficit_idle_cnt -= 1
@@ -414,10 +428,11 @@ class BaseXSerdesSource():
                     d_val = an_cfg.pop(0)
                     k_val = False
                 elif frame is not None:
-                    if frame_offset == 0:
+                    if sof:
                         # /S/
                         d_val = XgmiiCtrl.START # /K27.7/
                         k_val = True
+                        sof = False
                     elif frame_offset >= len(frame.data):
                         # /T/
                         d_val = XgmiiCtrl.TERM # /K29.7/
@@ -442,7 +457,8 @@ class BaseXSerdesSource():
                         else:
                             d_val = d # /Dx.y/
                             k_val = False
-                    frame_offset += 1
+                    if rep_cnt == 0:
+                        frame_offset += 1
                 elif self.an_cfg is not None and odd:
                     self.log.info("TX config reg: 0x%04x", self.an_cfg)
                     an_cfg = [self.an_cfg & 0xff, (self.an_cfg >> 8) & 0xff]
@@ -464,6 +480,11 @@ class BaseXSerdesSource():
 
                 odd = not odd
                 rd = rd ^ rd_flip_8b10b(d_val, k_val)
+
+                if rep_cnt > 0:
+                    rep_cnt -= 1
+                elif self.gmii_rep_count and odd:
+                    rep_cnt = self.gmii_rep_count
 
             # if self.slip is not None and self.slip.value:
             #     self.bit_offset += 1

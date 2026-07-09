@@ -791,7 +791,8 @@ class BaseXSerdesSink:
                         self.active_event.set()
 
                         frame = None
-                    elif skip_cnt == 0:
+                    elif skip_cnt == 0 or (in_pre and d_val == EthPre.SFD):
+                        skip_cnt = 0
                         # normal frame data
                         if frame.sim_time_sfd is None and not in_pre:
                             frame.sim_time_sfd = sim_time + (clk_period // self.byte_lanes * k) + gbx_delay

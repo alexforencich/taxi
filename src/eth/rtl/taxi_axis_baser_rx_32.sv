@@ -47,6 +47,8 @@ module taxi_axis_baser_rx_32 #
     output wire logic [23:0]          rx_os,
     output wire logic                 rx_os_sig,
     output wire logic                 rx_os_valid,
+    output wire logic                 rx_os_match,
+    output wire logic                 rx_idle_match,
 
     /*
      * PTP
@@ -209,6 +211,8 @@ logic rx_os_0_reg = 1'b0;
 logic rx_os_4_reg = 1'b0;
 logic rx_os_sig_reg = 1'b0;
 logic rx_os_valid_reg = 1'b0;
+logic [1:0] rx_os_match_reg = '0;
+logic [1:0] rx_idle_match_reg = '0;
 
 logic start_packet_reg = 1'b0, start_packet_next;
 logic frame_reg = 1'b0;
@@ -255,9 +259,11 @@ if (PTP_TS_EN) begin
     assign m_axis_rx.tuser[1 +: PTP_TS_W] = ptp_ts_out_reg;
 end
 
-assign rx_os = rx_os_reg;
+assign rx_os = {rx_os_reg[7:0], rx_os_reg[15:8], rx_os_reg[23:16]};
 assign rx_os_sig = rx_os_sig_reg;
 assign rx_os_valid = rx_os_valid_reg;
+assign rx_os_match = rx_os_match_reg[1];
+assign rx_idle_match = rx_idle_match_reg[1];
 
 assign rx_start_packet = start_packet_reg;
 
@@ -655,6 +661,8 @@ always_ff @(posedge clk) begin
                         input_data_d0_reg <= encoded_rx_data_reg;
                         framing_error_reg <= frame_reg;
                         frame_reg <= 1'b0;
+                        rx_os_match_reg <= '0;
+                        rx_idle_match_reg <= {rx_idle_match_reg[0], 1'b1};
                     end
                     BLOCK_TYPE_OS_4[7:4]: begin
                         input_data_d0_reg <= encoded_rx_data_reg;
@@ -674,9 +682,13 @@ always_ff @(posedge clk) begin
                         framing_error_reg <= frame_reg;
                         frame_reg <= 1'b1;
                         rx_os_0_reg <= 1'b1;
-                        rx_os_reg[7:0] <= encoded_rx_data_reg[31:24];
-                        rx_os_reg[15:8] <= encoded_rx_data_reg[23:16];
-                        rx_os_reg[23:16] <= encoded_rx_data_reg[15:8];
+                        rx_os_reg <= encoded_rx_data_reg[31:8];
+                        if (rx_os_reg == encoded_rx_data_reg[31:8]) begin
+                            rx_os_match_reg <= {rx_os_match_reg[0], 1'b1};
+                        end else begin
+                            rx_os_match_reg <= '0;
+                        end
+                        rx_idle_match_reg <= '0;
                     end
                     BLOCK_TYPE_OS_04[7:4]: begin
                         input_data_d0_reg <= encoded_rx_data_reg;
@@ -695,9 +707,7 @@ always_ff @(posedge clk) begin
                         framing_error_reg <= frame_reg;
                         frame_reg <= 1'b0;
                         rx_os_0_reg <= 1'b1;
-                        rx_os_reg[7:0] <= encoded_rx_data_reg[31:24];
-                        rx_os_reg[15:8] <= encoded_rx_data_reg[23:16];
-                        rx_os_reg[23:16] <= encoded_rx_data_reg[15:8];
+                        rx_os_reg <= encoded_rx_data_reg[31:8];
                     end
                     BLOCK_TYPE_TERM_0[7:4]: begin
                         input_data_d0_reg <= encoded_rx_data_reg; // don't care
@@ -809,13 +819,26 @@ always_ff @(posedge clk) begin
 
             if (rx_os_0_reg) begin
                 rx_os_sig_reg <= encoded_rx_data_reg[3:0] == O_SIG_OS;
-                rx_os_valid_reg <= encoded_rx_data_reg[3:0] == O_SEQ_OS || encoded_rx_data_reg[3:0] == O_SIG_OS;
+                if (encoded_rx_data_reg[3:0] == O_SEQ_OS || encoded_rx_data_reg[3:0] == O_SIG_OS) begin
+                    rx_os_valid_reg <= 1'b1;
+                end else begin
+                    rx_os_match_reg <= '0;
+                end
+                rx_idle_match_reg <= '0;
             end else if (rx_os_4_reg) begin
-                rx_os_reg[7:0] <= encoded_rx_data_reg[31:24];
-                rx_os_reg[15:8] <= encoded_rx_data_reg[23:16];
-                rx_os_reg[23:16] <= encoded_rx_data_reg[15:8];
+                rx_os_reg <= encoded_rx_data_reg[31:8];
                 rx_os_sig_reg <= encoded_rx_data_reg[7:4] == O_SIG_OS;
-                rx_os_valid_reg <= encoded_rx_data_reg[7:4] == O_SEQ_OS || encoded_rx_data_reg[7:4] == O_SIG_OS;
+                if (encoded_rx_data_reg[7:4] == O_SEQ_OS || encoded_rx_data_reg[7:4] == O_SIG_OS) begin
+                    rx_os_valid_reg <= 1'b1;
+                    if (rx_os_reg == encoded_rx_data_reg[31:8]) begin
+                        rx_os_match_reg <= {rx_os_match_reg[0], 1'b1};
+                    end else begin
+                        rx_os_match_reg <= '0;
+                    end
+                end else begin
+                    rx_os_match_reg <= '0;
+                end
+                rx_idle_match_reg <= '0;
             end
         end
 
@@ -874,6 +897,8 @@ always_ff @(posedge clk) begin
         rx_os_0_reg <= 1'b0;
         rx_os_4_reg <= 1'b0;
         rx_os_valid_reg <= 1'b0;
+        rx_os_match_reg <= '0;
+        rx_idle_match_reg <= '0;
 
         start_packet_reg <= 1'b0;
         frame_reg <= 1'b0;

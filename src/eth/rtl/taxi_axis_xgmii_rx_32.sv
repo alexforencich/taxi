@@ -45,6 +45,8 @@ module taxi_axis_xgmii_rx_32 #
     output wire logic [23:0]          rx_os,
     output wire logic                 rx_os_sig,
     output wire logic                 rx_os_valid,
+    output wire logic                 rx_os_match,
+    output wire logic                 rx_idle_match,
 
     /*
      * PTP
@@ -158,6 +160,8 @@ logic m_axis_rx_tuser_reg = 1'b0, m_axis_rx_tuser_next;
 logic [23:0] rx_os_reg = '0;
 logic rx_os_sig_reg = 1'b0;
 logic rx_os_valid_reg = 1'b0;
+logic [1:0] rx_os_match_reg = '0;
+logic [1:0] rx_idle_match_reg = '0;
 
 logic start_packet_reg = 1'b0, start_packet_next;
 
@@ -203,9 +207,11 @@ if (PTP_TS_EN) begin
     assign m_axis_rx.tuser[1 +: PTP_TS_W] = ptp_ts_out_reg;
 end
 
-assign rx_os = rx_os_reg;
+assign rx_os = {rx_os_reg[7:0], rx_os_reg[15:8], rx_os_reg[23:16]};
 assign rx_os_sig = rx_os_sig_reg;
 assign rx_os_valid = rx_os_valid_reg;
+assign rx_os_match = rx_os_match_reg[1];
+assign rx_idle_match = rx_idle_match_reg[1];
 
 assign rx_start_packet = start_packet_reg;
 
@@ -585,12 +591,20 @@ always_ff @(posedge clk) begin
         end
 
         // ordered sets
+        if (xgmii_rxc == 4'b1111) begin
+            rx_os_match_reg <= '0;
+            rx_idle_match_reg <= {rx_idle_match_reg[0], 1'b1};
+        end
         if (xgmii_rxc == 4'b0001 && (xgmii_rxd[7:0] == XGMII_SEQ_OS || xgmii_rxd[7:0] == XGMII_SIG_OS)) begin
-            rx_os_reg[7:0] <= xgmii_rxd[31:24];
-            rx_os_reg[15:8] <= xgmii_rxd[23:16];
-            rx_os_reg[23:16] <= xgmii_rxd[15:8];
+            rx_os_reg <= xgmii_rxd[31:8];
             rx_os_sig_reg <= xgmii_rxd[7:0] == XGMII_SIG_OS;
             rx_os_valid_reg <= 1'b1;
+            if (rx_os_reg == xgmii_rxd[31:8]) begin
+                rx_os_match_reg <= {rx_os_match_reg[0], 1'b1};
+            end else begin
+                rx_os_match_reg <= '0;
+            end
+            rx_idle_match_reg <= '0;
         end
 
         term_lane_d0_reg <= term_lane_reg;
@@ -611,6 +625,8 @@ always_ff @(posedge clk) begin
         m_axis_rx_tvalid_reg <= 1'b0;
 
         rx_os_valid_reg <= 1'b0;
+        rx_os_match_reg <= '0;
+        rx_idle_match_reg <= '0;
 
         start_packet_reg <= 1'b0;
 

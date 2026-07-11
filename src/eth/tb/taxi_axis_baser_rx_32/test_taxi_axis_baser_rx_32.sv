@@ -44,6 +44,8 @@ taxi_axis_if #(.DATA_W(DATA_W), .USER_EN(1), .USER_W(USER_W)) m_axis_rx();
 logic [23:0] rx_os;
 logic rx_os_sig;
 logic rx_os_valid;
+logic rx_os_match;
+logic rx_idle_match;
 
 logic [PTP_TS_W-1:0] ptp_ts;
 
@@ -101,6 +103,8 @@ uut (
     .rx_os(rx_os),
     .rx_os_sig(rx_os_sig),
     .rx_os_valid(rx_os_valid),
+    .rx_os_match(rx_os_match),
+    .rx_idle_match(rx_idle_match),
 
     /*
      * PTP

@@ -1220,7 +1220,7 @@ def test_taxi_eth_mac_25g_us(request, data_w, combined_mac_pcs, low_latency, dic
     parameters['QPLL1_EXT_CTRL'] = 0
     parameters['COMBINED_MAC_PCS'] = combined_mac_pcs
     parameters['DATA_W'] = data_w
-    parameters['USXGMII_EN'] = int(data_w == 32)
+    parameters['USXGMII_EN'] = int(combined_mac_pcs and data_w == 32)
     parameters['DIC_EN'] = dic_en
     parameters['PTP_TS_EN'] = 1
     parameters['PTP_TD_EN'] = parameters['PTP_TS_EN']

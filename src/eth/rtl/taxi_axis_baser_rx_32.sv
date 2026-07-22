@@ -628,8 +628,6 @@ always_ff @(posedge clk) begin
         term_lane_alt_reg <= 0;
         term_lane_reg <= term_lane_alt_reg;
 
-        input_start_alt_reg <= 1'b0;
-
         if (!USXGMII_EN || !rep_stall_d1_reg) begin
             term_lane_d0_reg <= term_lane_reg;
 
@@ -637,9 +635,14 @@ always_ff @(posedge clk) begin
             input_data_d1_reg <= input_data_d0_reg;
             input_data_d2_reg <= input_data_d1_reg;
 
-            input_start_d0_reg <= input_start_alt_reg;
+            input_start_d0_reg <= 1'b0;
             input_start_d1_reg <= input_start_d0_reg;
             input_start_d2_reg <= input_start_d1_reg;
+        end
+
+        input_start_alt_reg <= 1'b0;
+        if (input_start_alt_reg) begin
+            input_start_d0_reg <= input_start_alt_reg;
         end
 
         if (input_start_d1_reg) begin

@@ -77,22 +77,34 @@ class TB:
         dut.cfg_tx_enable.setimmediatevalue(0)
         if usxgmii_speed is not None:
             dut.cfg_tx_usxgmii_en.setimmediatevalue(1)
-            dut.cfg_tx_usxgmii_5g.setimmediatevalue(0)
-            dut.cfg_tx_usxgmii_speed.setimmediatevalue(usxgmii_speed)
-            if usxgmii_speed == 0:
-                self.sink.set_xgmii_rep_count(999) # 10 Mbps
-            elif usxgmii_speed == 1:
-                self.sink.set_xgmii_rep_count(99) # 100 Mbps
-            elif usxgmii_speed == 2:
-                self.sink.set_xgmii_rep_count(9) # 1 Gbps
-            elif usxgmii_speed == 3:
-                self.sink.set_xgmii_rep_count(0) # 10 Gbps
-            elif usxgmii_speed == 4:
-                self.sink.set_xgmii_rep_count(3) # 2.5 Gbps
-            elif usxgmii_speed == 5:
-                self.sink.set_xgmii_rep_count(1) # 5 Gbps
+            if usxgmii_speed & 8 == 0:
+                dut.cfg_tx_usxgmii_5g.setimmediatevalue(0)
+                dut.cfg_tx_usxgmii_speed.setimmediatevalue(usxgmii_speed & 0x7)
+                if usxgmii_speed == 0:
+                    self.sink.set_xgmii_rep_count(999) # 10 Mbps
+                elif usxgmii_speed == 1:
+                    self.sink.set_xgmii_rep_count(99) # 100 Mbps
+                elif usxgmii_speed == 2:
+                    self.sink.set_xgmii_rep_count(9) # 1 Gbps
+                elif usxgmii_speed == 4:
+                    self.sink.set_xgmii_rep_count(3) # 2.5 Gbps
+                elif usxgmii_speed == 5:
+                    self.sink.set_xgmii_rep_count(1) # 5 Gbps
+                else:
+                    self.sink.set_xgmii_rep_count(0) # 10 Gbps
             else:
-                self.sink.set_xgmii_rep_count(0)
+                dut.cfg_tx_usxgmii_5g.setimmediatevalue(1)
+                dut.cfg_tx_usxgmii_speed.setimmediatevalue(usxgmii_speed & 0x7)
+                if usxgmii_speed == 8:
+                    self.sink.set_xgmii_rep_count(499) # 10 Mbps
+                elif usxgmii_speed == 9:
+                    self.sink.set_xgmii_rep_count(49) # 100 Mbps
+                elif usxgmii_speed == 10:
+                    self.sink.set_xgmii_rep_count(4) # 1 Gbps
+                elif usxgmii_speed == 12:
+                    self.sink.set_xgmii_rep_count(1) # 2.5 Gbps
+                else:
+                    self.sink.set_xgmii_rep_count(0) # 5 Gbps
         else:
             dut.cfg_tx_usxgmii_en.setimmediatevalue(0)
             dut.cfg_tx_usxgmii_5g.setimmediatevalue(0)
@@ -458,7 +470,7 @@ if getattr(cocotb, 'top', None) is not None:
     factory.add_option("payload_lengths", [size_list])
     factory.add_option("payload_data", [incrementing_payload])
     factory.add_option("ifg", [12])
-    factory.add_option("usxgmii_speed", [None, 2, 4, 5, 3])
+    factory.add_option("usxgmii_speed", [None, 2, 4, 5, 3, 10, 12, 13])
     factory.add_option("gbx_cfg", gbx_cfgs)
     factory.generate_tests()
 
@@ -470,12 +482,12 @@ if getattr(cocotb, 'top', None) is not None:
 
         factory = TestFactory(test)
         factory.add_option("ifg", [12])
-        factory.add_option("usxgmii_speed", [None, 2, 4, 5, 3])
+        factory.add_option("usxgmii_speed", [None, 2, 4, 5, 3, 10, 12, 13])
         factory.add_option("gbx_cfg", gbx_cfgs)
         factory.generate_tests()
 
     factory = TestFactory(run_test_os)
-    factory.add_option("usxgmii_speed", [None, 2, 4, 5, 3])
+    factory.add_option("usxgmii_speed", [None, 2, 4, 5, 3, 10, 12, 13])
     factory.add_option("gbx_cfg", gbx_cfgs)
     factory.generate_tests()
 

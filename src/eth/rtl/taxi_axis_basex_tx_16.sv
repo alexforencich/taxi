@@ -705,7 +705,7 @@ always_comb begin
         endcase
     end
 
-    if (rep_en_reg) begin
+    if (SGMII_EN && rep_en_reg) begin
         if (rep_sel_reg) begin
             gmii_txd_rep = {2{gmii_txd_next[15:8]}};
             gmii_tx_en_rep = {2{gmii_tx_en_next[1]}};

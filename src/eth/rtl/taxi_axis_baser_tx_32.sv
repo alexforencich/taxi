@@ -426,7 +426,6 @@ always_comb begin
         case (output_type_reg)
             OUTPUT_TYPE_START: begin
                 // replace start character with 0xAA in replications
-                output_data_next[7:0] = 8'hAA;
                 output_type_next = OUTPUT_TYPE_DATA;
             end
             OUTPUT_TYPE_TERM_0, OUTPUT_TYPE_TERM_1, OUTPUT_TYPE_TERM_2, OUTPUT_TYPE_TERM_3: begin
@@ -528,7 +527,7 @@ always_comb begin
 
                 crc_data_next = {24'd0, s_axis_tx.tdata} ^ {24'd0, 32'hffffffff};
 
-                output_data_next = {ETH_SFD, {3{ETH_PRE}}};
+                output_data_next = {ETH_SFD, {2{ETH_PRE}}, 8'hAA};
                 output_type_next = OUTPUT_TYPE_DATA;
 
                 s_axis_tx_tready_next = 1'b1;

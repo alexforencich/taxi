@@ -21,6 +21,7 @@ module taxi_axis_baser_tx_64 #
     parameter HDR_W = 2,
     parameter logic GBX_IF_EN = 1'b0,
     parameter GBX_CNT = 1,
+    parameter logic USXGMII_EN = 1'b0,
     parameter logic DIC_EN = 1'b1,
     parameter logic PTP_TS_EN = 1'b0,
     parameter logic PTP_TS_FMT_TOD = 1'b1,
@@ -67,6 +68,9 @@ module taxi_axis_baser_tx_64 #
     input  wire logic [15:0]          cfg_tx_max_pkt_len = 16'd1518-1,
     input  wire logic [7:0]           cfg_tx_ifg = 8'd12,
     input  wire logic                 cfg_tx_enable,
+    input  wire logic                 cfg_tx_usxgmii_en = 1'b1,
+    input  wire logic                 cfg_tx_usxgmii_5g = 1'b0,
+    input  wire logic [2:0]           cfg_tx_usxgmii_speed = 3'b011,
 
     /*
      * Status
@@ -154,19 +158,19 @@ typedef enum logic [7:0] {
 } baser_block_type_t;
 
 typedef enum logic [3:0] {
-    OUTPUT_TYPE_IDLE = 4'd0,
-    OUTPUT_TYPE_ERROR = 4'd1,
-    OUTPUT_TYPE_START_0 = 4'd2,
-    OUTPUT_TYPE_START_4 = 4'd3,
-    OUTPUT_TYPE_DATA = 4'd4,
-    OUTPUT_TYPE_TERM_0 = 4'd8,
-    OUTPUT_TYPE_TERM_1 = 4'd9,
-    OUTPUT_TYPE_TERM_2 = 4'd10,
-    OUTPUT_TYPE_TERM_3 = 4'd11,
-    OUTPUT_TYPE_TERM_4 = 4'd12,
-    OUTPUT_TYPE_TERM_5 = 4'd13,
-    OUTPUT_TYPE_TERM_6 = 4'd14,
-    OUTPUT_TYPE_TERM_7 = 4'd15
+    OUT_TYPE_IDLE = 4'd0,
+    OUT_TYPE_ERROR = 4'd1,
+    OUT_TYPE_START_0 = 4'd2,
+    OUT_TYPE_START_4 = 4'd3,
+    OUT_TYPE_DATA = 4'd4,
+    OUT_TYPE_TERM_0 = 4'd8,
+    OUT_TYPE_TERM_1 = 4'd9,
+    OUT_TYPE_TERM_2 = 4'd10,
+    OUT_TYPE_TERM_3 = 4'd11,
+    OUT_TYPE_TERM_4 = 4'd12,
+    OUT_TYPE_TERM_5 = 4'd13,
+    OUT_TYPE_TERM_6 = 4'd14,
+    OUT_TYPE_TERM_7 = 4'd15
 } out_type_t;
 
 typedef enum logic [2:0] {
@@ -183,8 +187,7 @@ state_t state_reg = STATE_IDLE, state_next;
 logic swap_lanes_reg = 1'b0, swap_lanes_next;
 logic swap_lanes_d1_reg = 1'b0;
 logic [31:0] swap_data_reg = 32'd0;
-
-logic output_data_finish_reg = 1'b0;
+out_type_t swap_type_reg = OUT_TYPE_IDLE;
 
 logic [DATA_W-1:0] s_tdata_reg = '0, s_tdata_next;
 logic [EMPTY_W-1:0] s_empty_reg = '0, s_empty_next;
@@ -212,6 +215,14 @@ logic frame_len_lim_check_reg = '0, frame_len_lim_check_next;
 logic [7:0] ifg_cnt_reg = '0, ifg_cnt_next;
 logic [1:0] deficit_idle_cnt_reg = 2'd0, deficit_idle_cnt_next;
 
+logic [9:0] rep_cnt_reg = '0;
+logic rep_stall_reg = 1'b0;
+logic rep_en_reg = 1'b0;
+logic rep_sel_reg = 1'b0;
+logic rep_sel_d0_reg = 1'b0;
+logic rep_split_reg = 1'b0;
+logic [31:0] rep_data_reg = '0;
+
 logic s_axis_tx_tready_reg = 1'b0, s_axis_tx_tready_next;
 
 logic [PTP_TS_W-1:0] m_axis_tx_cpl_ts_reg = '0;
@@ -221,16 +232,18 @@ logic m_axis_tx_cpl_valid_reg = 1'b0;
 logic m_axis_tx_cpl_valid_int_reg = 1'b0;
 logic m_axis_tx_cpl_ts_borrow_reg = 1'b0;
 
-logic tx_os_ready_reg = 1'b0;
+logic tx_os_ready_reg = 1'b0, tx_os_ready_next;
 
-logic [DATA_W-1:0] encoded_tx_data_reg = {{8{CTRL_IDLE}}, BLOCK_TYPE_CTRL};
+logic [DATA_W-1:0] encoded_tx_data_reg = {{8{CTRL_IDLE}}, BLOCK_TYPE_CTRL}, encoded_tx_data_next;
 logic encoded_tx_data_valid_reg = 1'b0;
-logic [HDR_W-1:0] encoded_tx_hdr_reg = SYNC_CTRL;
+logic [HDR_W-1:0] encoded_tx_hdr_reg = SYNC_CTRL, encoded_tx_hdr_next;
 logic encoded_tx_hdr_valid_reg = 1'b0;
 logic [GBX_CNT-1:0] tx_gbx_sync_reg = '0;
 
-logic [DATA_W-1:0] output_data_reg = '0, output_data_next;
-out_type_t output_type_reg = OUTPUT_TYPE_IDLE, output_type_next;
+logic [DATA_W-1:0] output_data_reg = '0, output_data_next, output_data_remap;
+out_type_t output_type_reg = OUT_TYPE_IDLE, output_type_next, output_type_remap;
+logic output_start_packet_reg = 1'b0, output_start_packet_next;
+logic [1:0] output_start_packet_remap;
 
 logic [1:0] start_packet_reg = 2'b00;
 
@@ -249,7 +262,7 @@ logic stat_tx_err_underflow_reg = 1'b0, stat_tx_err_underflow_next;
 logic [4+16-1:0] last_ts_reg = '0;
 logic [4+16-1:0] ts_inc_reg = '0;
 
-assign s_axis_tx.tready = s_axis_tx_tready_reg && (!GBX_IF_EN || !tx_gbx_req_stall);
+assign s_axis_tx.tready = s_axis_tx_tready_reg && (!GBX_IF_EN || !tx_gbx_req_stall) && (!USXGMII_EN || !rep_stall_reg);
 
 assign encoded_tx_data = encoded_tx_data_reg;
 assign encoded_tx_data_valid = GBX_IF_EN ? encoded_tx_data_valid_reg : 1'b1;
@@ -325,64 +338,64 @@ always_comb begin
         3'd7: begin
             fcs_output_data_0 = {24'd0, ~crc_state[31:0], s_tdata_reg[7:0]};
             fcs_output_data_1 = 64'd0;
-            fcs_output_type_0 = OUTPUT_TYPE_TERM_5;
-            fcs_output_type_1 = OUTPUT_TYPE_IDLE;
+            fcs_output_type_0 = OUT_TYPE_TERM_5;
+            fcs_output_type_1 = OUT_TYPE_IDLE;
             ifg_offset = 8'd3;
             extra_cycle = 1'b0;
         end
         3'd6: begin
             fcs_output_data_0 = {16'd0, ~crc_state[31:0], s_tdata_reg[15:0]};
             fcs_output_data_1 = 64'd0;
-            fcs_output_type_0 = OUTPUT_TYPE_TERM_6;
-            fcs_output_type_1 = OUTPUT_TYPE_IDLE;
+            fcs_output_type_0 = OUT_TYPE_TERM_6;
+            fcs_output_type_1 = OUT_TYPE_IDLE;
             ifg_offset = 8'd2;
             extra_cycle = 1'b0;
         end
         3'd5: begin
             fcs_output_data_0 = {8'd0, ~crc_state[31:0], s_tdata_reg[23:0]};
             fcs_output_data_1 = 64'd0;
-            fcs_output_type_0 = OUTPUT_TYPE_TERM_7;
-            fcs_output_type_1 = OUTPUT_TYPE_IDLE;
+            fcs_output_type_0 = OUT_TYPE_TERM_7;
+            fcs_output_type_1 = OUT_TYPE_IDLE;
             ifg_offset = 8'd1;
             extra_cycle = 1'b0;
         end
         3'd4: begin
             fcs_output_data_0 = {~crc_state[31:0], s_tdata_reg[31:0]};
             fcs_output_data_1 = 64'd0;
-            fcs_output_type_0 = OUTPUT_TYPE_DATA;
-            fcs_output_type_1 = OUTPUT_TYPE_TERM_0;
+            fcs_output_type_0 = OUT_TYPE_DATA;
+            fcs_output_type_1 = OUT_TYPE_TERM_0;
             ifg_offset = 8'd8;
             extra_cycle = 1'b1;
         end
         3'd3: begin
             fcs_output_data_0 = {~crc_state[23:0], s_tdata_reg[39:0]};
             fcs_output_data_1 = {56'd0, ~crc_state_reg[31:24]};
-            fcs_output_type_0 = OUTPUT_TYPE_DATA;
-            fcs_output_type_1 = OUTPUT_TYPE_TERM_1;
+            fcs_output_type_0 = OUT_TYPE_DATA;
+            fcs_output_type_1 = OUT_TYPE_TERM_1;
             ifg_offset = 8'd7;
             extra_cycle = 1'b1;
         end
         3'd2: begin
             fcs_output_data_0 = {~crc_state[15:0], s_tdata_reg[47:0]};
             fcs_output_data_1 = {48'd0, ~crc_state_reg[31:16]};
-            fcs_output_type_0 = OUTPUT_TYPE_DATA;
-            fcs_output_type_1 = OUTPUT_TYPE_TERM_2;
+            fcs_output_type_0 = OUT_TYPE_DATA;
+            fcs_output_type_1 = OUT_TYPE_TERM_2;
             ifg_offset = 8'd6;
             extra_cycle = 1'b1;
         end
         3'd1: begin
             fcs_output_data_0 = {~crc_state[7:0], s_tdata_reg[55:0]};
             fcs_output_data_1 = {40'd0, ~crc_state_reg[31:8]};
-            fcs_output_type_0 = OUTPUT_TYPE_DATA;
-            fcs_output_type_1 = OUTPUT_TYPE_TERM_3;
+            fcs_output_type_0 = OUT_TYPE_DATA;
+            fcs_output_type_1 = OUT_TYPE_TERM_3;
             ifg_offset = 8'd5;
             extra_cycle = 1'b1;
         end
         3'd0: begin
             fcs_output_data_0 = s_tdata_reg;
             fcs_output_data_1 = {32'd0, ~crc_state_reg[31:0]};
-            fcs_output_type_0 = OUTPUT_TYPE_DATA;
-            fcs_output_type_1 = OUTPUT_TYPE_TERM_4;
+            fcs_output_type_0 = OUT_TYPE_DATA;
+            fcs_output_type_1 = OUT_TYPE_TERM_4;
             ifg_offset = 8'd4;
             extra_cycle = 1'b1;
         end
@@ -418,8 +431,14 @@ always_comb begin
 
     m_axis_tx_cpl_tag_next = m_axis_tx_cpl_tag_reg;
 
-    output_data_next = s_tdata_reg;
-    output_type_next = OUTPUT_TYPE_IDLE;
+    tx_os_ready_next = 1'b0;
+
+    encoded_tx_data_next = encoded_tx_data_reg;
+    encoded_tx_hdr_next = encoded_tx_hdr_reg;
+
+    output_data_next = output_data_reg;
+    output_type_next = output_type_reg;
+    output_start_packet_next = output_start_packet_reg;
 
     stat_tx_byte_next = '0;
     stat_tx_pkt_len_next = '0;
@@ -442,6 +461,48 @@ always_comb begin
         state_next = state_reg;
         frame_start_next = frame_start_reg;
         s_axis_tx_tready_next = s_axis_tx_tready_reg;
+
+        output_data_next = output_data_reg;
+        output_type_next = output_type_reg;
+        output_start_packet_next = output_start_packet_reg;
+    end else if (USXGMII_EN && rep_stall_reg) begin
+        // USXGMII stall - replicate XGMII symbol
+        state_next = state_reg;
+        frame_start_next = frame_start_reg;
+        s_axis_tx_tready_next = s_axis_tx_tready_reg;
+
+        output_data_next = output_data_reg;
+        output_type_next = output_type_reg;
+        output_start_packet_next = output_start_packet_reg;
+
+        if (!swap_lanes_reg || rep_sel_d0_reg || rep_split_reg) begin
+            output_start_packet_next = 1'b0;
+        end
+
+        // SOP/EOP are not replicated
+        case (output_type_reg)
+            OUT_TYPE_START_0: begin
+                // replace start character with 0xAA in replications
+                if (!swap_lanes_reg || rep_sel_d0_reg || rep_split_reg) begin
+                    output_type_next = OUT_TYPE_DATA;
+                end
+            end
+            OUT_TYPE_TERM_0, OUT_TYPE_TERM_1, OUT_TYPE_TERM_2, OUT_TYPE_TERM_3: begin
+                // EOP is sent once followed by idles
+                if (!swap_lanes_reg || rep_sel_d0_reg || rep_split_reg) begin
+                    output_type_next = OUT_TYPE_IDLE;
+                end
+            end
+            OUT_TYPE_TERM_4, OUT_TYPE_TERM_5, OUT_TYPE_TERM_6, OUT_TYPE_TERM_7: begin
+                // EOP is sent once followed by idles
+                if (rep_sel_d0_reg && !swap_lanes_reg) begin
+                    output_type_next = OUT_TYPE_IDLE;
+                end
+            end
+            default: begin
+                output_type_next = output_type_reg;
+            end
+        endcase
     end else begin
         // counter to measure frame length
         if (&frame_len_reg[15:3] == 0) begin
@@ -513,7 +574,8 @@ always_comb begin
                 s_axis_tx_tready_next = cfg_tx_enable;
 
                 output_data_next = s_tdata_reg;
-                output_type_next = OUTPUT_TYPE_IDLE;
+                output_type_next = OUT_TYPE_IDLE;
+                output_start_packet_next = 1'b0;
 
                 s_tdata_next = s_axis_tx.tdata;
                 s_empty_next = keep2empty(s_axis_tx.tkeep);
@@ -524,8 +586,8 @@ always_comb begin
 
                 if (s_axis_tx.tvalid && s_axis_tx.tready) begin
                     // Preamble and SFD
-                    output_data_next = {ETH_SFD, {7{ETH_PRE}}};
-                    output_type_next = OUTPUT_TYPE_START_0;
+                    output_data_next = {ETH_SFD, {6{ETH_PRE}}, 8'hAA};
+                    output_type_next = OUT_TYPE_START_0;
                     frame_start_next = 1'b1;
                     s_axis_tx_tready_next = 1'b1;
                     state_next = STATE_PAYLOAD;
@@ -541,7 +603,8 @@ always_comb begin
                 s_axis_tx_tready_next = 1'b1;
 
                 output_data_next = s_tdata_reg;
-                output_type_next = OUTPUT_TYPE_DATA;
+                output_type_next = OUT_TYPE_DATA;
+                output_start_packet_next = frame_start_reg;
 
                 s_tdata_next = s_axis_tx.tdata;
                 s_empty_next = keep2empty(s_axis_tx.tkeep);
@@ -582,6 +645,7 @@ always_comb begin
 
                 output_data_next = fcs_output_data_0;
                 output_type_next = fcs_output_type_0;
+                output_start_packet_next = 1'b0;
 
                 ifg_cnt_next = (cfg_tx_ifg > 8'd12 ? cfg_tx_ifg : 8'd12) - ifg_offset + (swap_lanes_reg ? 8'd4 : 8'd0) + 8'(deficit_idle_cnt_reg);
 
@@ -609,6 +673,7 @@ always_comb begin
 
                 output_data_next = fcs_output_data_1;
                 output_type_next = fcs_output_type_1;
+                output_start_packet_next = 1'b0;
 
                 stat_tx_byte_next = 4-s_empty_reg;
                 frame_len_next = frame_len_reg + 16'(4-s_empty_reg);
@@ -656,7 +721,8 @@ always_comb begin
                 s_axis_tx_tready_next = frame_next; // drop frame
 
                 output_data_next = s_tdata_reg;
-                output_type_next = OUTPUT_TYPE_ERROR;
+                output_type_next = OUT_TYPE_ERROR;
+                output_start_packet_next = 1'b0;
 
                 ifg_cnt_next = cfg_tx_ifg > 8'd12 ? cfg_tx_ifg : 8'd12;
 
@@ -676,7 +742,8 @@ always_comb begin
                 s_axis_tx_tready_next = frame_next; // drop frame
 
                 output_data_next = s_tdata_reg;
-                output_type_next = OUTPUT_TYPE_IDLE;
+                output_type_next = OUT_TYPE_IDLE;
+                output_start_packet_next = 1'b0;
 
                 crc_data_next = {24'd0, s_axis_tx.tdata} ^ {56'd0, 32'hffffffff};
 
@@ -708,6 +775,192 @@ always_comb begin
             default: begin
                 // invalid state, return to idle
                 state_next = STATE_IDLE;
+            end
+        endcase
+    end
+
+    if (USXGMII_EN && rep_en_reg) begin
+        // USXGMII replication
+        if (swap_lanes_d1_reg) begin
+            // offset start
+            if (rep_split_reg) begin
+                // split cycle - 1G rate for 5G USXGMII only
+                output_data_remap = {output_data_reg[31:0], swap_data_reg};
+                if (swap_type_reg[3]) begin
+                    output_type_remap = swap_type_reg;
+                end else begin
+                    case (output_type_reg)
+                        OUT_TYPE_START_0: output_type_remap = OUT_TYPE_START_4;
+                        OUT_TYPE_TERM_0: output_type_remap = OUT_TYPE_TERM_4;
+                        OUT_TYPE_TERM_1: output_type_remap = OUT_TYPE_TERM_5;
+                        OUT_TYPE_TERM_2: output_type_remap = OUT_TYPE_TERM_6;
+                        OUT_TYPE_TERM_3: output_type_remap = OUT_TYPE_TERM_7;
+                        OUT_TYPE_TERM_4: output_type_remap = OUT_TYPE_DATA;
+                        OUT_TYPE_TERM_5: output_type_remap = OUT_TYPE_DATA;
+                        OUT_TYPE_TERM_6: output_type_remap = OUT_TYPE_DATA;
+                        OUT_TYPE_TERM_7: output_type_remap = OUT_TYPE_DATA;
+                        default: output_type_remap = output_type_reg;
+                    endcase
+                end
+                output_start_packet_remap = {output_start_packet_reg, 1'b0};
+            end else if (rep_sel_d0_reg) begin
+                // second block
+                output_data_remap = {2{output_data_reg[31:0]}};
+                case (output_type_reg)
+                    OUT_TYPE_TERM_4, OUT_TYPE_TERM_5, OUT_TYPE_TERM_6, OUT_TYPE_TERM_7: begin
+                        // lower half replicated as data
+                        output_type_remap = OUT_TYPE_DATA;
+                    end
+                    default: output_type_remap = output_type_reg;
+                endcase
+                output_start_packet_remap = {1'b0, output_start_packet_reg};
+            end else begin
+                // first block
+                output_data_remap = {2{swap_data_reg}};
+                output_type_remap = swap_type_reg;
+                output_start_packet_remap = '0;
+            end
+        end else begin
+            // normal start
+            if (rep_split_reg) begin
+                // split cycle - 1G rate for 5G USXGMII only
+                output_data_remap = output_data_reg;
+                output_type_remap = output_type_reg;
+                output_start_packet_remap = {1'b0, output_start_packet_reg};
+            end else if (rep_sel_d0_reg) begin
+                // second block
+                output_data_remap = {2{output_data_reg[63:32]}};
+                case (output_type_reg)
+                    OUT_TYPE_START_0: output_type_remap = OUT_TYPE_DATA;
+                    OUT_TYPE_TERM_0: output_type_remap = OUT_TYPE_IDLE;
+                    OUT_TYPE_TERM_1: output_type_remap = OUT_TYPE_IDLE;
+                    OUT_TYPE_TERM_2: output_type_remap = OUT_TYPE_IDLE;
+                    OUT_TYPE_TERM_3: output_type_remap = OUT_TYPE_IDLE;
+                    OUT_TYPE_TERM_4: output_type_remap = OUT_TYPE_TERM_0;
+                    OUT_TYPE_TERM_5: output_type_remap = OUT_TYPE_TERM_1;
+                    OUT_TYPE_TERM_6: output_type_remap = OUT_TYPE_TERM_2;
+                    OUT_TYPE_TERM_7: output_type_remap = OUT_TYPE_TERM_3;
+                    default: output_type_remap = output_type_reg;
+                endcase
+                output_start_packet_remap = '0;
+            end else begin
+                // first block
+                output_data_remap = {2{output_data_reg[31:0]}};
+                case (output_type_reg)
+                    OUT_TYPE_TERM_4, OUT_TYPE_TERM_5, OUT_TYPE_TERM_6, OUT_TYPE_TERM_7: begin
+                        // lower half replicated as data
+                        output_type_remap = OUT_TYPE_DATA;
+                    end
+                    default: output_type_remap = output_type_reg;
+                endcase
+                output_start_packet_remap = {1'b0, output_start_packet_reg};
+            end
+        end
+    end else begin
+        // full rate
+        if (swap_lanes_d1_reg) begin
+            // offset start
+            output_data_remap = {output_data_reg[31:0], swap_data_reg};
+            if (swap_type_reg[3]) begin
+                // final termination
+                output_type_remap = swap_type_reg;
+            end else begin
+                case (output_type_reg)
+                    OUT_TYPE_START_0: output_type_remap = OUT_TYPE_START_4;
+                    OUT_TYPE_TERM_0: output_type_remap = OUT_TYPE_TERM_4;
+                    OUT_TYPE_TERM_1: output_type_remap = OUT_TYPE_TERM_5;
+                    OUT_TYPE_TERM_2: output_type_remap = OUT_TYPE_TERM_6;
+                    OUT_TYPE_TERM_3: output_type_remap = OUT_TYPE_TERM_7;
+                    OUT_TYPE_TERM_4: output_type_remap = OUT_TYPE_DATA;
+                    OUT_TYPE_TERM_5: output_type_remap = OUT_TYPE_DATA;
+                    OUT_TYPE_TERM_6: output_type_remap = OUT_TYPE_DATA;
+                    OUT_TYPE_TERM_7: output_type_remap = OUT_TYPE_DATA;
+                    default: output_type_remap = output_type_reg;
+                endcase
+            end
+            output_start_packet_remap = {output_start_packet_reg, 1'b0};
+        end else begin
+            // normal start
+            output_data_remap = output_data_reg;
+            output_type_remap = output_type_reg;
+            output_start_packet_remap = {1'b0, output_start_packet_reg};
+        end
+    end
+
+    if (GBX_IF_EN && tx_gbx_req_stall) begin
+        // gearbox stall
+        encoded_tx_data_next = encoded_tx_data_reg;
+        encoded_tx_hdr_next = encoded_tx_hdr_reg;
+    end else begin
+        case (output_type_remap)
+            OUT_TYPE_IDLE: begin
+                if (tx_os_valid) begin
+                    encoded_tx_data_next[7:0] = BLOCK_TYPE_OS_04;
+                    encoded_tx_data_next[15:8] = tx_os[23:16];
+                    encoded_tx_data_next[23:16] = tx_os[15:8];
+                    encoded_tx_data_next[31:24] = tx_os[7:0];
+                    encoded_tx_data_next[35:32] = tx_os_sig ? O_SIG_OS : O_SEQ_OS;
+                    encoded_tx_data_next[39:36] = tx_os_sig ? O_SIG_OS : O_SEQ_OS;
+                    encoded_tx_data_next[47:40] = tx_os[23:16];
+                    encoded_tx_data_next[55:48] = tx_os[15:8];
+                    encoded_tx_data_next[63:56] = tx_os[7:0];
+                    tx_os_ready_next = 1'b1;
+                end else begin
+                    encoded_tx_data_next = {{8{CTRL_IDLE}}, BLOCK_TYPE_CTRL};
+                end
+                encoded_tx_hdr_next = SYNC_CTRL;
+            end
+            OUT_TYPE_ERROR: begin
+                encoded_tx_data_next = {{8{CTRL_ERROR}}, BLOCK_TYPE_CTRL};
+                encoded_tx_hdr_next = SYNC_CTRL;
+            end
+            OUT_TYPE_START_0: begin
+                encoded_tx_data_next = {output_data_remap[63:8], BLOCK_TYPE_START_0};
+                encoded_tx_hdr_next = SYNC_CTRL;
+            end
+            OUT_TYPE_START_4: begin
+                encoded_tx_data_next = {output_data_remap[31:8], 4'd0, {4{CTRL_IDLE}}, BLOCK_TYPE_START_4};
+                encoded_tx_hdr_next = SYNC_CTRL;
+            end
+            OUT_TYPE_DATA: begin
+                encoded_tx_data_next = output_data_remap;
+                encoded_tx_hdr_next = SYNC_DATA;
+            end
+            OUT_TYPE_TERM_0: begin
+                encoded_tx_data_next = {{7{CTRL_IDLE}}, 7'd0, BLOCK_TYPE_TERM_0};
+                encoded_tx_hdr_next = SYNC_CTRL;
+            end
+            OUT_TYPE_TERM_1: begin
+                encoded_tx_data_next = {{6{CTRL_IDLE}}, 6'd0, output_data_remap[7:0], BLOCK_TYPE_TERM_1};
+                encoded_tx_hdr_next = SYNC_CTRL;
+            end
+            OUT_TYPE_TERM_2: begin
+                encoded_tx_data_next = {{5{CTRL_IDLE}}, 5'd0, output_data_remap[15:0], BLOCK_TYPE_TERM_2};
+                encoded_tx_hdr_next = SYNC_CTRL;
+            end
+            OUT_TYPE_TERM_3: begin
+                encoded_tx_data_next = {{4{CTRL_IDLE}}, 4'd0, output_data_remap[23:0], BLOCK_TYPE_TERM_3};
+                encoded_tx_hdr_next = SYNC_CTRL;
+            end
+            OUT_TYPE_TERM_4: begin
+                encoded_tx_data_next = {{3{CTRL_IDLE}}, 3'd0, output_data_remap[31:0], BLOCK_TYPE_TERM_4};
+                encoded_tx_hdr_next = SYNC_CTRL;
+            end
+            OUT_TYPE_TERM_5: begin
+                encoded_tx_data_next = {{2{CTRL_IDLE}}, 2'd0, output_data_remap[39:0], BLOCK_TYPE_TERM_5};
+                encoded_tx_hdr_next = SYNC_CTRL;
+            end
+            OUT_TYPE_TERM_6: begin
+                encoded_tx_data_next = {{1{CTRL_IDLE}}, 1'd0, output_data_remap[47:0], BLOCK_TYPE_TERM_6};
+                encoded_tx_hdr_next = SYNC_CTRL;
+            end
+            OUT_TYPE_TERM_7: begin
+                encoded_tx_data_next = {output_data_remap[55:0], BLOCK_TYPE_TERM_7};
+                encoded_tx_hdr_next = SYNC_CTRL;
+            end
+            default: begin
+                encoded_tx_data_next = {{8{CTRL_ERROR}}, BLOCK_TYPE_CTRL};
+                encoded_tx_hdr_next = SYNC_CTRL;
             end
         endcase
     end
@@ -744,7 +997,7 @@ always_ff @(posedge clk) begin
     m_axis_tx_cpl_valid_reg <= 1'b0;
     m_axis_tx_cpl_valid_int_reg <= 1'b0;
 
-    tx_os_ready_reg <= 1'b0;
+    tx_os_ready_reg <= tx_os_ready_next;
 
     start_packet_reg <= 2'b00;
 
@@ -776,33 +1029,44 @@ always_ff @(posedge clk) begin
         encoded_tx_data_valid_reg <= 1'b0;
         encoded_tx_hdr_valid_reg <= 1'b0;
     end else begin
-        output_data_finish_reg <= 1'b0;
-
-        swap_data_reg <= output_data_reg[63:32];
-
         output_data_reg <= output_data_next;
         output_type_reg <= output_type_next;
+        output_start_packet_reg <= output_start_packet_next;
 
-        if (frame_start_reg) begin
-            if (swap_lanes_reg) begin
-                if (PTP_TS_EN) begin
-                    if (PTP_TS_FMT_TOD) begin
-                        // workaround for verilator lint bug: unreachable by parameter value
-                        /* verilator lint_off SELRANGE */
-                        m_axis_tx_cpl_ts_reg[45:0] <= ptp_ts[45:0] + 46'(ts_inc_reg >> 1);
-                        m_axis_tx_cpl_ts_reg[95:48] <= ptp_ts[95:48];
-                        /* verilator lint_on SELRANGE */
-                    end else begin
-                        m_axis_tx_cpl_ts_reg <= ptp_ts + PTP_TS_W'(ts_inc_reg >> 1);
-                    end
+        if (!USXGMII_EN || !rep_stall_reg) begin
+            swap_data_reg <= output_data_reg[63:32];
+            case (output_type_reg)
+                OUT_TYPE_START_0: swap_type_reg <= OUT_TYPE_DATA;
+                OUT_TYPE_TERM_0: swap_type_reg <= OUT_TYPE_IDLE;
+                OUT_TYPE_TERM_1: swap_type_reg <= OUT_TYPE_IDLE;
+                OUT_TYPE_TERM_2: swap_type_reg <= OUT_TYPE_IDLE;
+                OUT_TYPE_TERM_3: swap_type_reg <= OUT_TYPE_IDLE;
+                OUT_TYPE_TERM_4: swap_type_reg <= OUT_TYPE_TERM_0;
+                OUT_TYPE_TERM_5: swap_type_reg <= OUT_TYPE_TERM_1;
+                OUT_TYPE_TERM_6: swap_type_reg <= OUT_TYPE_TERM_2;
+                OUT_TYPE_TERM_7: swap_type_reg <= OUT_TYPE_TERM_3;
+                default: swap_type_reg <= output_type_reg;
+            endcase
+        end
+
+        if (output_start_packet_remap[1]) begin
+            if (PTP_TS_EN) begin
+                if (PTP_TS_FMT_TOD) begin
+                    // workaround for verilator lint bug: unreachable by parameter value
+                    /* verilator lint_off SELRANGE */
+                    m_axis_tx_cpl_ts_reg[45:0] <= ptp_ts[45:0] + 46'(ts_inc_reg >> 1);
+                    m_axis_tx_cpl_ts_reg[95:48] <= ptp_ts[95:48];
+                    /* verilator lint_on SELRANGE */
+                end else begin
+                    m_axis_tx_cpl_ts_reg <= ptp_ts + PTP_TS_W'(ts_inc_reg >> 1);
                 end
-                start_packet_reg <= 2'b10;
-            end else begin
-                if (PTP_TS_EN) begin
-                    m_axis_tx_cpl_ts_reg <= ptp_ts;
-                end
-                start_packet_reg <= 2'b01;
             end
+        end else if (output_start_packet_remap[0]) begin
+            if (PTP_TS_EN) begin
+                m_axis_tx_cpl_ts_reg <= ptp_ts;
+            end
+        end
+        if (output_start_packet_remap != 0) begin
             if (TX_CPL_CTRL_IN_TUSER) begin
                 if (PTP_TS_FMT_TOD) begin
                     m_axis_tx_cpl_valid_int_reg <= (s_axis_tx.tuser >> 1) == 0;
@@ -820,168 +1084,75 @@ always_ff @(posedge clk) begin
 
         swap_lanes_d1_reg <= swap_lanes_reg;
 
-        if (swap_lanes_d1_reg) begin
-            if (output_data_finish_reg) begin
-                case (output_type_reg)
-                    OUTPUT_TYPE_TERM_4: begin
-                        encoded_tx_data_reg <= {{7{CTRL_IDLE}}, 7'd0, BLOCK_TYPE_TERM_0};
-                        encoded_tx_hdr_reg <= SYNC_CTRL;
-                    end
-                    OUTPUT_TYPE_TERM_5: begin
-                        encoded_tx_data_reg <= {{6{CTRL_IDLE}}, 6'd0, swap_data_reg[7:0], BLOCK_TYPE_TERM_1};
-                        encoded_tx_hdr_reg <= SYNC_CTRL;
-                    end
-                    OUTPUT_TYPE_TERM_6: begin
-                        encoded_tx_data_reg <= {{5{CTRL_IDLE}}, 5'd0, swap_data_reg[15:0], BLOCK_TYPE_TERM_2};
-                        encoded_tx_hdr_reg <= SYNC_CTRL;
-                    end
-                    OUTPUT_TYPE_TERM_7: begin
-                        encoded_tx_data_reg <= {{4{CTRL_IDLE}}, 4'd0, swap_data_reg[23:0], BLOCK_TYPE_TERM_3};
-                        encoded_tx_hdr_reg <= SYNC_CTRL;
-                    end
-                    default: begin
-                        encoded_tx_data_reg <= {{8{CTRL_ERROR}}, BLOCK_TYPE_CTRL};
-                        encoded_tx_hdr_reg <= SYNC_CTRL;
-                    end
-                endcase
-            end else begin
-                case (output_type_reg)
-                    OUTPUT_TYPE_IDLE: begin
-                        encoded_tx_data_reg <= {{8{CTRL_IDLE}}, BLOCK_TYPE_CTRL};
-                        encoded_tx_hdr_reg <= SYNC_CTRL;
-                    end
-                    OUTPUT_TYPE_ERROR: begin
-                        encoded_tx_data_reg <= {{8{CTRL_ERROR}}, BLOCK_TYPE_CTRL};
-                        encoded_tx_hdr_reg <= SYNC_CTRL;
-                    end
-                    OUTPUT_TYPE_START_0: begin
-                        encoded_tx_data_reg <= {output_data_reg[31:8], 4'd0, {4{CTRL_IDLE}}, BLOCK_TYPE_START_4};
-                        encoded_tx_hdr_reg <= SYNC_CTRL;
-                    end
-                    OUTPUT_TYPE_DATA: begin
-                        encoded_tx_data_reg <= {output_data_reg[31:0], swap_data_reg};
-                        encoded_tx_hdr_reg <= SYNC_DATA;
-                    end
-                    OUTPUT_TYPE_TERM_0: begin
-                        encoded_tx_data_reg <= {{3{CTRL_IDLE}}, 3'd0, swap_data_reg, BLOCK_TYPE_TERM_4};
-                        encoded_tx_hdr_reg <= SYNC_CTRL;
-                    end
-                    OUTPUT_TYPE_TERM_1: begin
-                        encoded_tx_data_reg <= {{2{CTRL_IDLE}}, 2'd0, output_data_reg[7:0], swap_data_reg, BLOCK_TYPE_TERM_5};
-                        encoded_tx_hdr_reg <= SYNC_CTRL;
-                    end
-                    OUTPUT_TYPE_TERM_2: begin
-                        encoded_tx_data_reg <= {{1{CTRL_IDLE}}, 1'd0, output_data_reg[15:0], swap_data_reg, BLOCK_TYPE_TERM_6};
-                        encoded_tx_hdr_reg <= SYNC_CTRL;
-                    end
-                    OUTPUT_TYPE_TERM_3: begin
-                        encoded_tx_data_reg <= {output_data_reg[23:0], swap_data_reg, BLOCK_TYPE_TERM_7};
-                        encoded_tx_hdr_reg <= SYNC_CTRL;
-                    end
-                    OUTPUT_TYPE_TERM_4: begin
-                        encoded_tx_data_reg <= {output_data_reg[31:0], swap_data_reg};
-                        encoded_tx_hdr_reg <= SYNC_DATA;
-                        output_data_finish_reg <= 1'b1;
-                        output_type_reg <= OUTPUT_TYPE_TERM_4;
-                    end
-                    OUTPUT_TYPE_TERM_5: begin
-                        encoded_tx_data_reg <= {output_data_reg[31:0], swap_data_reg};
-                        encoded_tx_hdr_reg <= SYNC_DATA;
-                        output_data_finish_reg <= 1'b1;
-                        output_type_reg <= OUTPUT_TYPE_TERM_5;
-                    end
-                    OUTPUT_TYPE_TERM_6: begin
-                        encoded_tx_data_reg <= {output_data_reg[31:0], swap_data_reg};
-                        encoded_tx_hdr_reg <= SYNC_DATA;
-                        output_data_finish_reg <= 1'b1;
-                        output_type_reg <= OUTPUT_TYPE_TERM_6;
-                    end
-                    OUTPUT_TYPE_TERM_7: begin
-                        encoded_tx_data_reg <= {output_data_reg[31:0], swap_data_reg};
-                        encoded_tx_hdr_reg <= SYNC_DATA;
-                        output_data_finish_reg <= 1'b1;
-                        output_type_reg <= OUTPUT_TYPE_TERM_7;
-                    end
-                    default: begin
-                        encoded_tx_data_reg <= {{8{CTRL_ERROR}}, BLOCK_TYPE_CTRL};
-                        encoded_tx_hdr_reg <= SYNC_CTRL;
-                    end
-                endcase
-            end
-        end else begin
-            case (output_type_reg)
-                OUTPUT_TYPE_IDLE: begin
-                    if (tx_os_valid) begin
-                        encoded_tx_data_reg[7:0] <= BLOCK_TYPE_OS_04;
-                        encoded_tx_data_reg[15:8] <= tx_os[23:16];
-                        encoded_tx_data_reg[23:16] <= tx_os[15:8];
-                        encoded_tx_data_reg[31:24] <= tx_os[7:0];
-                        encoded_tx_data_reg[35:32] <= tx_os_sig ? O_SIG_OS : O_SEQ_OS;
-                        encoded_tx_data_reg[39:36] <= tx_os_sig ? O_SIG_OS : O_SEQ_OS;
-                        encoded_tx_data_reg[47:40] <= tx_os[23:16];
-                        encoded_tx_data_reg[55:48] <= tx_os[15:8];
-                        encoded_tx_data_reg[63:56] <= tx_os[7:0];
-                        tx_os_ready_reg <= 1'b1;
-                    end else begin
-                        encoded_tx_data_reg <= {{8{CTRL_IDLE}}, BLOCK_TYPE_CTRL};
-                    end
-                    encoded_tx_hdr_reg <= SYNC_CTRL;
-                end
-                OUTPUT_TYPE_ERROR: begin
-                    encoded_tx_data_reg <= {{8{CTRL_ERROR}}, BLOCK_TYPE_CTRL};
-                    encoded_tx_hdr_reg <= SYNC_CTRL;
-                end
-                OUTPUT_TYPE_START_0: begin
-                    encoded_tx_data_reg <= {output_data_reg[63:8], BLOCK_TYPE_START_0};
-                    encoded_tx_hdr_reg <= SYNC_CTRL;
-                end
-                OUTPUT_TYPE_DATA: begin
-                    encoded_tx_data_reg <= output_data_reg;
-                    encoded_tx_hdr_reg <= SYNC_DATA;
-                end
-                OUTPUT_TYPE_TERM_0: begin
-                    encoded_tx_data_reg <= {{7{CTRL_IDLE}}, 7'd0, BLOCK_TYPE_TERM_0};
-                    encoded_tx_hdr_reg <= SYNC_CTRL;
-                end
-                OUTPUT_TYPE_TERM_1: begin
-                    encoded_tx_data_reg <= {{6{CTRL_IDLE}}, 6'd0, output_data_reg[7:0], BLOCK_TYPE_TERM_1};
-                    encoded_tx_hdr_reg <= SYNC_CTRL;
-                end
-                OUTPUT_TYPE_TERM_2: begin
-                    encoded_tx_data_reg <= {{5{CTRL_IDLE}}, 5'd0, output_data_reg[15:0], BLOCK_TYPE_TERM_2};
-                    encoded_tx_hdr_reg <= SYNC_CTRL;
-                end
-                OUTPUT_TYPE_TERM_3: begin
-                    encoded_tx_data_reg <= {{4{CTRL_IDLE}}, 4'd0, output_data_reg[23:0], BLOCK_TYPE_TERM_3};
-                    encoded_tx_hdr_reg <= SYNC_CTRL;
-                end
-                OUTPUT_TYPE_TERM_4: begin
-                    encoded_tx_data_reg <= {{3{CTRL_IDLE}}, 3'd0, output_data_reg[31:0], BLOCK_TYPE_TERM_4};
-                    encoded_tx_hdr_reg <= SYNC_CTRL;
-                end
-                OUTPUT_TYPE_TERM_5: begin
-                    encoded_tx_data_reg <= {{2{CTRL_IDLE}}, 2'd0, output_data_reg[39:0], BLOCK_TYPE_TERM_5};
-                    encoded_tx_hdr_reg <= SYNC_CTRL;
-                end
-                OUTPUT_TYPE_TERM_6: begin
-                    encoded_tx_data_reg <= {{1{CTRL_IDLE}}, 1'd0, output_data_reg[47:0], BLOCK_TYPE_TERM_6};
-                    encoded_tx_hdr_reg <= SYNC_CTRL;
-                end
-                OUTPUT_TYPE_TERM_7: begin
-                    encoded_tx_data_reg <= {output_data_reg[55:0], BLOCK_TYPE_TERM_7};
-                    encoded_tx_hdr_reg <= SYNC_CTRL;
-                end
-                default: begin
-                    encoded_tx_data_reg <= {{8{CTRL_ERROR}}, BLOCK_TYPE_CTRL};
-                    encoded_tx_hdr_reg <= SYNC_CTRL;
-                end
-            endcase
-        end
-
+        encoded_tx_data_reg <= encoded_tx_data_next;
         encoded_tx_data_valid_reg <= 1'b1;
+        encoded_tx_hdr_reg <= encoded_tx_hdr_next;
         encoded_tx_hdr_valid_reg <= 1'b1;
 
-        crc_state_reg <= crc_state;
+        start_packet_reg <= output_start_packet_remap;
+
+        if (!USXGMII_EN || !rep_stall_reg) begin
+            crc_state_reg <= crc_state;
+        end
+
+        rep_split_reg <= 1'b0;
+        if (USXGMII_EN && cfg_tx_usxgmii_en) begin
+            if (rep_cnt_reg == 0) begin
+                rep_stall_reg <= !rep_sel_reg;
+                rep_en_reg <= 1'b1;
+                rep_sel_reg <= !rep_sel_reg;
+                if (cfg_tx_usxgmii_5g) begin
+                    case (cfg_tx_usxgmii_speed)
+                        3'b000: rep_cnt_reg <= 249; // 10 Mbps
+                        3'b001: rep_cnt_reg <= 24; // 100 Mbps
+                        3'b010: begin
+                            // 1 Gbps
+                            if (!rep_sel_reg) begin
+                                rep_cnt_reg <= 1;
+                                rep_split_reg <= 1'b1;
+                            end else begin
+                                rep_cnt_reg <= 2;
+                            end
+                        end
+                        3'b100: rep_cnt_reg <= 0; // 2.5 Gbps
+                        default: begin
+                            // 5 Gbps
+                            rep_cnt_reg <= 0;
+                            rep_stall_reg <= 1'b0;
+                            rep_en_reg <= 1'b0;
+                            rep_sel_reg <= 1'b0;
+                        end
+                    endcase
+                end else begin
+                    case (cfg_tx_usxgmii_speed)
+                        3'b000: rep_cnt_reg <= 499; // 10 Mbps
+                        3'b001: rep_cnt_reg <= 49; // 100 Mbps
+                        3'b010: rep_cnt_reg <= 4; // 1 Gbps
+                        3'b100: rep_cnt_reg <= 1; // 2.5 Gbps
+                        3'b101: rep_cnt_reg <= 0; // 5 Gbps
+                        default: begin
+                            // 10 Gbps
+                            rep_cnt_reg <= 0;
+                            rep_stall_reg <= 1'b0;
+                            rep_en_reg <= 1'b0;
+                            rep_sel_reg <= 1'b0;
+                        end
+                    endcase
+                end
+            end else begin
+                rep_cnt_reg <= rep_cnt_reg-1;
+                rep_stall_reg <= 1'b1;
+                rep_en_reg <= 1'b1;
+            end
+
+            rep_sel_d0_reg <= rep_sel_reg;
+        end else begin
+            rep_cnt_reg <= '0;
+            rep_stall_reg <= 1'b0;
+            rep_en_reg <= 1'b0;
+            rep_sel_reg <= 1'b0;
+            rep_sel_d0_reg <= 1'b0;
+        end
     end
 
     tx_gbx_sync_reg <= tx_gbx_req_sync;
@@ -999,6 +1170,12 @@ always_ff @(posedge clk) begin
         frame_reg <= 1'b0;
         deficit_idle_cnt_reg <= 2'd0;
 
+        rep_cnt_reg <= '0;
+        rep_stall_reg <= 1'b0;
+        rep_sel_reg <= 1'b0;
+        rep_sel_d0_reg <= 1'b0;
+        rep_split_reg <= 1'b0;
+
         s_axis_tx_tready_reg <= 1'b0;
 
         m_axis_tx_cpl_valid_reg <= 1'b0;
@@ -1013,7 +1190,8 @@ always_ff @(posedge clk) begin
         tx_gbx_sync_reg <= '0;
 
         output_data_reg <= '0;
-        output_type_reg <= OUTPUT_TYPE_IDLE;
+        output_type_reg <= OUT_TYPE_IDLE;
+        output_start_packet_reg <= 1'b0;
 
         start_packet_reg <= 2'b00;
 
@@ -1028,8 +1206,6 @@ always_ff @(posedge clk) begin
         stat_tx_err_oversize_reg <= 1'b0;
         stat_tx_err_user_reg <= 1'b0;
         stat_tx_err_underflow_reg <= 1'b0;
-
-        output_data_finish_reg <= 1'b0;
     end
 end
 

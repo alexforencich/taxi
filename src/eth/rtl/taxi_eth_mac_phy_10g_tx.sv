@@ -155,6 +155,7 @@ if (DATA_W == 64) begin
         .HDR_W(HDR_W),
         .GBX_IF_EN(GBX_IF_EN),
         .GBX_CNT(1),
+        .USXGMII_EN(USXGMII_EN),
         .DIC_EN(DIC_EN),
         .PTP_TS_EN(PTP_TS_EN),
         .PTP_TS_FMT_TOD(PTP_TS_FMT_TOD),
@@ -201,6 +202,9 @@ if (DATA_W == 64) begin
         .cfg_tx_max_pkt_len(cfg_tx_max_pkt_len),
         .cfg_tx_ifg(cfg_tx_ifg),
         .cfg_tx_enable(cfg_tx_enable),
+        .cfg_tx_usxgmii_en(cfg_tx_usxgmii_en),
+        .cfg_tx_usxgmii_5g(cfg_tx_usxgmii_5g),
+        .cfg_tx_usxgmii_speed(cfg_tx_usxgmii_speed),
 
         /*
          * Status

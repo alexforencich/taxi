@@ -311,7 +311,7 @@ async def run_test_tx(dut, port=0, payload_lengths=None, payload_data=None, ifg=
 
     if dut.DATA_W.value == 64:
         if dut.COMBINED_MAC_PCS.value:
-            pipe_delay = int(dut.TX_SERDES_PIPELINE.value) + 2 + 1
+            pipe_delay = int(dut.TX_SERDES_PIPELINE.value) + 1 + 1
         else:
             pipe_delay = int(dut.TX_SERDES_PIPELINE.value) + 2 + 1
     else:
@@ -384,7 +384,7 @@ async def run_test_tx_alignment(dut, port=0, payload_data=None, ifg=12):
 
     if dut.DATA_W.value == 64:
         if dut.COMBINED_MAC_PCS.value:
-            pipe_delay = int(dut.TX_SERDES_PIPELINE.value) + 2 + 1
+            pipe_delay = int(dut.TX_SERDES_PIPELINE.value) + 1 + 1
         else:
             pipe_delay = int(dut.TX_SERDES_PIPELINE.value) + 2 + 1
     else:

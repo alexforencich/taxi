@@ -145,11 +145,12 @@ class TB:
                 self.stats[stat] += int(getattr(self.dut, stat).value)
 
 
-async def run_test(dut, gbx_cfg=None, usxgmii_speed=None, payload_lengths=None, payload_data=None, ifg=12):
+async def run_test(dut, gbx_cfg=None, offset_start=False, usxgmii_speed=None, payload_lengths=None, payload_data=None, ifg=12):
 
     tb = TB(dut, gbx_cfg, usxgmii_speed)
 
     tb.source.ifg = ifg
+    tb.source.force_offset_start = offset_start
     tb.dut.cfg_rx_max_pkt_len.value = 9218-1
     tb.dut.cfg_rx_enable.value = 1
 
@@ -351,6 +352,7 @@ if getattr(cocotb, 'top', None) is not None:
     factory.add_option("payload_lengths", [size_list])
     factory.add_option("payload_data", [incrementing_payload])
     factory.add_option("ifg", [0, 1, 11, 12])
+    factory.add_option("offset_start", [False, True])
     factory.add_option("usxgmii_speed", [None, 2, 4, 5, 3, 10, 12, 13])
     factory.add_option("gbx_cfg", gbx_cfgs)
     factory.generate_tests()

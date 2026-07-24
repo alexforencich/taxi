@@ -663,6 +663,8 @@ always_ff @(posedge clk) begin
                 // data
                 input_data_d0_reg <= encoded_rx_data_reg;
                 framing_error_reg <= !frame_reg;
+                rx_os_match_reg <= '0;
+                rx_idle_match_reg <= '0;
             end else begin
                 // control
                 case (encoded_rx_data_reg[7:4])

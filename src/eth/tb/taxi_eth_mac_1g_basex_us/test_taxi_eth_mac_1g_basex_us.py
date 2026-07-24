@@ -223,9 +223,9 @@ async def run_test_regs(dut):
 async def run_test_rx(dut, port=0, payload_lengths=None, payload_data=None, ifg=12):
 
     if dut.COMBINED_MAC_PCS.value:
-        pipe_delay = 3
+        pipe_delay = int(dut.RX_SERDES_PIPELINE.value) + 1 + 1
     else:
-        pipe_delay = 3
+        pipe_delay = int(dut.RX_SERDES_PIPELINE.value) + 1 + 1
 
     tb = TB(dut)
 
@@ -294,9 +294,9 @@ async def run_test_rx(dut, port=0, payload_lengths=None, payload_data=None, ifg=
 async def run_test_tx(dut, port=0, payload_lengths=None, payload_data=None, ifg=12):
 
     if dut.COMBINED_MAC_PCS.value:
-        pipe_delay = 4
+        pipe_delay = int(dut.TX_SERDES_PIPELINE.value) + 0 + 1
     else:
-        pipe_delay = 4
+        pipe_delay = int(dut.TX_SERDES_PIPELINE.value) + 0 + 1
 
     tb = TB(dut)
 

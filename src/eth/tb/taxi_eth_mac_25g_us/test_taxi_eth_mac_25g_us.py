@@ -234,14 +234,14 @@ async def run_test_rx(dut, port=0, payload_lengths=None, payload_data=None, ifg=
 
     if dut.DATA_W.value == 64:
         if dut.COMBINED_MAC_PCS.value:
-            pipe_delay = 3
+            pipe_delay = int(dut.RX_SERDES_PIPELINE.value) + 1 + 1
         else:
-            pipe_delay = 4
+            pipe_delay = int(dut.RX_SERDES_PIPELINE.value) + 2 + 1
     else:
         if dut.COMBINED_MAC_PCS.value:
-            pipe_delay = 4
+            pipe_delay = int(dut.RX_SERDES_PIPELINE.value) + 2 + 1
         else:
-            pipe_delay = 5
+            pipe_delay = int(dut.RX_SERDES_PIPELINE.value) + 3 + 1
 
     tb = TB(dut)
 
@@ -311,14 +311,14 @@ async def run_test_tx(dut, port=0, payload_lengths=None, payload_data=None, ifg=
 
     if dut.DATA_W.value == 64:
         if dut.COMBINED_MAC_PCS.value:
-            pipe_delay = 6
+            pipe_delay = int(dut.TX_SERDES_PIPELINE.value) + 2 + 1
         else:
-            pipe_delay = 6
+            pipe_delay = int(dut.TX_SERDES_PIPELINE.value) + 2 + 1
     else:
         if dut.COMBINED_MAC_PCS.value:
-            pipe_delay = 6
+            pipe_delay = int(dut.TX_SERDES_PIPELINE.value) + 2 + 1
         else:
-            pipe_delay = 8
+            pipe_delay = int(dut.TX_SERDES_PIPELINE.value) + 4 + 1
 
     tb = TB(dut)
 
@@ -384,14 +384,14 @@ async def run_test_tx_alignment(dut, port=0, payload_data=None, ifg=12):
 
     if dut.DATA_W.value == 64:
         if dut.COMBINED_MAC_PCS.value:
-            pipe_delay = 6
+            pipe_delay = int(dut.TX_SERDES_PIPELINE.value) + 2 + 1
         else:
-            pipe_delay = 6
+            pipe_delay = int(dut.TX_SERDES_PIPELINE.value) + 2 + 1
     else:
         if dut.COMBINED_MAC_PCS.value:
-            pipe_delay = 7
+            pipe_delay = int(dut.TX_SERDES_PIPELINE.value) + 2 + 1
         else:
-            pipe_delay = 8
+            pipe_delay = int(dut.TX_SERDES_PIPELINE.value) + 4 + 1
 
     tb = TB(dut)
 

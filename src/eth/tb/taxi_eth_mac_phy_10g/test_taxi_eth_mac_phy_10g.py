@@ -255,7 +255,7 @@ async def run_test_tx(dut, gbx_cfg=None, payload_lengths=None, payload_data=None
     if len(dut.serdes_tx_data) == 64:
         pipe_delay = int(dut.TX_SERDES_PIPELINE.value) + 2 + 1
     else:
-        pipe_delay = int(dut.TX_SERDES_PIPELINE.value) + 2 + 1
+        pipe_delay = int(dut.TX_SERDES_PIPELINE.value) + 1 + 1
 
     tb = TB(dut, gbx_cfg)
 
@@ -318,7 +318,7 @@ async def run_test_tx_alignment(dut, gbx_cfg=None, payload_data=None, ifg=12):
     if len(dut.serdes_tx_data) == 64:
         pipe_delay = int(dut.TX_SERDES_PIPELINE.value) + 2 + 1
     else:
-        pipe_delay = int(dut.TX_SERDES_PIPELINE.value) + 2 + 1
+        pipe_delay = int(dut.TX_SERDES_PIPELINE.value) + 1 + 1
 
     dic_en = int(cocotb.top.DIC_EN.value)
 

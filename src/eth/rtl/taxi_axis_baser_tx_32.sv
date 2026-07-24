@@ -226,9 +226,10 @@ logic [GBX_CNT-1:0] tx_gbx_sync_reg = '0;
 logic [DATA_W-1:0] output_data_reg = '0, output_data_next;
 logic [DATA_W-1:0] output_data_d1_reg = '0;
 out_type_t output_type_reg = OUTPUT_TYPE_IDLE, output_type_next;
+logic output_start_packet_reg = 1'b0, output_start_packet_next;
 
 logic start_packet_int_reg = 1'b0, start_packet_int_next;
-logic start_packet_reg = 1'b0, start_packet_next;
+logic start_packet_reg = 1'b0;
 
 logic [2:0] stat_tx_byte_reg = '0, stat_tx_byte_next;
 logic [15:0] stat_tx_pkt_len_reg = '0, stat_tx_pkt_len_next;
@@ -387,9 +388,9 @@ always_comb begin
 
     output_data_next = output_data_reg;
     output_type_next = output_type_reg;
+    output_start_packet_next = output_start_packet_reg;
 
     start_packet_int_next = start_packet_int_reg;
-    start_packet_next = 1'b0;
 
     stat_tx_byte_next = '0;
     stat_tx_pkt_len_next = '0;
@@ -414,6 +415,7 @@ always_comb begin
 
         output_data_next = output_data_reg;
         output_type_next = output_type_reg;
+        output_start_packet_next = output_start_packet_reg;
     end else if (USXGMII_EN && rep_stall_reg) begin
         // USXGMII stall - replicate XGMII symbol
         state_next = state_reg;
@@ -421,6 +423,7 @@ always_comb begin
 
         output_data_next = output_data_reg;
         output_type_next = output_type_reg;
+        output_start_packet_next = 1'b0;
 
         // SOP/EOP are not replicated
         case (output_type_reg)
@@ -498,6 +501,7 @@ always_comb begin
 
                 output_data_next = s_tdata_reg;
                 output_type_next = OUTPUT_TYPE_IDLE;
+                output_start_packet_next = 1'b0;
 
                 s_tdata_next = s_axis_tx.tdata;
                 s_empty_next = keep2empty(s_axis_tx.tkeep);
@@ -529,6 +533,7 @@ always_comb begin
 
                 output_data_next = {ETH_SFD, {2{ETH_PRE}}, 8'hAA};
                 output_type_next = OUTPUT_TYPE_DATA;
+                output_start_packet_next = 1'b0;
 
                 s_axis_tx_tready_next = 1'b1;
                 start_packet_int_next = 1'b1;
@@ -540,13 +545,13 @@ always_comb begin
 
                 output_data_next = s_tdata_reg;
                 output_type_next = OUTPUT_TYPE_DATA;
+                output_start_packet_next = start_packet_int_reg;
+                start_packet_int_next = 1'b0;
 
                 s_tdata_next = s_axis_tx.tdata;
                 s_empty_next = keep2empty(s_axis_tx.tkeep);
 
                 stat_tx_byte_next = 3'(KEEP_W);
-                start_packet_next = start_packet_int_reg;
-                start_packet_int_next = 1'b0;
 
                 if (s_axis_tx.tvalid && s_axis_tx.tlast) begin
                     if (frame_len_lim_check_reg) begin
@@ -578,6 +583,7 @@ always_comb begin
 
                 output_data_next = fcs_output_data_0;
                 output_type_next = fcs_output_type_0;
+                output_start_packet_next = 1'b0;
 
                 stat_tx_byte_next = 3'(KEEP_W);
 
@@ -593,6 +599,7 @@ always_comb begin
 
                 output_data_next = fcs_output_data_1;
                 output_type_next = fcs_output_type_1;
+                output_start_packet_next = 1'b0;
 
                 stat_tx_byte_next = 4-s_empty_reg;
                 frame_len_next = frame_len_reg + 16'(4-s_empty_reg);
@@ -619,6 +626,7 @@ always_comb begin
 
                 output_data_next = s_tdata_reg;
                 output_type_next = OUTPUT_TYPE_TERM_0;
+                output_start_packet_next = 1'b0;
 
                 stat_tx_pkt_len_next = frame_len_reg;
                 stat_tx_pkt_good_next = !frame_error_reg;
@@ -654,6 +662,7 @@ always_comb begin
 
                 output_data_next = s_tdata_reg;
                 output_type_next = OUTPUT_TYPE_ERROR;
+                output_start_packet_next = 1'b0;
 
                 ifg_cnt_next = cfg_tx_ifg > 8'd12 ? cfg_tx_ifg : 8'd12;
 
@@ -674,6 +683,7 @@ always_comb begin
 
                 output_data_next = s_tdata_reg;
                 output_type_next = OUTPUT_TYPE_IDLE;
+                output_start_packet_next = 1'b0;
 
                 if (DIC_EN) begin
                     if (ifg_cnt_next > 8'd3 || frame_reg) begin
@@ -730,7 +740,6 @@ always_ff @(posedge clk) begin
     tx_os_ready_reg <= 1'b0;
 
     start_packet_int_reg <= start_packet_int_next;
-    start_packet_reg <= start_packet_next;
 
     stat_tx_byte_reg <= stat_tx_byte_next;
     stat_tx_pkt_len_reg <= stat_tx_pkt_len_next;
@@ -751,7 +760,10 @@ always_ff @(posedge clk) begin
     end else begin
         output_data_reg <= output_data_next;
         output_type_reg <= output_type_next;
+        output_start_packet_reg <= output_start_packet_next;
         output_data_d1_reg <= output_data_reg;
+
+        start_packet_reg <= output_start_packet_reg;
 
         if (phase_reg == 0) begin
             case ({output_type_reg, output_type_next})
@@ -931,6 +943,7 @@ always_ff @(posedge clk) begin
         tx_gbx_sync_reg <= '0;
 
         output_type_reg <= OUTPUT_TYPE_IDLE;
+        output_start_packet_reg <= 1'b0;
 
         start_packet_reg <= 1'b0;
 

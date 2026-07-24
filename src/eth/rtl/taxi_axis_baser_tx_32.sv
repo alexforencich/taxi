@@ -157,14 +157,14 @@ typedef enum logic [7:0] {
 } baser_block_type_t;
 
 typedef enum logic [2:0] {
-    OUTPUT_TYPE_IDLE = 3'd0,
-    OUTPUT_TYPE_ERROR = 3'd1,
-    OUTPUT_TYPE_START = 3'd2,
-    OUTPUT_TYPE_DATA = 3'd3,
-    OUTPUT_TYPE_TERM_0 = 3'd4,
-    OUTPUT_TYPE_TERM_1 = 3'd5,
-    OUTPUT_TYPE_TERM_2 = 3'd6,
-    OUTPUT_TYPE_TERM_3 = 3'd7
+    OUT_TYPE_IDLE = 3'd0,
+    OUT_TYPE_ERROR = 3'd1,
+    OUT_TYPE_START = 3'd2,
+    OUT_TYPE_DATA = 3'd3,
+    OUT_TYPE_TERM_0 = 3'd4,
+    OUT_TYPE_TERM_1 = 3'd5,
+    OUT_TYPE_TERM_2 = 3'd6,
+    OUT_TYPE_TERM_3 = 3'd7
 } out_type_t;
 
 typedef enum logic [3:0] {
@@ -225,7 +225,7 @@ logic [GBX_CNT-1:0] tx_gbx_sync_reg = '0;
 
 logic [DATA_W-1:0] output_data_reg = '0, output_data_next;
 logic [DATA_W-1:0] output_data_d1_reg = '0;
-out_type_t output_type_reg = OUTPUT_TYPE_IDLE, output_type_next;
+out_type_t output_type_reg = OUT_TYPE_IDLE, output_type_next;
 logic output_start_packet_reg = 1'b0, output_start_packet_next;
 
 logic start_packet_int_reg = 1'b0, start_packet_int_next;
@@ -315,32 +315,32 @@ always_comb begin
         2'd3: begin
             fcs_output_data_0 = {~crc_state[23:0], s_tdata_reg[7:0]};
             fcs_output_data_1 = {24'd0, ~crc_state_reg[31:24]};
-            fcs_output_type_0 = OUTPUT_TYPE_DATA;
-            fcs_output_type_1 = OUTPUT_TYPE_TERM_1;
+            fcs_output_type_0 = OUT_TYPE_DATA;
+            fcs_output_type_1 = OUT_TYPE_TERM_1;
             ifg_offset = 8'd3;
             extra_cycle = 1'b0;
         end
         2'd2: begin
             fcs_output_data_0 = {~crc_state[15:0], s_tdata_reg[15:0]};
             fcs_output_data_1 = {16'd0, ~crc_state_reg[31:16]};
-            fcs_output_type_0 = OUTPUT_TYPE_DATA;
-            fcs_output_type_1 = OUTPUT_TYPE_TERM_2;
+            fcs_output_type_0 = OUT_TYPE_DATA;
+            fcs_output_type_1 = OUT_TYPE_TERM_2;
             ifg_offset = 8'd2;
             extra_cycle = 1'b0;
         end
         2'd1: begin
             fcs_output_data_0 = {~crc_state[7:0], s_tdata_reg[23:0]};
             fcs_output_data_1 = {8'd0, ~crc_state_reg[31:8]};
-            fcs_output_type_0 = OUTPUT_TYPE_DATA;
-            fcs_output_type_1 = OUTPUT_TYPE_TERM_3;
+            fcs_output_type_0 = OUT_TYPE_DATA;
+            fcs_output_type_1 = OUT_TYPE_TERM_3;
             ifg_offset = 8'd1;
             extra_cycle = 1'b0;
         end
         2'd0: begin
             fcs_output_data_0 = s_tdata_reg;
             fcs_output_data_1 = ~crc_state_reg;
-            fcs_output_type_0 = OUTPUT_TYPE_DATA;
-            fcs_output_type_1 = OUTPUT_TYPE_DATA;
+            fcs_output_type_0 = OUT_TYPE_DATA;
+            fcs_output_type_1 = OUT_TYPE_DATA;
             ifg_offset = 8'd4;
             extra_cycle = 1'b1;
         end
@@ -427,13 +427,13 @@ always_comb begin
 
         // SOP/EOP are not replicated
         case (output_type_reg)
-            OUTPUT_TYPE_START: begin
+            OUT_TYPE_START: begin
                 // replace start character with 0xAA in replications
-                output_type_next = OUTPUT_TYPE_DATA;
+                output_type_next = OUT_TYPE_DATA;
             end
-            OUTPUT_TYPE_TERM_0, OUTPUT_TYPE_TERM_1, OUTPUT_TYPE_TERM_2, OUTPUT_TYPE_TERM_3: begin
+            OUT_TYPE_TERM_0, OUT_TYPE_TERM_1, OUT_TYPE_TERM_2, OUT_TYPE_TERM_3: begin
                 // EOP is sent once followed by idles
-                output_type_next = OUTPUT_TYPE_IDLE;
+                output_type_next = OUT_TYPE_IDLE;
             end
             default: begin
                 output_type_next = output_type_reg;
@@ -500,7 +500,7 @@ always_comb begin
                 frame_len_lim_check_next = 1'b0;
 
                 output_data_next = s_tdata_reg;
-                output_type_next = OUTPUT_TYPE_IDLE;
+                output_type_next = OUT_TYPE_IDLE;
                 output_start_packet_next = 1'b0;
 
                 s_tdata_next = s_axis_tx.tdata;
@@ -511,7 +511,7 @@ always_comb begin
                 if (s_axis_tx.tvalid && cfg_tx_enable) begin
                     // Preamble and SFD
                     output_data_next = {4{ETH_PRE}};
-                    output_type_next = OUTPUT_TYPE_START;
+                    output_type_next = OUT_TYPE_START;
                     s_axis_tx_tready_next = 1'b1;
                     state_next = STATE_PREAMBLE;
                 end else begin
@@ -532,7 +532,7 @@ always_comb begin
                 crc_data_next = {24'd0, s_axis_tx.tdata} ^ {24'd0, 32'hffffffff};
 
                 output_data_next = {ETH_SFD, {2{ETH_PRE}}, 8'hAA};
-                output_type_next = OUTPUT_TYPE_DATA;
+                output_type_next = OUT_TYPE_DATA;
                 output_start_packet_next = 1'b0;
 
                 s_axis_tx_tready_next = 1'b1;
@@ -544,7 +544,7 @@ always_comb begin
                 s_axis_tx_tready_next = 1'b1;
 
                 output_data_next = s_tdata_reg;
-                output_type_next = OUTPUT_TYPE_DATA;
+                output_type_next = OUT_TYPE_DATA;
                 output_start_packet_next = start_packet_int_reg;
                 start_packet_int_next = 1'b0;
 
@@ -625,7 +625,7 @@ always_comb begin
                 s_axis_tx_tready_next = frame_next; // drop frame
 
                 output_data_next = s_tdata_reg;
-                output_type_next = OUTPUT_TYPE_TERM_0;
+                output_type_next = OUT_TYPE_TERM_0;
                 output_start_packet_next = 1'b0;
 
                 stat_tx_pkt_len_next = frame_len_reg;
@@ -661,7 +661,7 @@ always_comb begin
                 s_axis_tx_tready_next = frame_next; // drop frame
 
                 output_data_next = s_tdata_reg;
-                output_type_next = OUTPUT_TYPE_ERROR;
+                output_type_next = OUT_TYPE_ERROR;
                 output_start_packet_next = 1'b0;
 
                 ifg_cnt_next = cfg_tx_ifg > 8'd12 ? cfg_tx_ifg : 8'd12;
@@ -682,7 +682,7 @@ always_comb begin
                 s_axis_tx_tready_next = frame_next; // drop frame
 
                 output_data_next = s_tdata_reg;
-                output_type_next = OUTPUT_TYPE_IDLE;
+                output_type_next = OUT_TYPE_IDLE;
                 output_start_packet_next = 1'b0;
 
                 if (DIC_EN) begin
@@ -767,7 +767,7 @@ always_ff @(posedge clk) begin
 
         if (phase_reg == 0) begin
             case ({output_type_reg, output_type_next})
-                {OUTPUT_TYPE_IDLE, OUTPUT_TYPE_IDLE}: begin
+                {OUT_TYPE_IDLE, OUT_TYPE_IDLE}: begin
                     if (tx_os_valid) begin
                         encoded_tx_data_reg[7:0] <= BLOCK_TYPE_OS_04;
                         encoded_tx_data_reg[15:8] <= tx_os[23:16];
@@ -778,51 +778,51 @@ always_ff @(posedge clk) begin
                     end
                     encoded_tx_hdr_reg <= SYNC_CTRL;
                 end
-                {OUTPUT_TYPE_ERROR, OUTPUT_TYPE_ERROR}: begin
+                {OUT_TYPE_ERROR, OUT_TYPE_ERROR}: begin
                     encoded_tx_data_reg <= {24'hc78f1e, BLOCK_TYPE_CTRL};
                     encoded_tx_hdr_reg <= SYNC_CTRL;
                 end
-                {OUTPUT_TYPE_START, OUTPUT_TYPE_DATA}: begin
+                {OUT_TYPE_START, OUT_TYPE_DATA}: begin
                     encoded_tx_data_reg <= {output_data_reg[31:8], BLOCK_TYPE_START_0};
                     encoded_tx_hdr_reg <= SYNC_CTRL;
                 end
-                {OUTPUT_TYPE_IDLE, OUTPUT_TYPE_START}: begin
+                {OUT_TYPE_IDLE, OUT_TYPE_START}: begin
                     encoded_tx_data_reg <= {24'd0, BLOCK_TYPE_START_4};
                     encoded_tx_hdr_reg <= SYNC_CTRL;
                 end
-                {OUTPUT_TYPE_DATA, OUTPUT_TYPE_DATA}: begin
+                {OUT_TYPE_DATA, OUT_TYPE_DATA}: begin
                     encoded_tx_data_reg <= output_data_reg;
                     encoded_tx_hdr_reg <= SYNC_DATA;
                 end
-                {OUTPUT_TYPE_TERM_0, OUTPUT_TYPE_IDLE}: begin
+                {OUT_TYPE_TERM_0, OUT_TYPE_IDLE}: begin
                     encoded_tx_data_reg <= {24'd0, BLOCK_TYPE_TERM_0};
                     encoded_tx_hdr_reg <= SYNC_CTRL;
                 end
-                {OUTPUT_TYPE_TERM_1, OUTPUT_TYPE_IDLE}: begin
+                {OUT_TYPE_TERM_1, OUT_TYPE_IDLE}: begin
                     encoded_tx_data_reg <= {16'd0, output_data_reg[7:0], BLOCK_TYPE_TERM_1};
                     encoded_tx_hdr_reg <= SYNC_CTRL;
                 end
-                {OUTPUT_TYPE_TERM_2, OUTPUT_TYPE_IDLE}: begin
+                {OUT_TYPE_TERM_2, OUT_TYPE_IDLE}: begin
                     encoded_tx_data_reg <= {8'd0, output_data_reg[15:0], BLOCK_TYPE_TERM_2};
                     encoded_tx_hdr_reg <= SYNC_CTRL;
                 end
-                {OUTPUT_TYPE_TERM_3, OUTPUT_TYPE_IDLE}: begin
+                {OUT_TYPE_TERM_3, OUT_TYPE_IDLE}: begin
                     encoded_tx_data_reg <= {output_data_reg[23:0], BLOCK_TYPE_TERM_3};
                     encoded_tx_hdr_reg <= SYNC_CTRL;
                 end
-                {OUTPUT_TYPE_DATA, OUTPUT_TYPE_TERM_0}: begin
+                {OUT_TYPE_DATA, OUT_TYPE_TERM_0}: begin
                     encoded_tx_data_reg <= {output_data_reg[23:0], BLOCK_TYPE_TERM_4};
                     encoded_tx_hdr_reg <= SYNC_CTRL;
                 end
-                {OUTPUT_TYPE_DATA, OUTPUT_TYPE_TERM_1}: begin
+                {OUT_TYPE_DATA, OUT_TYPE_TERM_1}: begin
                     encoded_tx_data_reg <= {output_data_reg[23:0], BLOCK_TYPE_TERM_5};
                     encoded_tx_hdr_reg <= SYNC_CTRL;
                 end
-                {OUTPUT_TYPE_DATA, OUTPUT_TYPE_TERM_2}: begin
+                {OUT_TYPE_DATA, OUT_TYPE_TERM_2}: begin
                     encoded_tx_data_reg <= {output_data_reg[23:0], BLOCK_TYPE_TERM_6};
                     encoded_tx_hdr_reg <= SYNC_CTRL;
                 end
-                {OUTPUT_TYPE_DATA, OUTPUT_TYPE_TERM_3}: begin
+                {OUT_TYPE_DATA, OUT_TYPE_TERM_3}: begin
                     encoded_tx_data_reg <= {output_data_reg[23:0], BLOCK_TYPE_TERM_7};
                     encoded_tx_hdr_reg <= SYNC_CTRL;
                 end
@@ -833,7 +833,7 @@ always_ff @(posedge clk) begin
             endcase
         end else begin
             case (output_type_reg)
-                OUTPUT_TYPE_IDLE: begin
+                OUT_TYPE_IDLE: begin
                     if (tx_os_valid) begin
                         encoded_tx_data_reg[3:0] <= tx_os_sig ? O_SIG_OS : O_SEQ_OS;
                         encoded_tx_data_reg[7:4] <= tx_os_sig ? O_SIG_OS : O_SEQ_OS;
@@ -845,25 +845,25 @@ always_ff @(posedge clk) begin
                         encoded_tx_data_reg <= 32'd0;
                     end
                 end
-                OUTPUT_TYPE_ERROR: begin
+                OUT_TYPE_ERROR: begin
                     encoded_tx_data_reg <= 32'h3c78f1e3; // CTRL_ERROR
                 end
-                OUTPUT_TYPE_START: begin
+                OUT_TYPE_START: begin
                     encoded_tx_data_reg <= {output_data_reg[31:8], 8'd0};
                 end
-                OUTPUT_TYPE_DATA: begin
+                OUT_TYPE_DATA: begin
                     encoded_tx_data_reg <= output_data_reg;
                 end
-                OUTPUT_TYPE_TERM_0: begin
+                OUT_TYPE_TERM_0: begin
                     encoded_tx_data_reg <= {24'd0, output_data_d1_reg[31:24]};
                 end
-                OUTPUT_TYPE_TERM_1: begin
+                OUT_TYPE_TERM_1: begin
                     encoded_tx_data_reg <= {16'd0, output_data_reg[7:0], output_data_d1_reg[31:24]};
                 end
-                OUTPUT_TYPE_TERM_2: begin
+                OUT_TYPE_TERM_2: begin
                     encoded_tx_data_reg <= {8'd0, output_data_reg[15:0], output_data_d1_reg[31:24]};
                 end
-                OUTPUT_TYPE_TERM_3: begin
+                OUT_TYPE_TERM_3: begin
                     encoded_tx_data_reg <= {output_data_reg[23:0], output_data_d1_reg[31:24]};
                 end
                 default: begin
@@ -942,7 +942,7 @@ always_ff @(posedge clk) begin
         phase_reg <= 1'b0;
         tx_gbx_sync_reg <= '0;
 
-        output_type_reg <= OUTPUT_TYPE_IDLE;
+        output_type_reg <= OUT_TYPE_IDLE;
         output_start_packet_reg <= 1'b0;
 
         start_packet_reg <= 1'b0;

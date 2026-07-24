@@ -650,6 +650,10 @@ always_ff @(posedge clk) begin
         end
 
         // ordered sets
+        if (xgmii_rxc == 8'b00000000) begin
+            rx_os_match_reg <= '0;
+            rx_idle_match_reg <= '0;
+        end
         if (xgmii_rxc == 8'b11111111) begin
             rx_os_match_reg <= '0;
             rx_idle_match_reg <= {rx_idle_match_reg[0], 1'b1};

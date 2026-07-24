@@ -743,37 +743,42 @@ always_ff @(posedge clk) begin
         end
 
         // ordered sets
-        if (encoded_rx_data[7:4] == BLOCK_TYPE_CTRL[7:4]) begin
+        if (encoded_rx_hdr[0] == SYNC_CTRL[0]) begin
+            if (encoded_rx_data[7:4] == BLOCK_TYPE_CTRL[7:4]) begin
+                rx_os_match_reg <= '0;
+                rx_idle_match_reg <= {rx_idle_match_reg[0], 1'b1};
+            end
+            if (encoded_rx_data[7:4] == BLOCK_TYPE_OS_4[7:4] || encoded_rx_data[7:4] == BLOCK_TYPE_OS_04[7:4]) begin
+                rx_os_reg <= encoded_rx_data[63:40];
+                rx_os_sig_reg <= encoded_rx_data[39:36] == O_SIG_OS;
+                if ((encoded_rx_data[7:0] == BLOCK_TYPE_OS_4 || encoded_rx_data[7:0] == BLOCK_TYPE_OS_04) || (encoded_rx_data[39:36] == O_SEQ_OS || encoded_rx_data[39:36] == O_SIG_OS)) begin
+                    rx_os_valid_reg <= 1'b1;
+                    if (rx_os_reg == encoded_rx_data[63:40]) begin
+                        rx_os_match_reg <= {rx_os_match_reg[0], 1'b1};
+                    end else begin
+                        rx_os_match_reg <= '0;
+                    end
+                end else begin
+                    rx_os_match_reg <= '0;
+                end
+                rx_idle_match_reg <= '0;
+            end else if (encoded_rx_data[7:4] == BLOCK_TYPE_OS_0[7:4] || encoded_rx_data[7:4] == BLOCK_TYPE_OS_START[7:4]) begin
+                rx_os_reg <= encoded_rx_data[31:8];
+                rx_os_sig_reg <= encoded_rx_data[35:32] == O_SIG_OS;
+                if ((encoded_rx_data[7:0] == BLOCK_TYPE_OS_0 || encoded_rx_data[7:0] == BLOCK_TYPE_OS_START) || (encoded_rx_data[35:32] == O_SEQ_OS || encoded_rx_data[35:32] == O_SIG_OS)) begin
+                    rx_os_valid_reg <= 1'b1;
+                    if (rx_os_reg == encoded_rx_data[31:8]) begin
+                        rx_os_match_reg <= {rx_os_match_reg[0], 1'b1};
+                    end else begin
+                        rx_os_match_reg <= '0;
+                    end
+                end else begin
+                    rx_os_match_reg <= '0;
+                end
+                rx_idle_match_reg <= '0;
+            end
+        end else begin
             rx_os_match_reg <= '0;
-            rx_idle_match_reg <= {rx_idle_match_reg[0], 1'b1};
-        end
-        if (encoded_rx_data[7:4] == BLOCK_TYPE_OS_4[7:4] || encoded_rx_data[7:4] == BLOCK_TYPE_OS_04[7:4]) begin
-            rx_os_reg <= encoded_rx_data[63:40];
-            rx_os_sig_reg <= encoded_rx_data[39:36] == O_SIG_OS;
-            if ((encoded_rx_data[7:0] == BLOCK_TYPE_OS_4 || encoded_rx_data[7:0] == BLOCK_TYPE_OS_04) || (encoded_rx_data[39:36] == O_SEQ_OS || encoded_rx_data[39:36] == O_SIG_OS)) begin
-                rx_os_valid_reg <= 1'b1;
-                if (rx_os_reg == encoded_rx_data[63:40]) begin
-                    rx_os_match_reg <= {rx_os_match_reg[0], 1'b1};
-                end else begin
-                    rx_os_match_reg <= '0;
-                end
-            end else begin
-                rx_os_match_reg <= '0;
-            end
-            rx_idle_match_reg <= '0;
-        end else if (encoded_rx_data[7:4] == BLOCK_TYPE_OS_0[7:4] || encoded_rx_data[7:4] == BLOCK_TYPE_OS_START[7:4]) begin
-            rx_os_reg <= encoded_rx_data[31:8];
-            rx_os_sig_reg <= encoded_rx_data[35:32] == O_SIG_OS;
-            if ((encoded_rx_data[7:0] == BLOCK_TYPE_OS_0 || encoded_rx_data[7:0] == BLOCK_TYPE_OS_START) || (encoded_rx_data[35:32] == O_SEQ_OS || encoded_rx_data[35:32] == O_SIG_OS)) begin
-                rx_os_valid_reg <= 1'b1;
-                if (rx_os_reg == encoded_rx_data[31:8]) begin
-                    rx_os_match_reg <= {rx_os_match_reg[0], 1'b1};
-                end else begin
-                    rx_os_match_reg <= '0;
-                end
-            end else begin
-                rx_os_match_reg <= '0;
-            end
             rx_idle_match_reg <= '0;
         end
 

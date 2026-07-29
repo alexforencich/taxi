@@ -882,6 +882,7 @@ always_ff @(posedge clk) begin
                             // 5 Gbps
                             rep_cnt_reg <= 0;
                             rep_stall_reg <= 1'b0;
+                            rep_en_reg <= 1'b0;
                         end
                     endcase
                 end else begin

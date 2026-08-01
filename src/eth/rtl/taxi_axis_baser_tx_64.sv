@@ -185,7 +185,6 @@ typedef enum logic [2:0] {
 state_t state_reg = STATE_IDLE, state_next;
 
 logic swap_lanes_reg = 1'b0, swap_lanes_next;
-logic swap_lanes_d1_reg = 1'b0;
 logic [31:0] swap_data_reg = 32'd0;
 out_type_t swap_type_reg = OUT_TYPE_IDLE;
 
@@ -495,7 +494,7 @@ always_comb begin
             end
             OUT_TYPE_TERM_4, OUT_TYPE_TERM_5, OUT_TYPE_TERM_6, OUT_TYPE_TERM_7: begin
                 // EOP is sent once followed by idles
-                if (rep_sel_d0_reg && !swap_lanes_reg) begin
+                if ((rep_sel_d0_reg || rep_split_reg) && !swap_lanes_reg) begin
                     output_type_next = OUT_TYPE_IDLE;
                 end
             end
@@ -591,6 +590,15 @@ always_comb begin
                     frame_start_next = 1'b1;
                     s_axis_tx_tready_next = 1'b1;
                     state_next = STATE_PAYLOAD;
+                    if (DIC_EN) begin
+                        if (ifg_cnt_reg >= 8'd4) begin
+                            swap_lanes_next = 1'b1;
+                        end else begin
+                            swap_lanes_next = 1'b0;
+                        end
+                    end else begin
+                        swap_lanes_next = ifg_cnt_reg != 0;
+                    end
                 end else begin
                     swap_lanes_next = 1'b0;
                     ifg_cnt_next = 8'd0;
@@ -697,11 +705,9 @@ always_comb begin
                     end else begin
                         if (ifg_cnt_next >= 8'd4) begin
                             deficit_idle_cnt_next = 2'(ifg_cnt_next - 8'd4);
-                            swap_lanes_next = 1'b1;
                         end else begin
                             deficit_idle_cnt_next = 2'(ifg_cnt_next);
                             ifg_cnt_next = 8'd0;
-                            swap_lanes_next = 1'b0;
                         end
                         s_axis_tx_tready_next = cfg_tx_enable;
                         state_next = STATE_IDLE;
@@ -711,7 +717,6 @@ always_comb begin
                         state_next = STATE_IFG;
                     end else begin
                         s_axis_tx_tready_next = cfg_tx_enable;
-                        swap_lanes_next = ifg_cnt_next != 0;
                         state_next = STATE_IDLE;
                     end
                 end
@@ -753,11 +758,9 @@ always_comb begin
                     end else begin
                         if (ifg_cnt_next >= 8'd4) begin
                             deficit_idle_cnt_next = 2'(ifg_cnt_next - 8'd4);
-                            swap_lanes_next = 1'b1;
                         end else begin
                             deficit_idle_cnt_next = 2'(ifg_cnt_next);
                             ifg_cnt_next = 8'd0;
-                            swap_lanes_next = 1'b0;
                         end
                         s_axis_tx_tready_next = cfg_tx_enable;
                         state_next = STATE_IDLE;
@@ -767,7 +770,6 @@ always_comb begin
                         state_next = STATE_IFG;
                     end else begin
                         s_axis_tx_tready_next = cfg_tx_enable;
-                        swap_lanes_next = ifg_cnt_next != 0;
                         state_next = STATE_IDLE;
                     end
                 end
@@ -781,7 +783,7 @@ always_comb begin
 
     if (USXGMII_EN && rep_en_reg) begin
         // USXGMII replication
-        if (swap_lanes_d1_reg) begin
+        if (swap_lanes_reg) begin
             // offset start
             if (rep_split_reg) begin
                 // split cycle - 1G rate for 5G USXGMII only
@@ -858,7 +860,7 @@ always_comb begin
         end
     end else begin
         // full rate
-        if (swap_lanes_d1_reg) begin
+        if (swap_lanes_reg) begin
             // offset start
             output_data_remap = {output_data_reg[31:0], swap_data_reg};
             if (swap_type_reg[3]) begin
@@ -1033,6 +1035,23 @@ always_ff @(posedge clk) begin
         output_type_reg <= output_type_next;
         output_start_packet_reg <= output_start_packet_next;
 
+        if (USXGMII_EN) begin
+            // termination characters are not replicated
+            case (swap_type_reg)
+                OUT_TYPE_TERM_0: swap_type_reg <= OUT_TYPE_IDLE;
+                OUT_TYPE_TERM_1: swap_type_reg <= OUT_TYPE_IDLE;
+                OUT_TYPE_TERM_2: swap_type_reg <= OUT_TYPE_IDLE;
+                OUT_TYPE_TERM_3: swap_type_reg <= OUT_TYPE_IDLE;
+                OUT_TYPE_TERM_4: swap_type_reg <= OUT_TYPE_IDLE;
+                OUT_TYPE_TERM_5: swap_type_reg <= OUT_TYPE_IDLE;
+                OUT_TYPE_TERM_6: swap_type_reg <= OUT_TYPE_IDLE;
+                OUT_TYPE_TERM_7: swap_type_reg <= OUT_TYPE_IDLE;
+                default: begin
+                    // do nothing
+                end
+            endcase
+        end
+
         if (!USXGMII_EN || !rep_stall_reg) begin
             swap_data_reg <= output_data_reg[63:32];
             case (output_type_reg)
@@ -1081,8 +1100,6 @@ always_ff @(posedge clk) begin
                 end
             end
         end
-
-        swap_lanes_d1_reg <= swap_lanes_reg;
 
         encoded_tx_data_reg <= encoded_tx_data_next;
         encoded_tx_data_valid_reg <= 1'b1;
@@ -1164,7 +1181,6 @@ always_ff @(posedge clk) begin
         state_reg <= STATE_IDLE;
 
         swap_lanes_reg <= 1'b0;
-        swap_lanes_d1_reg <= 1'b0;
 
         frame_start_reg <= 1'b0;
         frame_reg <= 1'b0;

@@ -304,9 +304,9 @@ class BaseRSerdesSource():
             cl = []
 
             for k in range(8):
-                if k % 4 != 0 or rep_cnt != 0 or (self.force_offset_start and k == 0):
+                if k % 4 != 0 or rep_cnt != 0 or (self.force_offset_start and k == 0) or in_term:
                     pass
-                elif ifg_cnt + deficit_idle_cnt > 4-1 or (not self.enable_dic and ifg_cnt > 4) or in_term:
+                elif ifg_cnt + deficit_idle_cnt > 4-1 or (not self.enable_dic and ifg_cnt > 0):
                     # in IFG
                     ifg_cnt = ifg_cnt - 4
                     if ifg_cnt < 0:

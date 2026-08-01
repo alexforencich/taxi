@@ -851,6 +851,8 @@ class BaseRSerdesSink:
                 # data
                 dl = db
                 cl = [0]*8
+                if frame is None:
+                    self.log.warning("Data transfer outside of frame")
             elif hdr == BaseRSync.CTRL:
                 if db[0] == BaseRBlockType.CTRL:
                     # C7 C6 C5 C4 C3 C2 C1 C0 BT
@@ -986,6 +988,10 @@ class BaseRSerdesSink:
                             self.log.info("RX signal ordered set: 0x%06x", self.os)
                         else:
                             self.log.info("RX sequence ordered set: 0x%06x", self.os)
+
+            if frame is None:
+                if cl[0] == 0:
+                    self.log.warning("Data transfer outside of frame")
 
             for k in range(8):
                 d_val = dl[k]

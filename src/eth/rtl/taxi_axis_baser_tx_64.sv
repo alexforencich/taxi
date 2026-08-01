@@ -921,7 +921,7 @@ always_comb begin
                 encoded_tx_hdr_next = SYNC_CTRL;
             end
             OUT_TYPE_START_4: begin
-                encoded_tx_data_next = {output_data_remap[31:8], 4'd0, {4{CTRL_IDLE}}, BLOCK_TYPE_START_4};
+                encoded_tx_data_next = {output_data_remap[63:40], 4'd0, {4{CTRL_IDLE}}, BLOCK_TYPE_START_4};
                 encoded_tx_hdr_next = SYNC_CTRL;
             end
             OUT_TYPE_DATA: begin

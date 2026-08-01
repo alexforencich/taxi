@@ -795,48 +795,24 @@ always_ff @(posedge clk) begin
                 BLOCK_TYPE_CTRL[7:4]: begin
                     framing_error_reg <= frame_reg;
                 end
-                BLOCK_TYPE_OS_4[7:4]: begin
-                    framing_error_reg <= frame_reg;
-                end
-                BLOCK_TYPE_START_4[7:4]: begin
-                    frame_reg <= 1'b1;
-                    framing_error_reg <= frame_reg;
-                end
+                BLOCK_TYPE_START_0[7:4],
+                BLOCK_TYPE_START_4[7:4],
                 BLOCK_TYPE_OS_START[7:4]: begin
                     frame_reg <= 1'b1;
                     framing_error_reg <= frame_reg;
                 end
+                BLOCK_TYPE_OS_0[7:4],
+                BLOCK_TYPE_OS_4[7:4],
                 BLOCK_TYPE_OS_04[7:4]: begin
                     framing_error_reg <= frame_reg;
                 end
-                BLOCK_TYPE_START_0[7:4]: begin
-                    frame_reg <= 1'b1;
-                    framing_error_reg <= frame_reg;
-                end
-                BLOCK_TYPE_OS_0[7:4]: begin
-                    framing_error_reg <= frame_reg;
-                end
-                BLOCK_TYPE_TERM_0[7:4]: begin
-                    framing_error_reg <= !frame_reg;
-                end
-                BLOCK_TYPE_TERM_1[7:4]: begin
-                    framing_error_reg <= !frame_reg;
-                end
-                BLOCK_TYPE_TERM_2[7:4]: begin
-                    framing_error_reg <= !frame_reg;
-                end
-                BLOCK_TYPE_TERM_3[7:4]: begin
-                    framing_error_reg <= !frame_reg;
-                end
-                BLOCK_TYPE_TERM_4[7:4]: begin
-                    framing_error_reg <= !frame_reg;
-                end
-                BLOCK_TYPE_TERM_5[7:4]: begin
-                    framing_error_reg <= !frame_reg;
-                end
-                BLOCK_TYPE_TERM_6[7:4]: begin
-                    framing_error_reg <= !frame_reg;
-                end
+                BLOCK_TYPE_TERM_0[7:4],
+                BLOCK_TYPE_TERM_1[7:4],
+                BLOCK_TYPE_TERM_2[7:4],
+                BLOCK_TYPE_TERM_3[7:4],
+                BLOCK_TYPE_TERM_4[7:4],
+                BLOCK_TYPE_TERM_5[7:4],
+                BLOCK_TYPE_TERM_6[7:4],
                 BLOCK_TYPE_TERM_7[7:4]: begin
                     framing_error_reg <= !frame_reg;
                 end

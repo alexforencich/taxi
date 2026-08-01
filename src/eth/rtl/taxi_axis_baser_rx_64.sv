@@ -849,6 +849,7 @@ always_ff @(posedge clk) begin
         end else begin
             // invalid header
             frame_reg <= 1'b0;
+            framing_error_reg <= frame_reg;
         end
 
         // check all block type bits to detect bad encodings

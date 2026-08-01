@@ -223,6 +223,7 @@ class BaseRSerdesSource():
         frame_offset = 0
         sof = False
         in_pre = False
+        in_term = False
         ifg_cnt = 0
         deficit_idle_cnt = 0
         scrambler_state = 0
@@ -299,106 +300,92 @@ class BaseRSerdesSource():
 
                 continue
 
-            if rep_cnt != 0:
-                # scale IFG
-                pass
-            elif ifg_cnt + deficit_idle_cnt > 8-1 or (not self.enable_dic and ifg_cnt > 4):
-                # in IFG
-                ifg_cnt = ifg_cnt - 8
-                if ifg_cnt < 0:
-                    if self.enable_dic:
-                        deficit_idle_cnt = max(deficit_idle_cnt+ifg_cnt, 0)
-                    ifg_cnt = 0
-
-            elif frame is None:
-                # idle
-                if not self.queue.empty():
-                    # send frame
-                    frame = self.queue.get_nowait()
-                    self.dequeue_event.set()
-                    self.queue_occupancy_bytes -= len(frame)
-                    self.queue_occupancy_frames -= 1
-                    self.current_frame = frame
-                    frame.sim_time_start = sim_time - gbx_delay
-                    frame.sim_time_sfd = None
-                    frame.sim_time_end = None
-                    self.log.info("TX frame: %s", frame)
-                    frame.normalize()
-                    frame.start_lane = 0
-                    assert frame.data[0] == EthPre.PRE
-                    assert frame.ctrl[0] == 0
-                    frame.data[0] = XgmiiCtrl.START
-                    frame.ctrl[0] = 1
-                    frame.data.append(XgmiiCtrl.TERM)
-                    frame.ctrl.append(1)
-
-                    # offset start
-                    if self.enable_dic:
-                        min_ifg = 3 - deficit_idle_cnt
-                    else:
-                        min_ifg = 0
-
-                    if ifg_cnt > min_ifg or self.force_offset_start:
-                        ifg_cnt = ifg_cnt-4
-                        frame.start_lane = 4
-                        frame.sim_time_start = sim_time + (clk_period // self.byte_lanes * 4) - gbx_delay
-                        frame.data = bytearray([XgmiiCtrl.IDLE]*4)+frame.data
-                        frame.ctrl = [1]*4+frame.ctrl
-
-                    if self.enable_dic:
-                        deficit_idle_cnt = max(deficit_idle_cnt+ifg_cnt, 0)
-                    ifg_cnt = 0
-                    self.active = True
-                    frame_offset = -1
-                    sof = True
-                    in_pre = True
-                else:
-                    # clear counters
-                    deficit_idle_cnt = 0
-                    ifg_cnt = 0
-                    self.active = False
-                    self.idle_event.set()
-
             dl = bytearray()
             cl = []
 
             for k in range(8):
-                if frame is not None:
-                    frame_offset += 1
-                    if rep_cnt == 0:
-                        pass
-                    elif k == 0 or k == 4:
-                        frame_offset = max(0, frame_offset-4)
-                    d = frame.data[frame_offset]
-                    c = frame.ctrl[frame_offset]
-                    if frame.sim_time_sfd is None and not in_pre:
-                        frame.sim_time_sfd = sim_time + (clk_period // self.byte_lanes * k) - gbx_delay
-                    if d == EthPre.SFD and (not self.xgmii_rep_count or rep_cnt == 1):
-                        in_pre = False
-                    if c and d == XgmiiCtrl.START:
-                        if sof:
-                            sof = False
-                        else:
-                            d = 0xAA
-                            c = 0
-                    dl.append(d)
-                    cl.append(c)
+                if k % 4 != 0 or rep_cnt != 0 or (self.force_offset_start and k == 0):
+                    pass
+                elif ifg_cnt + deficit_idle_cnt > 4-1 or (not self.enable_dic and ifg_cnt > 4) or in_term:
+                    # in IFG
+                    ifg_cnt = ifg_cnt - 4
+                    if ifg_cnt < 0:
+                        if self.enable_dic:
+                            deficit_idle_cnt = max(deficit_idle_cnt+ifg_cnt, 0)
+                        ifg_cnt = 0
+                elif frame is None:
+                    # idle
+                    if not self.queue.empty():
+                        # send frame
+                        frame = self.queue.get_nowait()
+                        self.dequeue_event.set()
+                        self.queue_occupancy_bytes -= len(frame)
+                        self.queue_occupancy_frames -= 1
+                        self.current_frame = frame
+                        frame.sim_time_start = None
+                        frame.sim_time_sfd = None
+                        frame.sim_time_end = None
+                        self.log.info("TX frame: %s", frame)
+                        frame.normalize()
+                        frame.start_lane = 0
+                        assert frame.data[0] == EthPre.PRE
+                        assert frame.ctrl[0] == 0
 
-                    if frame_offset >= len(frame.data)-1:
+                        if self.enable_dic:
+                            deficit_idle_cnt = max(deficit_idle_cnt+ifg_cnt, 0)
+                        ifg_cnt = 0
+                        self.active = True
+                        frame_offset = 0
+                        sof = True
+                        in_pre = True
+                    else:
+                        # clear counters
+                        deficit_idle_cnt = 0
+                        ifg_cnt = 0
+                        self.active = False
+                        self.idle_event.set()
+
+                d = XgmiiCtrl.IDLE
+                c = 1
+                if frame is not None:
+                    if sof:
+                        sof = False
+                        d = XgmiiCtrl.START
+                        c = 1
+                        frame.start_lane = k
+                        frame.sim_time_start = sim_time + (clk_period // self.byte_lanes * k) - gbx_delay
+                    elif frame_offset >= len(frame.data):
+                        d = XgmiiCtrl.TERM
+                        c = 1
+                        in_term = True
                         ifg_cnt = max(self.ifg - (8-k), 0)
                         frame.sim_time_end = sim_time + (clk_period // self.byte_lanes * k) - gbx_delay
                         frame.handle_tx_complete()
                         frame = None
                         self.current_frame = None
-                else:
-                    dl.append(XgmiiCtrl.IDLE)
-                    cl.append(1)
+                    else:
+                        d = frame.data[frame_offset]
+                        c = frame.ctrl[frame_offset]
+                        if frame.sim_time_sfd is None and not in_pre:
+                            frame.sim_time_sfd = sim_time + (clk_period // self.byte_lanes * k) - gbx_delay
+                        if d == EthPre.SFD and (not self.xgmii_rep_count or rep_cnt == 1):
+                            in_pre = False
+                        if frame_offset == 0:
+                            d = 0xAA
+                            c = 0
 
-                if k == 3 or k == 7:
+                dl.append(d)
+                cl.append(c)
+
+                frame_offset += 1
+                if k % 4 == 3:
                     if rep_cnt > 0:
                         rep_cnt -= 1
                     elif self.xgmii_rep_count:
-                        rep_cnt = self.xgmii_rep_count
+                        if self.xgmii_rep_count % 2 == 0 or (k != 3 if self.force_offset_start else k == 3):
+                            rep_cnt = self.xgmii_rep_count
+                    if rep_cnt > 0:
+                        frame_offset -= 4
 
             # replace idles with ordered sets
             if self.os is not None:
@@ -412,6 +399,8 @@ class BaseRSerdesSource():
                             dl[k] = XgmiiCtrl.SEQ_OS
                         dl[k+1:k+4] = self.os.to_bytes(3, 'big')
                         cl[k+1:k+4] = [0, 0, 0]
+
+            in_term = False
 
             # remap control characters
             ctrl = sum(xgmii_ctrl_to_baser_mapping.get(d, BaseRCtrl.ERROR) << i*7 for i, d in enumerate(dl))

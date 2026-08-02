@@ -174,10 +174,10 @@ logic framing_error_reg = 1'b0;
 
 logic [9:0] rep_cnt_reg = '0;
 logic rep_stall_reg = 1'b0;
-logic rep_stall_d0_reg = 1'b0;
-logic rep_stall_d1_reg = 1'b0;
 logic rep_en_reg = 1'b0;
 logic rep_start_reg = 1'b0;
+
+logic input_valid_reg = 1'b0;
 
 logic [DATA_W-1:0] input_data_d0_reg = '0;
 logic [DATA_W-1:0] input_data_d1_reg = '0;
@@ -189,7 +189,6 @@ logic input_start_d1_reg = 1'b0;
 logic input_start_d2_reg = 1'b0;
 
 logic [DATA_W-1:0] encoded_rx_data_reg = '0;
-logic encoded_rx_data_valid_reg = 1'b0;
 logic [HDR_W-1:0] encoded_rx_hdr_reg = '0;
 logic encoded_rx_hdr_valid_reg = 1'b0;
 
@@ -344,11 +343,8 @@ always_comb begin
     stat_rx_err_framing_next = 1'b0;
     stat_rx_err_preamble_next = 1'b0;
 
-    if (GBX_IF_EN && !encoded_rx_data_valid) begin
-        // data from gearbox not valid - hold state
-        state_next = state_reg;
-    end else if (USXGMII_EN && rep_stall_d1_reg) begin
-        // USXGMII stall - hold state
+    if ((GBX_IF_EN || USXGMII_EN) && !input_valid_reg) begin
+        // intermediate data not valid - hold state
         state_next = state_reg;
     end else begin
         // counter to measure frame length
@@ -612,9 +608,31 @@ always_ff @(posedge clk) begin
     stat_rx_err_framing_reg <= stat_rx_err_framing_next;
     stat_rx_err_preamble_reg <= stat_rx_err_preamble_next;
 
+    input_valid_reg <= 1'b0;
+
+    if (!(GBX_IF_EN || USXGMII_EN) || input_valid_reg) begin
+        term_lane_d0_reg <= term_lane_reg;
+
+        input_data_d1_reg <= input_data_d0_reg;
+        input_data_d2_reg <= input_data_d1_reg;
+
+        input_start_d0_reg <= 1'b0;
+        input_start_d1_reg <= input_start_d0_reg;
+        input_start_d2_reg <= input_start_d1_reg;
+    end
+
+    if (reset_crc) begin
+        crc_state_reg <= '1;
+    end else if (update_crc) begin
+        crc_state_reg <= crc_state;
+    end
+
+    if (update_crc) begin
+        crc_valid_reg <= crc_valid;
+    end
+
     if (!GBX_IF_EN || encoded_rx_data_valid) begin
         encoded_rx_data_reg <= encoded_rx_data;
-        encoded_rx_data_valid_reg <= encoded_rx_data_valid;
         encoded_rx_hdr_reg <= encoded_rx_hdr;
         encoded_rx_hdr_valid_reg <= encoded_rx_hdr_valid;
 
@@ -628,22 +646,8 @@ always_ff @(posedge clk) begin
         term_lane_alt_reg <= 0;
         term_lane_reg <= term_lane_alt_reg;
 
-        if (!USXGMII_EN || !rep_stall_d1_reg) begin
-            term_lane_d0_reg <= term_lane_reg;
-
-            input_data_d0_reg <= encoded_rx_data_reg;
-            input_data_d1_reg <= input_data_d0_reg;
-            input_data_d2_reg <= input_data_d1_reg;
-
-            input_start_d0_reg <= 1'b0;
-            input_start_d1_reg <= input_start_d0_reg;
-            input_start_d2_reg <= input_start_d1_reg;
-        end
-
+        input_valid_reg <= 1'b0;
         input_start_alt_reg <= 1'b0;
-        if (input_start_alt_reg) begin
-            input_start_d0_reg <= input_start_alt_reg;
-        end
 
         if (input_start_d1_reg) begin
             ptp_ts_out_reg <= ptp_ts;
@@ -652,7 +656,7 @@ always_ff @(posedge clk) begin
             end
         end
 
-        if (USXGMII_EN && rep_start_reg && !rep_stall_d0_reg) begin
+        if (USXGMII_EN && rep_start_reg && !rep_stall_reg) begin
             ptp_ts_out_reg <= ptp_ts;
             start_packet_reg <= 1'b1;
         end
@@ -662,6 +666,7 @@ always_ff @(posedge clk) begin
             if (encoded_rx_hdr_reg[0] == 0) begin
                 // data
                 input_data_d0_reg <= encoded_rx_data_reg;
+                input_valid_reg <= !USXGMII_EN || !rep_stall_reg;
                 framing_error_reg <= !frame_reg;
                 rx_os_match_reg <= '0;
                 rx_idle_match_reg <= '0;
@@ -670,6 +675,7 @@ always_ff @(posedge clk) begin
                 case (encoded_rx_data_reg[7:4])
                     BLOCK_TYPE_CTRL[7:4]: begin
                         input_data_d0_reg <= encoded_rx_data_reg;
+                        input_valid_reg <= !USXGMII_EN || !rep_stall_reg;
                         framing_error_reg <= frame_reg;
                         frame_reg <= 1'b0;
                         rx_os_match_reg <= '0;
@@ -677,18 +683,21 @@ always_ff @(posedge clk) begin
                     end
                     BLOCK_TYPE_OS_4[7:4]: begin
                         input_data_d0_reg <= encoded_rx_data_reg;
+                        input_valid_reg <= !USXGMII_EN || !rep_stall_reg;
                         framing_error_reg <= frame_reg;
                         frame_reg <= 1'b0;
                         rx_os_4_reg <= 1'b1;
                     end
                     BLOCK_TYPE_START_4[7:4]: begin
                         input_data_d0_reg <= encoded_rx_data_reg;
+                        input_valid_reg <= !USXGMII_EN || !rep_stall_reg;
                         input_start_alt_reg <= 1'b1;
                         framing_error_reg <= frame_reg;
                         frame_reg <= 1'b1;
                     end
                     BLOCK_TYPE_OS_START[7:4]: begin
                         input_data_d0_reg <= encoded_rx_data_reg;
+                        input_valid_reg <= !USXGMII_EN || !rep_stall_reg;
                         input_start_alt_reg <= 1'b1;
                         framing_error_reg <= frame_reg;
                         frame_reg <= 1'b1;
@@ -703,18 +712,21 @@ always_ff @(posedge clk) begin
                     end
                     BLOCK_TYPE_OS_04[7:4]: begin
                         input_data_d0_reg <= encoded_rx_data_reg;
+                        input_valid_reg <= !USXGMII_EN || !rep_stall_reg;
                         framing_error_reg <= frame_reg;
                         frame_reg <= 1'b0;
                         rx_os_4_reg <= 1'b1;
                     end
                     BLOCK_TYPE_START_0[7:4]: begin
                         input_data_d0_reg <= encoded_rx_data_reg;
+                        input_valid_reg <= 1'b1;
                         input_start_d0_reg <= 1'b1;
                         framing_error_reg <= frame_reg;
                         frame_reg <= 1'b1;
                     end
                     BLOCK_TYPE_OS_0[7:4]: begin
                         input_data_d0_reg <= encoded_rx_data_reg;
+                        input_valid_reg <= !USXGMII_EN || !rep_stall_reg;
                         framing_error_reg <= frame_reg;
                         frame_reg <= 1'b0;
                         rx_os_0_reg <= 1'b1;
@@ -722,6 +734,7 @@ always_ff @(posedge clk) begin
                     end
                     BLOCK_TYPE_TERM_0[7:4]: begin
                         input_data_d0_reg <= encoded_rx_data_reg; // don't care
+                        input_valid_reg <= !USXGMII_EN || !rep_stall_reg;
                         term_present_reg <= 1'b1;
                         term_first_cycle_reg <= 1'b1;
                         term_lane_reg <= 0;
@@ -730,6 +743,7 @@ always_ff @(posedge clk) begin
                     end
                     BLOCK_TYPE_TERM_1[7:4]: begin
                         input_data_d0_reg <= {24'd0, encoded_rx_data_reg[15:8]};
+                        input_valid_reg <= 1'b1;
                         term_present_reg <= 1'b1;
                         term_lane_reg <= 1;
                         framing_error_reg <= !frame_reg;
@@ -737,6 +751,7 @@ always_ff @(posedge clk) begin
                     end
                     BLOCK_TYPE_TERM_2[7:4]: begin
                         input_data_d0_reg <= {16'd0, encoded_rx_data_reg[23:8]};
+                        input_valid_reg <= 1'b1;
                         term_present_reg <= 1'b1;
                         term_lane_reg <= 2;
                         framing_error_reg <= !frame_reg;
@@ -744,6 +759,7 @@ always_ff @(posedge clk) begin
                     end
                     BLOCK_TYPE_TERM_3[7:4]: begin
                         input_data_d0_reg <= {8'd0, encoded_rx_data_reg[31:8]};
+                        input_valid_reg <= 1'b1;
                         term_present_reg <= 1'b1;
                         term_lane_reg <= 3;
                         framing_error_reg <= !frame_reg;
@@ -751,6 +767,7 @@ always_ff @(posedge clk) begin
                     end
                     BLOCK_TYPE_TERM_4[7:4]: begin
                         input_data_d0_reg <= {encoded_rx_data[7:0], encoded_rx_data_reg[31:8]};
+                        input_valid_reg <= !USXGMII_EN || !rep_stall_reg;
                         term_present_alt_reg <= 1'b1;
                         term_first_cycle_alt_reg <= 1'b1;
                         term_lane_alt_reg <= 0;
@@ -759,6 +776,7 @@ always_ff @(posedge clk) begin
                     end
                     BLOCK_TYPE_TERM_5[7:4]: begin
                         input_data_d0_reg <= {encoded_rx_data[7:0], encoded_rx_data_reg[31:8]};
+                        input_valid_reg <= !USXGMII_EN || !rep_stall_reg;
                         term_present_alt_reg <= 1'b1;
                         term_lane_alt_reg <= 1;
                         framing_error_reg <= !frame_reg;
@@ -766,6 +784,7 @@ always_ff @(posedge clk) begin
                     end
                     BLOCK_TYPE_TERM_6[7:4]: begin
                         input_data_d0_reg <= {encoded_rx_data[7:0], encoded_rx_data_reg[31:8]};
+                        input_valid_reg <= !USXGMII_EN || !rep_stall_reg;
                         term_present_alt_reg <= 1'b1;
                         term_lane_alt_reg <= 2;
                         framing_error_reg <= !frame_reg;
@@ -773,6 +792,7 @@ always_ff @(posedge clk) begin
                     end
                     BLOCK_TYPE_TERM_7[7:4]: begin
                         input_data_d0_reg <= {encoded_rx_data[7:0], encoded_rx_data_reg[31:8]};
+                        input_valid_reg <= !USXGMII_EN || !rep_stall_reg;
                         term_present_alt_reg <= 1'b1;
                         term_lane_alt_reg <= 3;
                         framing_error_reg <= !frame_reg;
@@ -781,6 +801,7 @@ always_ff @(posedge clk) begin
                     default: begin
                         // invalid block type
                         input_data_d0_reg <= encoded_rx_data_reg;
+                        input_valid_reg <= !USXGMII_EN || !rep_stall_reg;
                         framing_error_reg <= frame_reg;
                         frame_reg <= 1'b0;
                     end
@@ -819,13 +840,20 @@ always_ff @(posedge clk) begin
             end
         end else begin
             input_data_d0_reg <= encoded_rx_data_reg;
+            input_valid_reg <= !USXGMII_EN || !rep_stall_reg;
             if (term_present_alt_reg) begin
+                input_valid_reg <= 1'b1;
                 case (term_lane_alt_reg)
                     1: input_data_d0_reg <= {24'd0, encoded_rx_data_reg[15:8]};
                     2: input_data_d0_reg <= {16'd0, encoded_rx_data_reg[23:8]};
                     3: input_data_d0_reg <= {8'd0, encoded_rx_data_reg[31:8]};
                     default: input_data_d0_reg <= encoded_rx_data_reg;
                 endcase
+            end
+
+            if (input_start_alt_reg) begin
+                input_start_d0_reg <= 1'b1;
+                input_valid_reg <= 1'b1;
             end
 
             if (rx_os_0_reg) begin
@@ -853,30 +881,20 @@ always_ff @(posedge clk) begin
             end
         end
 
-        if (reset_crc) begin
-            crc_state_reg <= '1;
-        end else if (update_crc) begin
-            crc_state_reg <= crc_state;
-        end
-
-        if (update_crc) begin
-            crc_valid_reg <= crc_valid;
-        end
-
         if (USXGMII_EN && cfg_rx_usxgmii_en) begin
             if ((encoded_rx_hdr_valid_reg && encoded_rx_hdr_reg[0] && encoded_rx_data_reg[7:4] == BLOCK_TYPE_START_0[7:4]) || input_start_alt_reg) begin
-                rep_stall_reg <= !rep_stall_d0_reg;
+                rep_stall_reg <= 1'b1;
                 rep_en_reg <= 1'b1;
                 rep_start_reg <= 1'b0;
                 if (cfg_rx_usxgmii_5g) begin
                     case (cfg_rx_usxgmii_speed)
-                        3'b000: rep_cnt_reg <= 497; // 10 Mbps
-                        3'b001: rep_cnt_reg <= 47; // 100 Mbps
-                        3'b010: rep_cnt_reg <= 2; // 1 Gbps
+                        3'b000: rep_cnt_reg <= 498; // 10 Mbps
+                        3'b001: rep_cnt_reg <= 48; // 100 Mbps
+                        3'b010: rep_cnt_reg <= 3; // 1 Gbps
                         3'b100: begin
                             // 2.5 Gbps
-                            rep_cnt_reg <= 1;
-                            rep_stall_reg <= 1'b0;
+                            rep_cnt_reg <= 0;
+                            rep_stall_reg <= 1'b1;
                         end
                         default: begin
                             // 5 Gbps
@@ -887,14 +905,14 @@ always_ff @(posedge clk) begin
                     endcase
                 end else begin
                     case (cfg_rx_usxgmii_speed)
-                        3'b000: rep_cnt_reg <= 997; // 10 Mbps
-                        3'b001: rep_cnt_reg <= 97; // 100 Mbps
-                        3'b010: rep_cnt_reg <= 7; // 1 Gbps
-                        3'b100: rep_cnt_reg <= 1; // 2.5 Gbps
+                        3'b000: rep_cnt_reg <= 998; // 10 Mbps
+                        3'b001: rep_cnt_reg <= 98; // 100 Mbps
+                        3'b010: rep_cnt_reg <= 8; // 1 Gbps
+                        3'b100: rep_cnt_reg <= 2; // 2.5 Gbps
                         3'b101: begin
                             // 5 Gbps
-                            rep_cnt_reg <= 1;
-                            rep_stall_reg <= 1'b0;
+                            rep_cnt_reg <= 0;
+                            rep_stall_reg <= 1'b1;
                         end
                         default: begin
                             // 10 Gbps
@@ -947,14 +965,9 @@ always_ff @(posedge clk) begin
                 rep_cnt_reg <= rep_cnt_reg-1;
                 rep_stall_reg <= 1'b1;
             end
-
-            rep_stall_d0_reg <= rep_stall_reg;
-            rep_stall_d1_reg <= rep_stall_d0_reg;
         end else begin
             rep_cnt_reg <= '0;
             rep_stall_reg <= 1'b0;
-            rep_stall_d0_reg <= 1'b0;
-            rep_stall_d1_reg <= 1'b0;
             rep_en_reg <= 1'b0;
             rep_start_reg <= 1'b0;
         end
@@ -965,8 +978,6 @@ always_ff @(posedge clk) begin
 
         rep_cnt_reg <= '0;
         rep_stall_reg <= 1'b0;
-        rep_stall_d0_reg <= 1'b0;
-        rep_stall_d1_reg <= 1'b0;
         rep_en_reg <= 1'b0;
         rep_start_reg <= 1'b0;
 

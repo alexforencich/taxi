@@ -152,10 +152,13 @@ class TB:
 
 async def run_test_rx(dut, gbx_cfg=None, payload_lengths=None, payload_data=None, ifg=12):
 
-    if len(dut.serdes_tx_data) == 64:
-        pipe_delay = int(dut.RX_SERDES_PIPELINE.value) + 1 + 1
+    if len(dut.serdes_rx_data) == 64:
+        pipe_delay = 0 + 1
+        if dut.USXGMII_EN.value:
+            pipe_delay += 1
     else:
-        pipe_delay = int(dut.RX_SERDES_PIPELINE.value) + 2 + 1
+        pipe_delay = 2 + 1
+    pipe_delay += int(dut.RX_SERDES_PIPELINE.value)
 
     tb = TB(dut, gbx_cfg)
 
@@ -217,9 +220,10 @@ async def run_test_rx(dut, gbx_cfg=None, payload_lengths=None, payload_data=None
 async def run_test_tx(dut, gbx_cfg=None, payload_lengths=None, payload_data=None, ifg=12):
 
     if len(dut.serdes_tx_data) == 64:
-        pipe_delay = int(dut.TX_SERDES_PIPELINE.value) + 1 + 1
+        pipe_delay = 0 + 1
     else:
-        pipe_delay = int(dut.TX_SERDES_PIPELINE.value) + 1 + 1
+        pipe_delay = 1 + 1
+    pipe_delay += int(dut.TX_SERDES_PIPELINE.value)
 
     tb = TB(dut, gbx_cfg)
 
@@ -275,9 +279,10 @@ async def run_test_tx(dut, gbx_cfg=None, payload_lengths=None, payload_data=None
 async def run_test_tx_alignment(dut, gbx_cfg=None, payload_data=None, ifg=12):
 
     if len(dut.serdes_tx_data) == 64:
-        pipe_delay = int(dut.TX_SERDES_PIPELINE.value) + 1 + 1
+        pipe_delay = 1 + 1
     else:
-        pipe_delay = int(dut.TX_SERDES_PIPELINE.value) + 1 + 1
+        pipe_delay = 1 + 1
+    pipe_delay += int(dut.TX_SERDES_PIPELINE.value)
 
     dic_en = int(cocotb.top.DIC_EN.value)
 
@@ -649,7 +654,7 @@ def test_taxi_eth_mac_phy_10g_fifo(request, data_w, gbx_en, dic_en):
     parameters['HDR_W'] = 2
     parameters['TX_GBX_IF_EN'] = gbx_en
     parameters['RX_GBX_IF_EN'] = parameters['TX_GBX_IF_EN']
-    parameters['USXGMII_EN'] = int(data_w == 32)
+    parameters['USXGMII_EN'] = 1
     parameters['AXIS_DATA_W'] = parameters['DATA_W']
     parameters['DIC_EN'] = dic_en
     parameters['PTP_TS_EN'] = 1

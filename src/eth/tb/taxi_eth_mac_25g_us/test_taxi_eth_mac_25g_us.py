@@ -234,14 +234,17 @@ async def run_test_rx(dut, port=0, payload_lengths=None, payload_data=None, ifg=
 
     if dut.DATA_W.value == 64:
         if dut.COMBINED_MAC_PCS.value:
-            pipe_delay = int(dut.RX_SERDES_PIPELINE.value) + 1 + 1
+            pipe_delay = 0 + 1
         else:
-            pipe_delay = int(dut.RX_SERDES_PIPELINE.value) + 2 + 1
+            pipe_delay = 2 + 1
+        if dut.USXGMII_EN.value:
+            pipe_delay += 1
     else:
         if dut.COMBINED_MAC_PCS.value:
-            pipe_delay = int(dut.RX_SERDES_PIPELINE.value) + 2 + 1
+            pipe_delay = 2 + 1
         else:
-            pipe_delay = int(dut.RX_SERDES_PIPELINE.value) + 3 + 1
+            pipe_delay = 3 + 1
+    pipe_delay += int(dut.RX_SERDES_PIPELINE.value)
 
     tb = TB(dut)
 
@@ -311,14 +314,15 @@ async def run_test_tx(dut, port=0, payload_lengths=None, payload_data=None, ifg=
 
     if dut.DATA_W.value == 64:
         if dut.COMBINED_MAC_PCS.value:
-            pipe_delay = int(dut.TX_SERDES_PIPELINE.value) + 1 + 1
+            pipe_delay = 1 + 1
         else:
-            pipe_delay = int(dut.TX_SERDES_PIPELINE.value) + 2 + 1
+            pipe_delay = 2 + 1
     else:
         if dut.COMBINED_MAC_PCS.value:
-            pipe_delay = int(dut.TX_SERDES_PIPELINE.value) + 1 + 1
+            pipe_delay = 1 + 1
         else:
-            pipe_delay = int(dut.TX_SERDES_PIPELINE.value) + 4 + 1
+            pipe_delay = 4 + 1
+    pipe_delay += int(dut.TX_SERDES_PIPELINE.value)
 
     tb = TB(dut)
 
@@ -384,14 +388,15 @@ async def run_test_tx_alignment(dut, port=0, payload_data=None, ifg=12):
 
     if dut.DATA_W.value == 64:
         if dut.COMBINED_MAC_PCS.value:
-            pipe_delay = int(dut.TX_SERDES_PIPELINE.value) + 1 + 1
+            pipe_delay = 1 + 1
         else:
-            pipe_delay = int(dut.TX_SERDES_PIPELINE.value) + 2 + 1
+            pipe_delay = 2 + 1
     else:
         if dut.COMBINED_MAC_PCS.value:
-            pipe_delay = int(dut.TX_SERDES_PIPELINE.value) + 1 + 1
+            pipe_delay = 1 + 1
         else:
-            pipe_delay = int(dut.TX_SERDES_PIPELINE.value) + 4 + 1
+            pipe_delay = 4 + 1
+    pipe_delay += int(dut.TX_SERDES_PIPELINE.value)
 
     tb = TB(dut)
 
@@ -1220,7 +1225,7 @@ def test_taxi_eth_mac_25g_us(request, data_w, combined_mac_pcs, low_latency, dic
     parameters['QPLL1_EXT_CTRL'] = 0
     parameters['COMBINED_MAC_PCS'] = combined_mac_pcs
     parameters['DATA_W'] = data_w
-    parameters['USXGMII_EN'] = int(combined_mac_pcs and data_w == 32)
+    parameters['USXGMII_EN'] = int(combined_mac_pcs)
     parameters['DIC_EN'] = dic_en
     parameters['PTP_TS_EN'] = 1
     parameters['PTP_TD_EN'] = parameters['PTP_TS_EN']

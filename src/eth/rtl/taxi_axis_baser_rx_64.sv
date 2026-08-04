@@ -20,6 +20,7 @@ module taxi_axis_baser_rx_64 #
     parameter DATA_W = 64,
     parameter HDR_W = 2,
     parameter logic GBX_IF_EN = 1'b0,
+    parameter logic USXGMII_EN = 1'b0,
     parameter logic PTP_TS_EN = 1'b0,
     parameter logic PTP_TS_FMT_TOD = 1'b1,
     parameter PTP_TS_W = PTP_TS_FMT_TOD ? 96 : 64
@@ -60,6 +61,9 @@ module taxi_axis_baser_rx_64 #
      */
     input  wire logic [15:0]          cfg_rx_max_pkt_len = 16'd1518-1,
     input  wire logic                 cfg_rx_enable,
+    input  wire logic                 cfg_rx_usxgmii_en = 1'b1,
+    input  wire logic                 cfg_rx_usxgmii_5g = 1'b0,
+    input  wire logic [2:0]           cfg_rx_usxgmii_speed = 3'b011,
 
     /*
      * Status
@@ -304,6 +308,239 @@ always_comb begin
     end
 end
 
+// USGMII remapping
+wire [DATA_W-1:0] encoded_rx_data_remap;
+wire [3:0] encoded_rx_type_remap;
+wire encoded_rx_data_remap_valid;
+wire [1:0] encoded_rx_start_remap;
+
+if (USXGMII_EN) begin : usxgmii
+
+    logic [DATA_W-1:0] encoded_rx_data_remap_reg = '0;
+    logic [3:0] encoded_rx_type_remap_reg = '0;
+    logic encoded_rx_data_remap_valid_reg = 1'b0;
+    logic [1:0] encoded_rx_start_remap_reg = '0;
+
+    logic [8:0] rep_cnt_reg = '0;
+    logic rep_stall_reg = 1'b0;
+    logic rep_en_reg = 1'b0;
+    logic rep_sel_reg = 1'b0;
+    logic [1:0] rep_start_reg = '0;
+    logic lane_sel_reg = 1'b0;
+
+    assign encoded_rx_data_remap = encoded_rx_data_remap_reg;
+    assign encoded_rx_type_remap = encoded_rx_type_remap_reg;
+    assign encoded_rx_data_remap_valid = encoded_rx_data_remap_valid_reg;
+    assign encoded_rx_start_remap = encoded_rx_start_remap_reg;
+
+    always_ff @(posedge clk) begin
+        encoded_rx_data_remap_valid_reg <= 1'b0;
+
+        if (!GBX_IF_EN || encoded_rx_data_valid) begin
+
+            encoded_rx_start_remap_reg <= '0;
+
+            if (cfg_rx_usxgmii_en) begin
+                if (encoded_rx_hdr[0]) begin
+                    rep_stall_reg <= 1'b1;
+                    rep_en_reg <= 1'b1;
+                    rep_sel_reg <= 1'b0;
+                    rep_start_reg <= 1;
+                    if (cfg_rx_usxgmii_5g) begin
+                        case (cfg_rx_usxgmii_speed)
+                            3'b000: rep_cnt_reg <= 248; // 10 Mbps
+                            3'b001: rep_cnt_reg <= 23; // 100 Mbps
+                            3'b010: begin
+                                // 1 Gbps
+                                if (encoded_rx_data[7:4] == BLOCK_TYPE_START_0[7:4]) begin
+                                    rep_cnt_reg <= 0;
+                                    lane_sel_reg <= 1'b1;
+                                end else begin
+                                    rep_cnt_reg <= 1;
+                                    lane_sel_reg <= 1'b0;
+                                end
+                            end
+                            3'b100: begin
+                                // 2.5 Gbps
+                                rep_cnt_reg <= 0;
+                                rep_stall_reg <= 1'b0;
+                                rep_sel_reg <= 1'b1;
+                                rep_start_reg <= 2;
+                            end
+                            default: begin
+                                // 5 Gbps
+                                rep_cnt_reg <= 0;
+                                rep_stall_reg <= 1'b0;
+                                rep_en_reg <= 1'b0;
+                                rep_sel_reg <= 1'b0;
+                            end
+                        endcase
+                    end else begin
+                        case (cfg_rx_usxgmii_speed)
+                            3'b000: rep_cnt_reg <= 498; // 10 Mbps
+                            3'b001: rep_cnt_reg <= 48; // 100 Mbps
+                            3'b010: rep_cnt_reg <= 3; // 1 Gbps
+                            3'b100: rep_cnt_reg <= 0; // 2.5 Gbps
+                            3'b101: begin
+                                // 5 Gbps
+                                rep_cnt_reg <= 0;
+                                rep_stall_reg <= 1'b0;
+                                rep_sel_reg <= 1'b1;
+                                rep_start_reg <= 2;
+                            end
+                            default: begin
+                                // 10 Gbps
+                                rep_cnt_reg <= 0;
+                                rep_stall_reg <= 1'b0;
+                                rep_en_reg <= 1'b0;
+                                rep_sel_reg <= 1'b0;
+                            end
+                        endcase
+                    end
+                end else if (rep_cnt_reg == 0) begin
+                    rep_stall_reg <= 1'b0;
+                    rep_en_reg <= 1'b1;
+                    rep_sel_reg <= !rep_sel_reg;
+                    rep_start_reg <= rep_start_reg << 1;
+                    if (rep_start_reg[1]) begin
+                        encoded_rx_start_remap_reg[0] <= !lane_sel_reg;
+                        encoded_rx_start_remap_reg[1] <= lane_sel_reg;
+                    end
+                    if (cfg_rx_usxgmii_5g) begin
+                        case (cfg_rx_usxgmii_speed)
+                            3'b000: rep_cnt_reg <= 249; // 10 Mbps
+                            3'b001: rep_cnt_reg <= 24; // 100 Mbps
+                            3'b010: begin
+                                // 1 Gbps
+                                lane_sel_reg <= !lane_sel_reg;
+                                if (!lane_sel_reg) begin
+                                    rep_cnt_reg <= 2;
+                                end else begin
+                                    rep_cnt_reg <= 1;
+                                end
+                                if (rep_start_reg[1]) begin
+                                    encoded_rx_start_remap_reg[0] <= lane_sel_reg;
+                                    encoded_rx_start_remap_reg[1] <= !lane_sel_reg;
+                                end
+                            end
+                            3'b100: rep_cnt_reg <= 0; // 2.5 Gbps
+                            default: begin
+                                // 5 Gbps
+                                rep_cnt_reg <= 0;
+                                rep_en_reg <= 1'b0;
+                                rep_sel_reg <= 1'b0;
+                            end
+                        endcase
+                    end else begin
+                        case (cfg_rx_usxgmii_speed)
+                            3'b000: rep_cnt_reg <= 499; // 10 Mbps
+                            3'b001: rep_cnt_reg <= 49; // 100 Mbps
+                            3'b010: rep_cnt_reg <= 4; // 1 Gbps
+                            3'b100: rep_cnt_reg <= 1; // 2.5 Gbps
+                            3'b101: rep_cnt_reg <= 0; // 5 Gbps
+                            default: begin
+                                // 10 Gbps
+                                rep_cnt_reg <= 0;
+                                rep_en_reg <= 1'b0;
+                                rep_sel_reg <= 1'b0;
+                            end
+                        endcase
+                    end
+                end else begin
+                    rep_cnt_reg <= rep_cnt_reg-1;
+                    rep_stall_reg <= 1'b1;
+                end
+            end else begin
+                rep_cnt_reg <= '0;
+                rep_stall_reg <= 1'b0;
+                rep_en_reg <= 1'b0;
+                rep_sel_reg <= 1'b0;
+            end
+
+            if (rep_en_reg) begin
+                if (!rep_stall_reg) begin
+                    if (rep_sel_reg) begin
+                        if (lane_sel_reg) begin
+                            encoded_rx_data_remap_reg[63:32] <= encoded_rx_data_masked[63:32];
+                        end else begin
+                            encoded_rx_data_remap_reg[63:32] <= encoded_rx_data_masked[31:0];
+                        end
+                        encoded_rx_data_remap_valid_reg <= 1'b1;
+                    end else begin
+                        if (lane_sel_reg) begin
+                            encoded_rx_data_remap_reg <= {32'd0, encoded_rx_data_masked[63:32]};
+                        end else begin
+                            encoded_rx_data_remap_reg <= {32'd0, encoded_rx_data_masked[31:0]};
+                        end
+                        encoded_rx_type_remap_reg <= '0;
+                    end
+                end
+
+                if (encoded_rx_hdr[0] == SYNC_CTRL[0]) begin
+                    encoded_rx_type_remap_reg <= encoded_rx_data[7:4];
+                    case (encoded_rx_data[7:4])
+                        BLOCK_TYPE_START_0[7:4]: begin
+                            // start in lane 0
+                            encoded_rx_data_remap_reg <= {32'd0, encoded_rx_data_masked[31:0]};
+                            encoded_rx_type_remap_reg <= BLOCK_TYPE_START_0[7:4];
+                            encoded_rx_data_remap_valid_reg <= 1'b0;
+                            lane_sel_reg <= 1'b0;
+                        end
+                        BLOCK_TYPE_START_4[7:4], BLOCK_TYPE_OS_START[7:4]: begin
+                            // start in lane 4
+                            encoded_rx_data_remap_reg <= {32'd0, encoded_rx_data_masked[63:32]};
+                            encoded_rx_type_remap_reg <= BLOCK_TYPE_START_0[7:4];
+                            encoded_rx_data_remap_valid_reg <= 1'b0;
+                            lane_sel_reg <= 1'b1;
+                        end
+                        BLOCK_TYPE_TERM_0[7:4], BLOCK_TYPE_TERM_1[7:4], BLOCK_TYPE_TERM_2[7:4], BLOCK_TYPE_TERM_3[7:4]: begin
+                            // terminate in lower half
+                            encoded_rx_type_remap_reg <= {1'b1, rep_sel_reg, encoded_rx_data[5:4]};
+                            encoded_rx_data_remap_valid_reg <= 1'b1;
+                        end
+                        BLOCK_TYPE_TERM_4[7:4], BLOCK_TYPE_TERM_5[7:4], BLOCK_TYPE_TERM_6[7:4], BLOCK_TYPE_TERM_7[7:4]: begin
+                            // terminate in upper half
+                            encoded_rx_type_remap_reg <= {1'b1, rep_sel_reg, encoded_rx_data[5:4]};
+                            encoded_rx_data_remap_valid_reg <= 1'b1;
+                        end
+                        default: begin
+                            // other control - flush
+                            encoded_rx_data_remap_valid_reg <= 1'b1;
+                        end
+                    endcase
+                end
+            end else begin
+                encoded_rx_data_remap_reg <= encoded_rx_data_masked;
+                encoded_rx_type_remap_reg <= encoded_rx_hdr[0] == SYNC_CTRL[0] ? encoded_rx_data[7:4] : '0;
+                encoded_rx_data_remap_valid_reg <= 1'b1;
+                encoded_rx_start_remap_reg[0] <= encoded_rx_hdr[0] == SYNC_CTRL[0] && encoded_rx_data[7:4] == BLOCK_TYPE_START_0[7:4];
+                encoded_rx_start_remap_reg[1] <= encoded_rx_hdr[0] == SYNC_CTRL[0] && (encoded_rx_data[7:4] == BLOCK_TYPE_START_4[7:4] || encoded_rx_data[7:4] == BLOCK_TYPE_OS_START[7:4]);
+            end
+        end
+
+        if (rst) begin
+            encoded_rx_data_remap_valid_reg <= 1'b0;
+            encoded_rx_start_remap_reg <= '0;
+
+            rep_cnt_reg <= '0;
+            rep_stall_reg <= 1'b0;
+            rep_en_reg <= 1'b0;
+            rep_sel_reg <= 1'b0;
+            rep_start_reg <= '0;
+        end
+    end
+
+end else begin
+
+    assign encoded_rx_data_remap = encoded_rx_data_masked;
+    assign encoded_rx_type_remap = encoded_rx_hdr[0] == SYNC_CTRL[0] ? encoded_rx_data[7:4] : '0;
+    assign encoded_rx_data_remap_valid = !GBX_IF_EN || encoded_rx_data_valid;
+    assign encoded_rx_start_remap[0] = encoded_rx_hdr[0] == SYNC_CTRL[0] && encoded_rx_data[7:4] == BLOCK_TYPE_START_0[7:4];
+    assign encoded_rx_start_remap[1] = encoded_rx_hdr[0] == SYNC_CTRL[0] && (encoded_rx_data[7:4] == BLOCK_TYPE_START_4[7:4] || encoded_rx_data[7:4] == BLOCK_TYPE_OS_START[7:4]);
+
+end
+
+// FCS verification
 taxi_lfsr #(
     .LFSR_W(32),
     .LFSR_POLY(32'h4c11db7),
@@ -315,7 +552,7 @@ taxi_lfsr #(
     .DATA_OUT_EN(1'b0)
 )
 eth_crc (
-    .data_in(input_start_swap_reg ? {encoded_rx_data_masked[63:32], 32'd0} : encoded_rx_data_masked),
+    .data_in(input_start_swap_reg ? {encoded_rx_data_remap[63:32], 32'd0} : encoded_rx_data_remap),
     .state_in(crc_state_reg),
     .data_out(),
     .state_out(crc_state)
@@ -359,7 +596,7 @@ always_comb begin
     stat_rx_err_framing_next = 1'b0;
     stat_rx_err_preamble_next = 1'b0;
 
-    if (GBX_IF_EN && !encoded_rx_data_valid) begin
+    if ((GBX_IF_EN || USXGMII_EN) && !encoded_rx_data_remap_valid) begin
         // data from gearbox not valid - hold state
         state_next = state_reg;
     end else begin
@@ -419,6 +656,10 @@ always_comb begin
 
                 pre_ok_next = input_data_d1_reg[63:8] == 56'hD5555555555555;
 
+                if (PTP_TS_EN) begin
+                    ptp_ts_out_next = (!PTP_TS_FMT_TOD || ptp_ts_borrow_reg) ? ptp_ts_reg : ptp_ts_adj_reg;
+                end
+
                 if (input_start_d1_reg && cfg_rx_enable) begin
                     // start condition
                     stat_rx_byte_next = 4'(KEEP_W);
@@ -448,10 +689,6 @@ always_comb begin
                         // at the limit but this isn't a termination character
                         frame_oversize_next = 1'b1;
                     end
-                end
-
-                if (PTP_TS_EN) begin
-                    ptp_ts_out_next = (!PTP_TS_FMT_TOD || ptp_ts_borrow_reg) ? ptp_ts_reg : ptp_ts_adj_reg;
                 end
 
                 if (framing_error_reg || framing_error_d0_reg) begin
@@ -605,7 +842,28 @@ always_ff @(posedge clk) begin
     stat_rx_err_preamble_reg <= stat_rx_err_preamble_next;
 
     if (!GBX_IF_EN || encoded_rx_data_valid) begin
-        swap_data_reg <= encoded_rx_data_masked[63:32];
+        // capture timestamps
+        if (encoded_rx_start_remap[1]) begin
+            start_packet_reg <= 2'b10;
+            if (PTP_TS_FMT_TOD) begin
+                // workaround for verilator lint bug: unreachable by parameter value
+                /* verilator lint_off SELRANGE */
+                ptp_ts_reg[45:0] <= ptp_ts[45:0] + 46'(ts_inc_reg >> 1);
+                ptp_ts_reg[95:48] <= ptp_ts[95:48];
+                /* verilator lint_on SELRANGE */
+            end else begin
+                ptp_ts_reg <= ptp_ts + PTP_TS_W'(ts_inc_reg >> 1);
+            end
+        end
+
+        if (encoded_rx_start_remap[0]) begin
+            start_packet_reg <= 2'b01;
+            ptp_ts_reg <= ptp_ts;
+        end
+    end
+
+    if (!(GBX_IF_EN || USXGMII_EN) || encoded_rx_data_remap_valid) begin
+        swap_data_reg <= encoded_rx_data_remap[63:32];
 
         input_start_swap_reg <= 1'b0;
         input_start_d0_reg <= input_start_swap_reg;
@@ -631,8 +889,8 @@ always_ff @(posedge clk) begin
 
         // lane swapping and termination character detection
         if (lanes_swapped_reg) begin
-            if (!term_present_alt_reg && encoded_rx_hdr[0] == SYNC_CTRL[0]) begin
-                case (encoded_rx_data[7:4])
+            if (!term_present_alt_reg) begin
+                case (encoded_rx_type_remap)
                     BLOCK_TYPE_TERM_0[7:4]: begin
                         term_present_reg <= 1'b1;
                         term_first_cycle_reg <= 1'b1;
@@ -679,69 +937,76 @@ always_ff @(posedge clk) begin
                 // mask off trailing data
                 input_data_d0_reg <= {32'd0, swap_data_reg};
             end else begin
-                input_data_d0_reg <= {encoded_rx_data_masked[31:0], swap_data_reg};
+                input_data_d0_reg <= {encoded_rx_data_remap[31:0], swap_data_reg};
             end
         end else begin
-            if (encoded_rx_hdr[0] == SYNC_CTRL[0]) begin
-                case (encoded_rx_data[7:4])
-                    BLOCK_TYPE_TERM_0[7:4]: begin
-                        term_present_reg <= 1'b1;
-                        term_first_cycle_reg <= 1'b1;
-                        term_lane_reg <= 0;
-                    end
-                    BLOCK_TYPE_TERM_1[7:4]: begin
-                        term_present_reg <= 1'b1;
-                        term_first_cycle_reg <= 1'b1;
-                        term_lane_reg <= 1;
-                    end
-                    BLOCK_TYPE_TERM_2[7:4]: begin
-                        term_present_reg <= 1'b1;
-                        term_first_cycle_reg <= 1'b1;
-                        term_lane_reg <= 2;
-                    end
-                    BLOCK_TYPE_TERM_3[7:4]: begin
-                        term_present_reg <= 1'b1;
-                        term_first_cycle_reg <= 1'b1;
-                        term_lane_reg <= 3;
-                    end
-                    BLOCK_TYPE_TERM_4[7:4]: begin
-                        term_present_reg <= 1'b1;
-                        term_first_cycle_reg <= 1'b1;
-                        term_lane_reg <= 4;
-                    end
-                    BLOCK_TYPE_TERM_5[7:4]: begin
-                        term_present_reg <= 1'b1;
-                        term_lane_reg <= 5;
-                    end
-                    BLOCK_TYPE_TERM_6[7:4]: begin
-                        term_present_reg <= 1'b1;
-                        term_lane_reg <= 6;
-                    end
-                    BLOCK_TYPE_TERM_7[7:4]: begin
-                        term_present_reg <= 1'b1;
-                        term_lane_reg <= 7;
-                    end
-                    default: begin
-                        // do nothing
-                    end
-                endcase
-            end
-            input_data_d0_reg <= encoded_rx_data_masked;
+            case (encoded_rx_type_remap)
+                BLOCK_TYPE_TERM_0[7:4]: begin
+                    term_present_reg <= 1'b1;
+                    term_first_cycle_reg <= 1'b1;
+                    term_lane_reg <= 0;
+                end
+                BLOCK_TYPE_TERM_1[7:4]: begin
+                    term_present_reg <= 1'b1;
+                    term_first_cycle_reg <= 1'b1;
+                    term_lane_reg <= 1;
+                end
+                BLOCK_TYPE_TERM_2[7:4]: begin
+                    term_present_reg <= 1'b1;
+                    term_first_cycle_reg <= 1'b1;
+                    term_lane_reg <= 2;
+                end
+                BLOCK_TYPE_TERM_3[7:4]: begin
+                    term_present_reg <= 1'b1;
+                    term_first_cycle_reg <= 1'b1;
+                    term_lane_reg <= 3;
+                end
+                BLOCK_TYPE_TERM_4[7:4]: begin
+                    term_present_reg <= 1'b1;
+                    term_first_cycle_reg <= 1'b1;
+                    term_lane_reg <= 4;
+                end
+                BLOCK_TYPE_TERM_5[7:4]: begin
+                    term_present_reg <= 1'b1;
+                    term_lane_reg <= 5;
+                end
+                BLOCK_TYPE_TERM_6[7:4]: begin
+                    term_present_reg <= 1'b1;
+                    term_lane_reg <= 6;
+                end
+                BLOCK_TYPE_TERM_7[7:4]: begin
+                    term_present_reg <= 1'b1;
+                    term_lane_reg <= 7;
+                end
+                default: begin
+                    // do nothing
+                end
+            endcase
+            input_data_d0_reg <= encoded_rx_data_remap;
         end
 
         // start control character detection
         crc_state_reg <= crc_state;
-        if (encoded_rx_hdr == SYNC_CTRL && encoded_rx_data[7:0] == BLOCK_TYPE_START_0) begin
+        if (encoded_rx_type_remap == BLOCK_TYPE_START_0[7:4]) begin
             lanes_swapped_reg <= 1'b0;
             input_start_d0_reg <= 1'b1;
-            input_data_d0_reg <= encoded_rx_data_masked;
+            input_data_d0_reg <= encoded_rx_data_remap;
             crc_state_reg <= 32'hffffffff;
-        end else if (encoded_rx_hdr == SYNC_CTRL && (encoded_rx_data[7:0] == BLOCK_TYPE_START_4 || encoded_rx_data[7:0] == BLOCK_TYPE_OS_START)) begin
+        end else if ((encoded_rx_type_remap == BLOCK_TYPE_START_4[7:4] || encoded_rx_type_remap == BLOCK_TYPE_OS_START[7:4])) begin
             lanes_swapped_reg <= 1'b1;
             input_start_swap_reg <= 1'b1;
             crc_state_reg <= ~32'h6dd90a9d;
         end
 
+        lanes_swapped_d1_reg <= lanes_swapped_reg;
+
+        input_start_d1_reg <= input_start_d0_reg;
+        input_data_d1_reg <= input_data_d0_reg;
+
+        crc_valid_reg <= crc_valid;
+    end
+
+    if (!GBX_IF_EN || encoded_rx_data_valid) begin
         // ordered sets
         if (encoded_rx_hdr[0] == SYNC_CTRL[0]) begin
             if (encoded_rx_data[7:4] == BLOCK_TYPE_CTRL[7:4]) begin
@@ -858,32 +1123,6 @@ always_ff @(posedge clk) begin
             // invalid header
             stat_rx_err_bad_block_reg <= 1'b1;
         end
-
-        // capture timestamps
-        if (input_start_swap_reg) begin
-            start_packet_reg <= 2'b10;
-            if (PTP_TS_FMT_TOD) begin
-                // workaround for verilator lint bug: unreachable by parameter value
-                /* verilator lint_off SELRANGE */
-                ptp_ts_reg[45:0] <= ptp_ts[45:0] + 46'(ts_inc_reg >> 1);
-                ptp_ts_reg[95:48] <= ptp_ts[95:48];
-                /* verilator lint_on SELRANGE */
-            end else begin
-                ptp_ts_reg <= ptp_ts + PTP_TS_W'(ts_inc_reg >> 1);
-            end
-        end
-
-        if (input_start_d0_reg && !lanes_swapped_reg) begin
-            start_packet_reg <= 2'b01;
-            ptp_ts_reg <= ptp_ts;
-        end
-
-        lanes_swapped_d1_reg <= lanes_swapped_reg;
-
-        input_start_d1_reg <= input_start_d0_reg;
-        input_data_d1_reg <= input_data_d0_reg;
-
-        crc_valid_reg <= crc_valid;
     end
 
     last_ts_reg <= (4+16)'(ptp_ts);

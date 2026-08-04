@@ -147,9 +147,6 @@ tx_pad_inst (
 
 if (DATA_W == 64) begin
 
-    if (USXGMII_EN)
-        $fatal(0, "Error: USXGMII is not currently supported in 64-bit mode (instance %m)");
-
     taxi_axis_baser_tx_64 #(
         .DATA_W(DATA_W),
         .HDR_W(HDR_W),

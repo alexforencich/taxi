@@ -157,13 +157,11 @@ eth_phy_10g_rx_if_inst (
 
 if (DATA_W == 64) begin
 
-    if (USXGMII_EN)
-        $fatal(0, "Error: USXGMII is not currently supported in 64-bit mode (instance %m)");
-
     taxi_axis_baser_rx_64 #(
         .DATA_W(DATA_W),
         .HDR_W(HDR_W),
         .GBX_IF_EN(GBX_IF_EN),
+        .USXGMII_EN(USXGMII_EN),
         .PTP_TS_EN(PTP_TS_EN),
         .PTP_TS_FMT_TOD(PTP_TS_FMT_TOD),
         .PTP_TS_W(PTP_TS_W)
@@ -204,6 +202,9 @@ if (DATA_W == 64) begin
          */
         .cfg_rx_max_pkt_len(cfg_rx_max_pkt_len),
         .cfg_rx_enable(cfg_rx_enable),
+        .cfg_rx_usxgmii_en(cfg_rx_usxgmii_en),
+        .cfg_rx_usxgmii_5g(cfg_rx_usxgmii_5g),
+        .cfg_rx_usxgmii_speed(cfg_rx_usxgmii_speed),
 
         /*
          * Status

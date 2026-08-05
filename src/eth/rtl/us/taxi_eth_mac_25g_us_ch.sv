@@ -1139,6 +1139,9 @@ end else begin : mac
 
     localparam CTRL_W = DATA_W / 8;
 
+    if (USXGMII_EN)
+        $fatal(0, "Error: USXGMII is not currently supported in split MAC/PHY configuration (instance %m)");
+
     wire [DATA_W-1:0]  xgmii_txd;
     wire [CTRL_W-1:0]  xgmii_txc;
     wire               xgmii_tx_valid;

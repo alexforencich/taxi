@@ -24,7 +24,11 @@ module fpga_core #
     // device family
     parameter string FAMILY = "kintexu",
     // SFP rate selection (0 for 1G, 1 for 10G)
-    parameter logic SFP_RATE = 1'b1
+    parameter logic SFP_RATE = 1'b1,
+    // 10G MAC configuration
+    parameter logic CFG_LOW_LATENCY = 1'b1,
+    parameter logic COMBINED_MAC_PCS = 1'b1,
+    parameter MAC_DATA_W = SFP_RATE ? 32 : 16
 )
 (
     /*
@@ -328,11 +332,9 @@ wire sfp_mgt_refclk_0_bufg;
 
 wire sfp_rst;
 
-localparam SFP_DATA_W = SFP_RATE ? 32 : 16;
-
-taxi_axis_if #(.DATA_W(SFP_DATA_W), .ID_W(8), .USER_EN(1), .USER_W(1)) axis_sfp_tx[2]();
+taxi_axis_if #(.DATA_W(MAC_DATA_W), .ID_W(8), .USER_EN(1), .USER_W(1)) axis_sfp_tx[2]();
 taxi_axis_if #(.DATA_W(96), .KEEP_W(1), .ID_W(8)) axis_sfp_tx_cpl[2]();
-taxi_axis_if #(.DATA_W(SFP_DATA_W), .ID_W(8), .USER_EN(1), .USER_W(1)) axis_sfp_rx[2]();
+taxi_axis_if #(.DATA_W(MAC_DATA_W), .ID_W(8), .USER_EN(1), .USER_W(1)) axis_sfp_rx[2]();
 
 if (SIM) begin
 
@@ -406,12 +408,13 @@ if (SFP_RATE == 0) begin : sfp_mac
         .CNT(2),
 
         // GT config
-        .CFG_LOW_LATENCY(1),
+        .CFG_LOW_LATENCY(CFG_LOW_LATENCY),
 
         // GT type
         .GT_TYPE("GTH"),
 
         // PHY parameters
+        .COMBINED_MAC_PCS(COMBINED_MAC_PCS),
         .SGMII_EN(1'b1),
         .AN_EN(1'b1),
         .DIC_EN(1'b1),
@@ -673,12 +676,13 @@ end else begin : sfp_mac
         .CNT(2),
 
         // GT config
-        .CFG_LOW_LATENCY(1),
+        .CFG_LOW_LATENCY(CFG_LOW_LATENCY),
 
         // GT type
         .GT_TYPE("GTH"),
 
         // PHY parameters
+        .COMBINED_MAC_PCS(COMBINED_MAC_PCS),
         .DATA_W(axis_sfp_tx[0].DATA_W),
         .USXGMII_EN(1'b1),
         .DIC_EN(1'b1),

@@ -28,7 +28,7 @@ module fpga #
     // 10G MAC configuration
     parameter logic CFG_LOW_LATENCY = 1'b1,
     parameter logic COMBINED_MAC_PCS = 1'b1,
-    parameter MAC_DATA_W = 32
+    parameter MAC_DATA_W = SFP_RATE ? 32 : 16
 )
 (
     /*

@@ -172,7 +172,7 @@ for (genvar n = 0; n < 2; n = n + 1) begin : gt_quad
         // PHY parameters
         .COMBINED_MAC_PCS(COMBINED_MAC_PCS),
         .DATA_W(axis_qsfp_tx[0].DATA_W),
-        .USXGMII_EN(COMBINED_MAC_PCS && axis_qsfp_tx[0].DATA_W == 32),
+        .USXGMII_EN(COMBINED_MAC_PCS),
         .DIC_EN(1'b1),
         .PTP_TS_EN(1'b0),
         .PTP_TD_EN(1'b0),

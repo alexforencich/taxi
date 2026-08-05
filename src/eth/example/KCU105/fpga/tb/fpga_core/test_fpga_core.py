@@ -245,8 +245,8 @@ def process_f_files(files):
     return list(lst.values())
 
 
-@pytest.mark.parametrize("sfp_rate", [0, 1])
-def test_fpga_core(request, sfp_rate):
+@pytest.mark.parametrize(("sfp_rate", "mac_data_w"), [(0, 16), (1, 32), (1, 64)])
+def test_fpga_core(request, sfp_rate, mac_data_w):
     dut = "fpga_core"
     module = os.path.splitext(os.path.basename(__file__))[0]
     toplevel = dut
@@ -274,6 +274,9 @@ def test_fpga_core(request, sfp_rate):
     parameters['VENDOR'] = "\"XILINX\""
     parameters['FAMILY'] = "\"kintexu\""
     parameters['SFP_RATE'] = f"1'b{sfp_rate}"
+    parameters['CFG_LOW_LATENCY'] = "1'b1"
+    parameters['COMBINED_MAC_PCS'] = "1'b1"
+    parameters['MAC_DATA_W'] = mac_data_w
 
     extra_env = {f'PARAM_{k}': str(v) for k, v in parameters.items()}
 

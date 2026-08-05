@@ -305,7 +305,7 @@ taxi_eth_mac_25g_us #(
     // MAC/PHY config
     .COMBINED_MAC_PCS(COMBINED_MAC_PCS),
     .DATA_W(axis_sfp_tx[0].DATA_W),
-    .USXGMII_EN(1'b1),
+    .USXGMII_EN(COMBINED_MAC_PCS),
     .DIC_EN(1'b1),
     .PTP_TS_EN(1'b0),
     .PTP_TD_EN(1'b0),

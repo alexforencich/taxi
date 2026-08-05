@@ -170,7 +170,7 @@ logic term_present_alt_reg = 1'b0;
 logic term_present_reg = 1'b0;
 logic term_first_cycle_alt_reg = 1'b0;
 logic term_first_cycle_reg = 1'b0;
-logic framing_error_reg = 1'b0, framing_error_d0_reg = 1'b0;
+logic framing_error_reg = 1'b0, framing_error_d0_reg = 1'b0, framing_error_d1_reg = 1'b0;
 
 logic [DATA_W-1:0] input_data_d0_reg = '0;
 logic [DATA_W-1:0] input_data_d1_reg = '0;
@@ -345,7 +345,6 @@ if (USXGMII_EN) begin : usxgmii
                     rep_stall_reg <= 1'b1;
                     rep_en_reg <= 1'b1;
                     rep_sel_reg <= 1'b0;
-                    rep_start_reg <= 1;
                     if (cfg_rx_usxgmii_5g) begin
                         case (cfg_rx_usxgmii_speed)
                             3'b000: rep_cnt_reg <= 248; // 10 Mbps
@@ -365,7 +364,6 @@ if (USXGMII_EN) begin : usxgmii
                                 rep_cnt_reg <= 0;
                                 rep_stall_reg <= 1'b0;
                                 rep_sel_reg <= 1'b1;
-                                rep_start_reg <= 2;
                             end
                             default: begin
                                 // 5 Gbps
@@ -386,7 +384,6 @@ if (USXGMII_EN) begin : usxgmii
                                 rep_cnt_reg <= 0;
                                 rep_stall_reg <= 1'b0;
                                 rep_sel_reg <= 1'b1;
-                                rep_start_reg <= 2;
                             end
                             default: begin
                                 // 10 Gbps
@@ -485,6 +482,18 @@ if (USXGMII_EN) begin : usxgmii
                             encoded_rx_type_remap_reg <= BLOCK_TYPE_START_0[7:4];
                             encoded_rx_data_remap_valid_reg <= 1'b0;
                             lane_sel_reg <= 1'b0;
+                            rep_start_reg <= 1;
+                            if (cfg_rx_usxgmii_5g) begin
+                                if (cfg_rx_usxgmii_speed == 3'b100) begin
+                                    // 2.5 Gbps
+                                    rep_start_reg <= 2;
+                                end
+                            end else begin
+                                if (cfg_rx_usxgmii_speed == 3'b101) begin
+                                    // 5 Gbps
+                                    rep_start_reg <= 2;
+                                end
+                            end
                         end
                         BLOCK_TYPE_START_4[7:4], BLOCK_TYPE_OS_START[7:4]: begin
                             // start in lane 4
@@ -492,6 +501,18 @@ if (USXGMII_EN) begin : usxgmii
                             encoded_rx_type_remap_reg <= BLOCK_TYPE_START_0[7:4];
                             encoded_rx_data_remap_valid_reg <= 1'b0;
                             lane_sel_reg <= 1'b1;
+                            rep_start_reg <= 1;
+                            if (cfg_rx_usxgmii_5g) begin
+                                if (cfg_rx_usxgmii_speed == 3'b100) begin
+                                    // 2.5 Gbps
+                                    rep_start_reg <= 2;
+                                end
+                            end else begin
+                                if (cfg_rx_usxgmii_speed == 3'b101) begin
+                                    // 5 Gbps
+                                    rep_start_reg <= 2;
+                                end
+                            end
                         end
                         BLOCK_TYPE_TERM_0[7:4], BLOCK_TYPE_TERM_1[7:4], BLOCK_TYPE_TERM_2[7:4], BLOCK_TYPE_TERM_3[7:4]: begin
                             // terminate in lower half
@@ -660,7 +681,11 @@ always_comb begin
                     ptp_ts_out_next = (!PTP_TS_FMT_TOD || ptp_ts_borrow_reg) ? ptp_ts_reg : ptp_ts_adj_reg;
                 end
 
-                if (input_start_d1_reg && cfg_rx_enable) begin
+                if (framing_error_reg || framing_error_d0_reg || framing_error_d1_reg) begin
+                    // control or error characters in packet
+                    stat_rx_err_framing_next = 1'b1;
+                    state_next = STATE_IDLE;
+                end else if (input_start_d1_reg && cfg_rx_enable) begin
                     // start condition
                     stat_rx_byte_next = 4'(KEEP_W);
                     state_next = STATE_PAYLOAD;
@@ -691,7 +716,7 @@ always_comb begin
                     end
                 end
 
-                if (framing_error_reg || framing_error_d0_reg) begin
+                if (framing_error_reg || framing_error_d0_reg || framing_error_d1_reg) begin
                     // control or error characters in packet
                     m_axis_rx_tlast_next = 1'b1;
                     m_axis_rx_tuser_next = 1'b1;
@@ -1004,6 +1029,10 @@ always_ff @(posedge clk) begin
         input_data_d1_reg <= input_data_d0_reg;
 
         crc_valid_reg <= crc_valid;
+
+        framing_error_reg <= 1'b0;
+        framing_error_d0_reg <= framing_error_reg;
+        framing_error_d1_reg <= framing_error_d0_reg;
     end
 
     if (!GBX_IF_EN || encoded_rx_data_valid) begin
@@ -1048,28 +1077,34 @@ always_ff @(posedge clk) begin
         end
 
         // check for framing errors
-        framing_error_reg <= 1'b0;
-        framing_error_d0_reg <= framing_error_reg;
         if (encoded_rx_hdr == SYNC_DATA) begin
             // data - must be in a frame
-            framing_error_reg <= !frame_reg;
+            if (!frame_reg) begin
+                framing_error_reg <= 1'b1;
+            end
         end else if (encoded_rx_hdr == SYNC_CTRL) begin
             // control - control only allowed between frames
             frame_reg <= 1'b0;
             case (encoded_rx_data[7:4])
                 BLOCK_TYPE_CTRL[7:4]: begin
-                    framing_error_reg <= frame_reg;
+                    if (frame_reg) begin
+                        framing_error_reg <= 1'b1;
+                    end
                 end
                 BLOCK_TYPE_START_0[7:4],
                 BLOCK_TYPE_START_4[7:4],
                 BLOCK_TYPE_OS_START[7:4]: begin
                     frame_reg <= 1'b1;
-                    framing_error_reg <= frame_reg;
+                    if (frame_reg) begin
+                        framing_error_reg <= 1'b1;
+                    end
                 end
                 BLOCK_TYPE_OS_0[7:4],
                 BLOCK_TYPE_OS_4[7:4],
                 BLOCK_TYPE_OS_04[7:4]: begin
-                    framing_error_reg <= frame_reg;
+                    if (frame_reg) begin
+                        framing_error_reg <= 1'b1;
+                    end
                 end
                 BLOCK_TYPE_TERM_0[7:4],
                 BLOCK_TYPE_TERM_1[7:4],
@@ -1079,18 +1114,24 @@ always_ff @(posedge clk) begin
                 BLOCK_TYPE_TERM_5[7:4],
                 BLOCK_TYPE_TERM_6[7:4],
                 BLOCK_TYPE_TERM_7[7:4]: begin
-                    framing_error_reg <= !frame_reg;
+                    if (!frame_reg) begin
+                        framing_error_reg <= 1'b1;
+                    end
                 end
                 default: begin
                     // invalid block type
                     frame_reg <= 1'b0;
-                    framing_error_reg <= frame_reg;
+                    if (frame_reg) begin
+                        framing_error_reg <= 1'b1;
+                    end
                 end
             endcase
         end else begin
             // invalid header
             frame_reg <= 1'b0;
-            framing_error_reg <= frame_reg;
+            if (frame_reg) begin
+                framing_error_reg <= 1'b1;
+            end
         end
 
         // check all block type bits to detect bad encodings

@@ -17,9 +17,9 @@ Authors:
  */
 module taxi_gt_rx_reset #
 (
-    parameter GT_RX_PD = 1'b0,
-    parameter GT_RX_QPLL_SEL = 1'b0,
-    parameter GT_RX_LPM_EN = 1'b0,
+    parameter logic GT_RX_PD = 1'b0,
+    parameter logic GT_RX_QPLL_SEL = 1'b0,
+    parameter logic GT_RX_LPM_EN = 1'b0,
     parameter CNT_W = 8,
     parameter CDR_CNT_W = 20
 )
@@ -34,7 +34,7 @@ module taxi_gt_rx_reset #
     output wire logic  gt_rx_pd_out,
     output wire logic  gt_rx_reset_out,
     input  wire logic  gt_rx_reset_done_in,
-    input  wire logic  gt_userclk_rx_active_in,
+    output wire logic  gt_userclk_rx_active_out,
     output wire logic  gt_rx_pma_reset_out,
     output wire logic  gt_rx_dfe_lpm_reset_out,
     output wire logic  gt_rx_eyescan_reset_out,
@@ -79,6 +79,18 @@ logic gt_rx_pd_reg = GT_RX_PD;
 logic gt_rx_qpll_sel_reg = GT_RX_QPLL_SEL;
 logic gt_rx_lpm_en_reg = GT_RX_LPM_EN;
 
+wire gt_userclk_rx_active_n;
+assign gt_userclk_rx_active_out = !gt_userclk_rx_active_n;
+
+taxi_sync_reset #(
+    .N(4)
+)
+gt_userclk_rx_active_sync_inst (
+    .clk(gt_rxusrclk2),
+    .rst(gt_rx_reset_reg),
+    .out(gt_userclk_rx_active_n)
+);
+
 wire gt_rx_reset_done_sync;
 wire gt_rx_pma_reset_done_sync;
 wire gt_rx_prgdiv_reset_done_sync;
@@ -91,7 +103,7 @@ taxi_sync_signal #(
 )
 gt_status_sync_inst (
     .clk(clk),
-    .in({gt_rx_reset_done_in, gt_rx_pma_reset_done_in, gt_rx_prgdiv_reset_done_in, gt_userclk_rx_active_in, gt_rx_cdr_lock_in}),
+    .in({gt_rx_reset_done_in, gt_rx_pma_reset_done_in, gt_rx_prgdiv_reset_done_in, gt_userclk_rx_active_out, gt_rx_cdr_lock_in}),
     .out({gt_rx_reset_done_sync, gt_rx_pma_reset_done_sync, gt_rx_prgdiv_reset_done_sync, gt_userclk_rx_active_sync, gt_rx_cdr_lock_sync})
 );
 

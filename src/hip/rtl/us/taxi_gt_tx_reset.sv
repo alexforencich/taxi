@@ -17,8 +17,8 @@ Authors:
  */
 module taxi_gt_tx_reset #
 (
-    parameter GT_TX_PD = 1'b0,
-    parameter GT_TX_QPLL_SEL = 1'b0,
+    parameter logic GT_TX_PD = 1'b0,
+    parameter logic GT_TX_QPLL_SEL = 1'b0,
     parameter CNT_W = 8
 )
 (
@@ -32,7 +32,7 @@ module taxi_gt_tx_reset #
     output wire logic  gt_tx_pd_out,
     output wire logic  gt_tx_reset_out,
     input  wire logic  gt_tx_reset_done_in,
-    input  wire logic  gt_userclk_tx_active_in,
+    output wire logic  gt_userclk_tx_active_out,
     output wire logic  gt_tx_pma_reset_out,
     output wire logic  gt_tx_pcs_reset_out,
     input  wire logic  gt_tx_pma_reset_done_in,
@@ -67,6 +67,18 @@ logic gt_tx_pd_reg = GT_TX_PD;
 
 logic gt_tx_qpll_sel_reg = GT_TX_QPLL_SEL;
 
+wire gt_userclk_tx_active_n;
+assign gt_userclk_tx_active_out = !gt_userclk_tx_active_n;
+
+taxi_sync_reset #(
+    .N(4)
+)
+gt_userclk_tx_active_sync_inst (
+    .clk(gt_txusrclk2),
+    .rst(gt_tx_reset_reg),
+    .out(gt_userclk_tx_active_n)
+);
+
 wire gt_tx_reset_done_sync;
 wire gt_tx_pma_reset_done_sync;
 wire gt_tx_prgdiv_reset_done_sync;
@@ -78,7 +90,7 @@ taxi_sync_signal #(
 )
 gt_status_sync_inst (
     .clk(clk),
-    .in({gt_tx_reset_done_in, gt_tx_pma_reset_done_in, gt_tx_prgdiv_reset_done_in, gt_userclk_tx_active_in}),
+    .in({gt_tx_reset_done_in, gt_tx_pma_reset_done_in, gt_tx_prgdiv_reset_done_in, gt_userclk_tx_active_out}),
     .out({gt_tx_reset_done_sync, gt_tx_pma_reset_done_sync, gt_tx_prgdiv_reset_done_sync, gt_userclk_tx_active_sync})
 );
 

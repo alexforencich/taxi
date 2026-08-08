@@ -376,7 +376,6 @@ end
 wire gt_tx_pd;
 wire gt_tx_reset;
 wire gt_tx_reset_done;
-wire gt_userclk_tx_active = 1'b1; // TODO
 wire gt_tx_pma_reset;
 wire gt_tx_pcs_reset;
 wire gt_tx_pma_reset_done;
@@ -406,7 +405,7 @@ gt_tx_reset_inst (
     .gt_tx_pd_out(gt_tx_pd),
     .gt_tx_reset_out(gt_tx_reset),
     .gt_tx_reset_done_in(gt_tx_reset_done),
-    .gt_userclk_tx_active_in(gt_userclk_tx_active),
+    .gt_userclk_tx_active_out(),
     .gt_tx_pma_reset_out(gt_tx_pma_reset),
     .gt_tx_pcs_reset_out(gt_tx_pcs_reset),
     .gt_tx_pma_reset_done_in(gt_tx_pma_reset_done),
@@ -433,7 +432,6 @@ gt_tx_reset_inst (
 wire gt_rx_pd;
 wire gt_rx_reset;
 wire gt_rx_reset_done;
-wire gt_userclk_rx_active = 1'b1; // TODO
 wire gt_rx_pma_reset;
 wire gt_rx_dfe_lpm_reset;
 wire gt_rx_eyescan_reset;
@@ -469,7 +467,7 @@ gt_rx_reset_inst (
     .gt_rx_pd_out(gt_rx_pd),
     .gt_rx_reset_out(gt_rx_reset),
     .gt_rx_reset_done_in(gt_rx_reset_done),
-    .gt_userclk_rx_active_in(gt_userclk_rx_active),
+    .gt_userclk_rx_active_out(),
     .gt_rx_pma_reset_out(gt_rx_pma_reset),
     .gt_rx_dfe_lpm_reset_out(gt_rx_dfe_lpm_reset),
     .gt_rx_eyescan_reset_out(gt_rx_eyescan_reset),
@@ -569,11 +567,9 @@ if (SIM) begin : xcvr
     assign xcvr_qpllrefclk_out = xcvr_gtrefclk0_in;
 
     assign gt_tx_reset_done = !gt_tx_reset;
-    assign gt_userclk_tx_active = qpll_lock;
     assign gt_tx_pma_reset_done = gt_tx_reset_done;
 
     assign gt_rx_reset_done = !gt_rx_reset;
-    assign gt_userclk_rx_active = qpll_lock;
     assign gt_rx_pma_reset_done = gt_rx_reset_done;
     assign gt_rx_cdr_lock = gt_rx_reset_done;
 

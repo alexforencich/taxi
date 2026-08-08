@@ -101,10 +101,12 @@ module taxi_eth_mac_100g_us_ch #
     /*
      * MAC clocks
      */
-    output wire logic                 rx_clk,
+    output wire logic                 rx_clk_out,
+    input  wire logic                 rx_clk_in = 1'b0,
     input  wire logic                 rx_rst_in = 1'b0,
     output wire logic                 rx_rst_out,
-    output wire logic                 tx_clk,
+    output wire logic                 tx_clk_out,
+    input  wire logic                 tx_clk_in = 1'b0,
     input  wire logic                 tx_rst_in = 1'b0,
     output wire logic                 tx_rst_out,
 
@@ -137,7 +139,7 @@ if (TX_SERDES_PIPELINE > 0) begin : tx_pipe
     (* shreg_extract = "no" *)
     reg [15:0]  serdes_txctrl1_pipe_reg[TX_SERDES_PIPELINE-1:0];
 
-    always @(posedge tx_clk) begin
+    always @(posedge tx_clk_in) begin
         serdes_txdata_pipe_reg[0] <= serdes_txdata;
         serdes_txctrl0_pipe_reg[0] <= serdes_txctrl0;
         serdes_txctrl1_pipe_reg[0] <= serdes_txctrl1;
@@ -170,7 +172,7 @@ if (RX_SERDES_PIPELINE > 0) begin : rx_pipe
     (* shreg_extract = "no" *)
     reg [15:0]  serdes_rxctrl1_pipe_reg[RX_SERDES_PIPELINE-1:0];
 
-    always @(posedge rx_clk) begin
+    always @(posedge rx_clk_in) begin
         serdes_rxdata_pipe_reg[0] <= gt_rxdata;
         serdes_rxctrl0_pipe_reg[0] <= gt_rxctrl0;
         serdes_rxctrl1_pipe_reg[0] <= gt_rxctrl1;
@@ -274,10 +276,12 @@ if (CFG_LOW_LATENCY) begin : gt
         /*
          * GT user clocks
          */
-        .rx_clk(rx_clk),
+        .rx_clk_out(rx_clk_out),
+        .rx_clk_in(rx_clk_in),
         .rx_rst_in(rx_rst_in || rx_reset_req),
         .rx_rst_out(rx_rst_out),
-        .tx_clk(tx_clk),
+        .tx_clk_out(tx_clk_out),
+        .tx_clk_in(tx_clk_in),
         .tx_rst_in(tx_rst_in),
         .tx_rst_out(tx_rst_out),
 
@@ -372,10 +376,12 @@ end else if (!CFG_LOW_LATENCY) begin : gt
         /*
          * GT user clocks
          */
-        .rx_clk(rx_clk),
+        .rx_clk_out(rx_clk_out),
+        .rx_clk_in(rx_clk_in),
         .rx_rst_in(rx_rst_in || rx_reset_req),
         .rx_rst_out(rx_rst_out),
-        .tx_clk(tx_clk),
+        .tx_clk_out(tx_clk_out),
+        .tx_clk_in(tx_clk_in),
         .tx_rst_in(tx_rst_in),
         .tx_rst_out(tx_rst_out),
 

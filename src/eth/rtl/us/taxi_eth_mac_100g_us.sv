@@ -326,6 +326,12 @@ ctrl_intercon_inst (
 localparam STAT_TX_CNT = STAT_TX_LEVEL == 0 ? 8 : (STAT_TX_LEVEL == 1 ? 16: 32);
 localparam STAT_RX_CNT = STAT_RX_LEVEL == 0 ? 8 : (STAT_RX_LEVEL == 1 ? 16: 32);
 
+wire tx_clk_out[CNT];
+wire rx_clk_out[CNT];
+
+assign tx_clk = '{CNT{tx_clk_out[0]}};
+assign rx_clk = rx_clk_out;
+
 wire [127:0] serdes_txdata[CNT];
 wire [15:0]  serdes_txctrl0[CNT];
 wire [15:0]  serdes_txctrl1[CNT];
@@ -439,10 +445,12 @@ for (genvar n = 0; n < CNT; n = n + 1) begin : ch
         /*
          * MAC clocks
          */
-        .rx_clk(rx_clk[n]),
+        .rx_clk_out(rx_clk_out[n]),
+        .rx_clk_in(rx_clk[n]),
         .rx_rst_in(rx_rst_in[n]),
         .rx_rst_out(rx_rst_out[n]),
-        .tx_clk(tx_clk[n]),
+        .tx_clk_out(tx_clk_out[n]),
+        .tx_clk_in(tx_clk[n]),
         .tx_rst_in(tx_rst_in[n]),
         .tx_rst_out(tx_rst_out[n]),
 

@@ -71,8 +71,8 @@ if {$sec_line_rate != 0} {
 dict set config ENABLE_OPTIONAL_PORTS $extra_ports
 dict set config LOCATE_COMMON {CORE}
 dict set config LOCATE_RESET_CONTROLLER {EXAMPLE_DESIGN}
-dict set config LOCATE_TX_USER_CLOCKING {CORE}
-dict set config LOCATE_RX_USER_CLOCKING {CORE}
+dict set config LOCATE_TX_USER_CLOCKING {EXAMPLE_DESIGN}
+dict set config LOCATE_RX_USER_CLOCKING {EXAMPLE_DESIGN}
 dict set config LOCATE_USER_DATA_WIDTH_SIZING {EXAMPLE_DESIGN}
 dict set config FREERUN_FREQUENCY $freerun_freq
 dict set config DISABLE_LOC_XDC {1}

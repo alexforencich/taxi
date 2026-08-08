@@ -94,10 +94,12 @@ module taxi_eth_mac_100g_us_gt #
     /*
      * GT user clocks
      */
-    output wire logic               rx_clk,
+    output wire logic               rx_clk_out,
+    input  wire logic               rx_clk_in = 1'b0,
     input  wire logic               rx_rst_in = 1'b0,
     output wire logic               rx_rst_out,
-    output wire logic               tx_clk,
+    output wire logic               tx_clk_out,
+    input  wire logic               tx_clk_in = 1'b0,
     input  wire logic               tx_rst_in = 1'b0,
     output wire logic               tx_rst_out,
 
@@ -214,8 +216,8 @@ ctrl_regs_inst (
     /*
      * Transceiver clocks
      */
-    .gt_txusrclk2(tx_clk),
-    .gt_rxusrclk2(rx_clk),
+    .gt_txusrclk2(tx_clk_in),
+    .gt_rxusrclk2(rx_clk_in),
 
     /*
      * Transceiver control
@@ -369,9 +371,13 @@ end else begin : common_ctrl
 
 end
 
+wire gt_txoutclk;
+wire gt_rxoutclk;
+
 wire gt_tx_pd;
 wire gt_tx_reset;
 wire gt_tx_reset_done;
+wire gt_userclk_tx_active;
 wire gt_tx_pma_reset;
 wire gt_tx_pcs_reset;
 wire gt_tx_pma_reset_done;
@@ -384,7 +390,7 @@ taxi_sync_reset #(
     .N(4)
 )
 tx_reset_sync_inst (
-    .clk(tx_clk),
+    .clk(tx_clk_in),
     .rst(!tx_reset_done || tx_rst_in),
     .out(tx_rst_out)
 );
@@ -401,11 +407,11 @@ gt_tx_reset_inst (
     /*
      * GT
      */
-    .gt_txusrclk2(tx_clk),
+    .gt_txusrclk2(tx_clk_in),
     .gt_tx_pd_out(gt_tx_pd),
     .gt_tx_reset_out(gt_tx_reset),
     .gt_tx_reset_done_in(gt_tx_reset_done),
-    .gt_userclk_tx_active_out(),
+    .gt_userclk_tx_active_out(gt_userclk_tx_active),
     .gt_tx_pma_reset_out(gt_tx_pma_reset),
     .gt_tx_pcs_reset_out(gt_tx_pcs_reset),
     .gt_tx_pma_reset_done_in(gt_tx_pma_reset_done),
@@ -432,6 +438,7 @@ gt_tx_reset_inst (
 wire gt_rx_pd;
 wire gt_rx_reset;
 wire gt_rx_reset_done;
+wire gt_userclk_rx_active;
 wire gt_rx_pma_reset;
 wire gt_rx_dfe_lpm_reset;
 wire gt_rx_eyescan_reset;
@@ -448,7 +455,7 @@ taxi_sync_reset #(
     .N(4)
 )
 rx_reset_sync_inst (
-    .clk(rx_clk),
+    .clk(rx_clk_in),
     .rst(!rx_reset_done || rx_rst_in),
     .out(rx_rst_out)
 );
@@ -467,11 +474,11 @@ gt_rx_reset_inst (
     /*
      * GT
      */
-    .gt_rxusrclk2(rx_clk),
+    .gt_rxusrclk2(rx_clk_in),
     .gt_rx_pd_out(gt_rx_pd),
     .gt_rx_reset_out(gt_rx_reset),
     .gt_rx_reset_done_in(gt_rx_reset_done),
-    .gt_userclk_rx_active_out(),
+    .gt_userclk_rx_active_out(gt_userclk_rx_active),
     .gt_rx_pma_reset_out(gt_rx_pma_reset),
     .gt_rx_dfe_lpm_reset_out(gt_rx_dfe_lpm_reset),
     .gt_rx_eyescan_reset_out(gt_rx_eyescan_reset),
@@ -501,6 +508,35 @@ gt_rx_reset_inst (
     .rx_qpll_sel_in(ctrl_rx_qpll_sel),
     .rx_lpm_en_in(ctrl_rxlpmen)
 );
+
+if (SIM) begin : clkbuf
+
+    assign tx_clk_out = gt_txoutclk;
+    assign rx_clk_out = gt_rxoutclk;
+
+end else begin : clkbuf
+
+    BUFG_GT bufg_gt_txusrclk_inst (
+        .CE      (1'b1),
+        .CEMASK  (1'b0),
+        .CLR     (gt_tx_reset),
+        .CLRMASK (1'b0),
+        .DIV     (3'd0),
+        .I       (gt_txoutclk),
+        .O       (tx_clk_out)
+    );
+
+    BUFG_GT bufg_gt_rxusrclk_inst (
+        .CE      (1'b1),
+        .CEMASK  (1'b0),
+        .CLR     (gt_rx_reset),
+        .CLRMASK (1'b0),
+        .DIV     (3'd0),
+        .I       (gt_rxoutclk),
+        .O       (rx_clk_out)
+    );
+
+end
 
 if (SIM) begin : xcvr
     // simulation (no GT core)
@@ -577,12 +613,11 @@ end else if (HAS_COMMON && GT_TYPE == "GTY" && GT_USP) begin : xcvr
         .gtyrxn_in(xcvr_rxn),
 
         // Transmit
-        .gtwiz_userclk_tx_reset_in(gt_tx_reset),
-        .gtwiz_userclk_tx_srcclk_out(),
-        .gtwiz_userclk_tx_usrclk_out(),
-        .gtwiz_userclk_tx_usrclk2_out(tx_clk),
-        .gtwiz_userclk_tx_active_out(),
+        .gtwiz_userclk_tx_active_in(gt_userclk_tx_active),
         .gtwiz_reset_tx_done_in(tx_reset_done),
+        .txoutclk_out(gt_txoutclk),
+        .txusrclk_in(tx_clk_in),
+        .txusrclk2_in(tx_clk_in),
         .txpdelecidlemode_in(1'b1),
         .txpd_in(gt_tx_pd ? 2'b11 : 2'b00),
         .gttxreset_in(gt_tx_reset),
@@ -609,12 +644,11 @@ end else if (HAS_COMMON && GT_TYPE == "GTY" && GT_USP) begin : xcvr
         .txctrl1_in(serdes_txctrl1),
 
         // Receive
-        .gtwiz_userclk_rx_reset_in(gt_rx_reset),
-        .gtwiz_userclk_rx_srcclk_out(),
-        .gtwiz_userclk_rx_usrclk_out(),
-        .gtwiz_userclk_rx_usrclk2_out(rx_clk),
-        .gtwiz_userclk_rx_active_out(),
+        .gtwiz_userclk_rx_active_in(gt_userclk_rx_active),
         .gtwiz_reset_rx_done_in(rx_reset_done),
+        .rxoutclk_out(gt_rxoutclk),
+        .rxusrclk_in(rx_clk_in),
+        .rxusrclk2_in(rx_clk_in),
         .rxpd_in(gt_rx_pd ? 2'b11 : 2'b00),
         .gtrxreset_in(gt_rx_reset),
         .rxpmareset_in(gt_rx_pma_reset),
@@ -689,12 +723,11 @@ end else if (HAS_COMMON && GT_TYPE == "GTY" && !GT_USP) begin : xcvr
         .gtyrxn_in(xcvr_rxn),
 
         // Transmit
-        .gtwiz_userclk_tx_reset_in(gt_tx_reset),
-        .gtwiz_userclk_tx_srcclk_out(),
-        .gtwiz_userclk_tx_usrclk_out(),
-        .gtwiz_userclk_tx_usrclk2_out(tx_clk),
-        .gtwiz_userclk_tx_active_out(),
+        .gtwiz_userclk_tx_active_in(gt_userclk_tx_active),
         .gtwiz_reset_tx_done_in(tx_reset_done),
+        .txoutclk_out(gt_txoutclk),
+        .txusrclk_in(tx_clk_in),
+        .txusrclk2_in(tx_clk_in),
         .txpdelecidlemode_in(1'b1),
         .txpd_in(gt_tx_pd ? 2'b11 : 2'b00),
         .gttxreset_in(gt_tx_reset),
@@ -721,12 +754,11 @@ end else if (HAS_COMMON && GT_TYPE == "GTY" && !GT_USP) begin : xcvr
         .txctrl1_in(serdes_txctrl1),
 
         // Receive
-        .gtwiz_userclk_rx_reset_in(gt_rx_reset),
-        .gtwiz_userclk_rx_srcclk_out(),
-        .gtwiz_userclk_rx_usrclk_out(),
-        .gtwiz_userclk_rx_usrclk2_out(rx_clk),
-        .gtwiz_userclk_rx_active_out(),
+        .gtwiz_userclk_rx_active_in(gt_userclk_rx_active),
         .gtwiz_reset_rx_done_in(rx_reset_done),
+        .rxoutclk_out(gt_rxoutclk),
+        .rxusrclk_in(rx_clk_in),
+        .rxusrclk2_in(rx_clk_in),
         .rxpd_in(gt_rx_pd ? 2'b11 : 2'b00),
         .gtrxreset_in(gt_rx_reset),
         .rxpmareset_in(gt_rx_pma_reset),
@@ -784,12 +816,11 @@ end else if (!HAS_COMMON && GT_TYPE == "GTY") begin : xcvr
         .gtyrxn_in(xcvr_rxn),
 
         // Transmit
-        .gtwiz_userclk_tx_reset_in(gt_tx_reset),
-        .gtwiz_userclk_tx_srcclk_out(),
-        .gtwiz_userclk_tx_usrclk_out(),
-        .gtwiz_userclk_tx_usrclk2_out(tx_clk),
-        .gtwiz_userclk_tx_active_out(),
+        .gtwiz_userclk_tx_active_in(gt_userclk_tx_active),
         .gtwiz_reset_tx_done_in(tx_reset_done),
+        .txoutclk_out(gt_txoutclk),
+        .txusrclk_in(tx_clk_in),
+        .txusrclk2_in(tx_clk_in),
         .txpdelecidlemode_in(1'b1),
         .txpd_in(gt_tx_pd ? 2'b11 : 2'b00),
         .gttxreset_in(gt_tx_reset),
@@ -816,12 +847,11 @@ end else if (!HAS_COMMON && GT_TYPE == "GTY") begin : xcvr
         .txctrl1_in(serdes_txctrl1),
 
         // Receive
-        .gtwiz_userclk_rx_reset_in(gt_rx_reset),
-        .gtwiz_userclk_rx_srcclk_out(),
-        .gtwiz_userclk_rx_usrclk_out(),
-        .gtwiz_userclk_rx_usrclk2_out(rx_clk),
-        .gtwiz_userclk_rx_active_out(),
+        .gtwiz_userclk_rx_active_in(gt_userclk_rx_active),
         .gtwiz_reset_rx_done_in(rx_reset_done),
+        .rxoutclk_out(gt_rxoutclk),
+        .rxusrclk_in(rx_clk_in),
+        .rxusrclk2_in(rx_clk_in),
         .rxpd_in(gt_rx_pd ? 2'b11 : 2'b00),
         .gtrxreset_in(gt_rx_reset),
         .rxpmareset_in(gt_rx_pma_reset),

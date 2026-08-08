@@ -26,11 +26,13 @@ from cocotbext.uart import UartSource, UartSink
 
 try:
     from baser import BaseRSerdesSource, BaseRSerdesSink
+    from basex import BaseXSerdesSource, BaseXSerdesSink
 except ImportError:
     # attempt import from current directory
     sys.path.insert(0, os.path.join(os.path.dirname(__file__)))
     try:
         from baser import BaseRSerdesSource, BaseRSerdesSink
+        from basex import BaseXSerdesSource, BaseXSerdesSink
     finally:
         del sys.path[0]
 
@@ -49,39 +51,77 @@ class TB:
 
         cocotb.start_soon(Clock(dut.sfp_mgt_refclk_2_p, 6.4, units="ns").start())
 
-        for ch in dut.sfp_mac_inst.ch:
+        for ch in dut.sfp_mac.sfp_mac_inst.ch:
             gt_inst = ch.ch_inst.gt.gt_inst
 
-            if ch.ch_inst.CFG_LOW_LATENCY.value:
-                clk = 3.102
-                gbx_cfg = (66, [64, 65])
+            if dut.MAC_DATA_W.value == 16:
+                if ch.ch_inst.CFG_LOW_LATENCY.value:
+                    clk = 16
+                    gbx_cfg = None
+                else:
+                    clk = 16
+                    gbx_cfg = None
+
+                cocotb.start_soon(Clock(gt_inst.tx_clk, clk, units="ns").start())
+                cocotb.start_soon(Clock(gt_inst.rx_clk, clk, units="ns").start())
+
+                self.sfp_sources.append(BaseXSerdesSource(
+                    data=gt_inst.serdes_rx_data,
+                    data_k=gt_inst.serdes_rx_data_k,
+                    data_valid=gt_inst.serdes_rx_data_valid,
+                    clock=gt_inst.rx_clk,
+                    enc_8b10b=False,
+                    gbx_cfg=gbx_cfg
+                ))
+                self.sfp_sinks.append(BaseXSerdesSink(
+                    data=gt_inst.serdes_tx_data,
+                    data_k=gt_inst.serdes_tx_data_k,
+                    data_valid=gt_inst.serdes_tx_data_valid,
+                    gbx_sync=gt_inst.serdes_tx_gbx_sync,
+                    clock=gt_inst.tx_clk,
+                    dec_8b10b=False,
+                    gbx_cfg=gbx_cfg
+                ))
+
             else:
-                clk = 3.2
-                gbx_cfg = None
+                if ch.ch_inst.DATA_W.value == 64:
+                    if ch.ch_inst.CFG_LOW_LATENCY.value:
+                        clk = 6.206
+                        gbx_cfg = (66, [64, 65])
+                    else:
+                        clk = 6.4
+                        gbx_cfg = None
+                else:
+                    if ch.ch_inst.CFG_LOW_LATENCY.value:
+                        clk = 3.102
+                        gbx_cfg = (66, [64, 65])
+                    else:
+                        clk = 3.2
+                        gbx_cfg = None
 
-            cocotb.start_soon(Clock(gt_inst.tx_clk, clk, units="ns").start())
-            cocotb.start_soon(Clock(gt_inst.rx_clk, clk, units="ns").start())
+                cocotb.start_soon(Clock(gt_inst.tx_clk, clk, units="ns").start())
+                cocotb.start_soon(Clock(gt_inst.rx_clk, clk, units="ns").start())
 
-            self.sfp_sources.append(BaseRSerdesSource(
-                data=gt_inst.serdes_rx_data,
-                data_valid=gt_inst.serdes_rx_data_valid,
-                hdr=gt_inst.serdes_rx_hdr,
-                hdr_valid=gt_inst.serdes_rx_hdr_valid,
-                clock=gt_inst.rx_clk,
-                slip=gt_inst.serdes_rx_bitslip,
-                reverse=True,
-                gbx_cfg=gbx_cfg
-            ))
-            self.sfp_sinks.append(BaseRSerdesSink(
-                data=gt_inst.serdes_tx_data,
-                data_valid=gt_inst.serdes_tx_data_valid,
-                hdr=gt_inst.serdes_tx_hdr,
-                hdr_valid=gt_inst.serdes_tx_hdr_valid,
-                gbx_sync=gt_inst.serdes_tx_gbx_sync,
-                clock=gt_inst.tx_clk,
-                reverse=True,
-                gbx_cfg=gbx_cfg
-            ))
+                self.sfp_sources.append(BaseRSerdesSource(
+                    data=gt_inst.serdes_rx_data,
+                    data_valid=gt_inst.serdes_rx_data_valid,
+                    hdr=gt_inst.serdes_rx_hdr,
+                    hdr_valid=gt_inst.serdes_rx_hdr_valid,
+                    clock=gt_inst.rx_clk,
+                    slip=gt_inst.serdes_rx_bitslip,
+                    reverse=True,
+                    gbx_cfg=gbx_cfg
+                ))
+                self.sfp_sinks.append(BaseRSerdesSink(
+                    data=gt_inst.serdes_tx_data,
+                    data_valid=gt_inst.serdes_tx_data_valid,
+                    hdr=gt_inst.serdes_tx_hdr,
+                    hdr_valid=gt_inst.serdes_tx_hdr_valid,
+                    gbx_sync=gt_inst.serdes_tx_gbx_sync,
+                    clock=gt_inst.tx_clk,
+                    reverse=True,
+                    gbx_cfg=gbx_cfg
+                ))
 
     async def init(self):
 
@@ -101,12 +141,10 @@ class TB:
             await RisingEdge(self.dut.clk_125mhz)
 
 
-async def mac_test_10g(tb, source, sink):
+async def mac_test(tb, source, sink):
     tb.log.info("Test MAC")
 
-    tb.log.info("Wait for block lock")
-    for k in range(1200):
-        await RisingEdge(tb.dut.clk_125mhz)
+    sink.clear()
 
     tb.log.info("Multiple small packets")
 
@@ -154,9 +192,13 @@ async def run_test(dut):
 
     tests = []
 
+    tb.log.info("Wait for block lock")
+    for k in range(1200):
+        await RisingEdge(dut.clk_125mhz)
+
     for k in range(len(tb.sfp_sources)):
-        tb.log.info("Start SFP %d 10G MAC loopback test", k)
-        tests.append(cocotb.start_soon(mac_test_10g(tb, tb.sfp_sources[k], tb.sfp_sinks[k])))
+        tb.log.info("Start SFP %d MAC loopback test", k)
+        tests.append(cocotb.start_soon(mac_test(tb, tb.sfp_sources[k], tb.sfp_sinks[k])))
 
     await Combine(*tests)
 
@@ -185,7 +227,8 @@ def process_f_files(files):
     return list(lst.values())
 
 
-def test_fpga_core(request):
+@pytest.mark.parametrize("mac_data_w", [16, 32, 64])
+def test_fpga_core(request, mac_data_w):
     dut = "fpga_core"
     module = os.path.splitext(os.path.basename(__file__))[0]
     toplevel = dut
@@ -193,6 +236,7 @@ def test_fpga_core(request):
     verilog_sources = [
         os.path.join(rtl_dir, f"{dut}.sv"),
         os.path.join(taxi_src_dir, "eth", "rtl", "us", "taxi_eth_mac_25g_us.f"),
+        os.path.join(taxi_src_dir, "eth", "rtl", "us", "taxi_eth_mac_1g_basex_us.f"),
         os.path.join(taxi_src_dir, "axis", "rtl", "taxi_axis_async_fifo.f"),
         os.path.join(taxi_src_dir, "sync", "rtl", "taxi_sync_reset.sv"),
         os.path.join(taxi_src_dir, "sync", "rtl", "taxi_sync_signal.sv"),
@@ -205,6 +249,9 @@ def test_fpga_core(request):
     parameters['SIM'] = "1'b1"
     parameters['VENDOR'] = "\"XILINX\""
     parameters['FAMILY'] = "\"artixuplus\""
+    parameters['CFG_LOW_LATENCY'] = "1'b1"
+    parameters['COMBINED_MAC_PCS'] = "1'b1"
+    parameters['MAC_DATA_W'] = mac_data_w
 
     extra_env = {f'PARAM_{k}': str(v) for k, v in parameters.items()}
 

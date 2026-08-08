@@ -60,7 +60,7 @@ class TB:
         for ch in dut.sfp_mac.sfp_mac_inst.ch:
             gt_inst = ch.ch_inst.gt.gt_inst
 
-            if dut.SFP_RATE.value == 0:
+            if dut.MAC_DATA_W.value == 16:
                 if ch.ch_inst.CFG_LOW_LATENCY.value:
                     clk = 16
                     gbx_cfg = None
@@ -245,8 +245,8 @@ def process_f_files(files):
     return list(lst.values())
 
 
-@pytest.mark.parametrize(("sfp_rate", "mac_data_w"), [(0, 16), (1, 32), (1, 64)])
-def test_fpga_core(request, sfp_rate, mac_data_w):
+@pytest.mark.parametrize("mac_data_w", [16, 32, 64])
+def test_fpga_core(request, mac_data_w):
     dut = "fpga_core"
     module = os.path.splitext(os.path.basename(__file__))[0]
     toplevel = dut
@@ -273,7 +273,6 @@ def test_fpga_core(request, sfp_rate, mac_data_w):
     parameters['SIM'] = "1'b1"
     parameters['VENDOR'] = "\"XILINX\""
     parameters['FAMILY'] = "\"kintexu\""
-    parameters['SFP_RATE'] = f"1'b{sfp_rate}"
     parameters['CFG_LOW_LATENCY'] = "1'b1"
     parameters['COMBINED_MAC_PCS'] = "1'b1"
     parameters['MAC_DATA_W'] = mac_data_w

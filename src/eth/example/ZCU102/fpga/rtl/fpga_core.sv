@@ -25,10 +25,10 @@ module fpga_core #
     parameter string FAMILY = "zynquplus",
     // SFP rate selection (0 for 1G, 1 for 10G)
     parameter logic SFP_RATE = 1'b1,
-    // 10G MAC configuration
+    // MAC configuration
     parameter logic CFG_LOW_LATENCY = 1'b1,
     parameter logic COMBINED_MAC_PCS = 1'b1,
-    parameter MAC_DATA_W = SFP_RATE ? 32 : 16
+    parameter MAC_DATA_W = 32
 )
 (
     /*
@@ -262,7 +262,7 @@ xfcp_mod_apb_inst (
     .m_apb(gt_apb_ctrl)
 );
 
-if (SFP_RATE == 0) begin : sfp_mac
+if (MAC_DATA_W == 16) begin : sfp_mac
 
     taxi_eth_mac_1g_basex_us #(
         .SIM(SIM),
@@ -808,30 +808,30 @@ for (genvar n = 0; n < $size(axis_sfp_tx); n = n + 1) begin : sfp_ch
     )
     ch_fifo (
         /*
-            * AXI4-Stream input (sink)
-            */
+         * AXI4-Stream input (sink)
+         */
         .s_clk(sfp_rx_clk[n]),
         .s_rst(sfp_rx_rst[n]),
         .s_axis(axis_sfp_rx[n]),
 
         /*
-            * AXI4-Stream output (source)
-            */
+         * AXI4-Stream output (source)
+         */
         .m_clk(sfp_tx_clk[n]),
         .m_rst(sfp_tx_rst[n]),
         .m_axis(axis_sfp_tx[n]),
 
         /*
-            * Pause
-            */
+         * Pause
+         */
         .s_pause_req(1'b0),
         .s_pause_ack(),
         .m_pause_req(1'b0),
         .m_pause_ack(),
 
         /*
-            * Status
-            */
+         * Status
+         */
         .s_status_depth(),
         .s_status_depth_commit(),
         .s_status_overflow(),

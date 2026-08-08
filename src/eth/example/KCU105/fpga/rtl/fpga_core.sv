@@ -23,12 +23,10 @@ module fpga_core #
     parameter string VENDOR = "XILINX",
     // device family
     parameter string FAMILY = "kintexu",
-    // SFP rate selection (0 for 1G, 1 for 10G)
-    parameter logic SFP_RATE = 1'b1,
-    // 10G MAC configuration
+    // MAC configuration
     parameter logic CFG_LOW_LATENCY = 1'b1,
     parameter logic COMBINED_MAC_PCS = 1'b1,
-    parameter MAC_DATA_W = SFP_RATE ? 32 : 16
+    parameter MAC_DATA_W = 32
 )
 (
     /*
@@ -398,7 +396,7 @@ xfcp_mod_apb_inst (
     .m_apb(gt_apb_ctrl)
 );
 
-if (SFP_RATE == 0) begin : sfp_mac
+if (MAC_DATA_W == 16) begin : sfp_mac
 
     taxi_eth_mac_1g_basex_us #(
         .SIM(SIM),

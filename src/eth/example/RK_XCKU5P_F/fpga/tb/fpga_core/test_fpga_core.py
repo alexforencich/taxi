@@ -20,7 +20,7 @@ import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge, Timer, Combine
 
-from cocotbext.eth import GmiiFrame, RgmiiPhy
+from cocotbext.eth import RgmiiPhy
 from cocotbext.eth import XgmiiFrame
 from cocotbext.uart import UartSource, UartSink
 
@@ -132,52 +132,6 @@ class TB:
 async def mac_test(tb, source, sink):
     tb.log.info("Test MAC")
 
-    tb.log.info("Multiple small packets")
-
-    count = 64
-
-    pkts = [bytearray([(x+k) % 256 for x in range(60)]) for k in range(count)]
-
-    for p in pkts:
-        await source.send(GmiiFrame.from_payload(p))
-
-    for k in range(count):
-        rx_frame = await sink.recv()
-
-        tb.log.info("RX frame: %s", rx_frame)
-
-        assert rx_frame.get_payload() == pkts[k]
-        assert rx_frame.check_fcs()
-        assert rx_frame.error is None
-
-    tb.log.info("Multiple large packets")
-
-    count = 32
-
-    pkts = [bytearray([(x+k) % 256 for x in range(1514)]) for k in range(count)]
-
-    for p in pkts:
-        await source.send(GmiiFrame.from_payload(p))
-
-    for k in range(count):
-        rx_frame = await sink.recv()
-
-        tb.log.info("RX frame: %s", rx_frame)
-
-        assert rx_frame.get_payload() == pkts[k]
-        assert rx_frame.check_fcs()
-        assert rx_frame.error is None
-
-    tb.log.info("MAC test done")
-
-
-async def mac_test_25g(tb, source, sink):
-    tb.log.info("Test MAC")
-
-    tb.log.info("Wait for block lock")
-    for k in range(1200):
-        await RisingEdge(tb.dut.clk)
-
     sink.clear()
 
     tb.log.info("Multiple small packets")
@@ -226,6 +180,10 @@ async def run_test(dut):
 
     tests = []
 
+    tb.log.info("Wait for block lock")
+    for k in range(1200):
+        await RisingEdge(tb.dut.clk)
+
     tb.log.info("Start BASE-T MAC loopback test")
 
     tests.append(cocotb.start_soon(mac_test(tb, tb.baset_phy.rx, tb.baset_phy.tx)))
@@ -233,7 +191,7 @@ async def run_test(dut):
     for k in range(len(tb.qsfp_sources)):
         tb.log.info("Start QSFP %d MAC loopback test", k)
 
-        tests.append(cocotb.start_soon(mac_test_25g(tb, tb.qsfp_sources[k], tb.qsfp_sinks[k])))
+        tests.append(cocotb.start_soon(mac_test(tb, tb.qsfp_sources[k], tb.qsfp_sinks[k])))
 
     await Combine(*tests)
 

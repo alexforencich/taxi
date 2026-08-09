@@ -23,8 +23,8 @@ COCOTB_TOPLEVEL     = $(DUT)
 MODULE   = $(COCOTB_TEST_MODULES)
 TOPLEVEL = $(COCOTB_TOPLEVEL)
 VERILOG_SOURCES += $(RTL_DIR)/$(DUT).sv
-VERILOG_SOURCES += $(TAXI_SRC_DIR)/eth/rtl/taxi_eth_mac_1g_fifo.f
 VERILOG_SOURCES += $(TAXI_SRC_DIR)/eth/rtl/us/taxi_eth_mac_25g_us.f
+VERILOG_SOURCES += $(TAXI_SRC_DIR)/eth/rtl/us/taxi_eth_mac_1g_basex_us.f
 VERILOG_SOURCES += $(TAXI_SRC_DIR)/eth/rtl/taxi_eth_mac_1g_rgmii_fifo.f
 VERILOG_SOURCES += $(TAXI_SRC_DIR)/sync/rtl/taxi_sync_reset.sv
 VERILOG_SOURCES += $(TAXI_SRC_DIR)/sync/rtl/taxi_sync_signal.sv
@@ -40,7 +40,9 @@ export PARAM_SIM := "1'b1"
 export PARAM_VENDOR := "\"XILINX\""
 export PARAM_FAMILY := "\"zynquplus\""
 export PARAM_USE_CLK90 := "1'b1"
-export PARAM_SFP_RATE := "1'b1"
+export PARAM_CFG_LOW_LATENCY := "1'b1"
+export PARAM_COMBINED_MAC_PCS := "1'b1"
+export PARAM_MAC_DATA_W := "32"
 
 ifeq ($(SIM), icarus)
 	PLUSARGS += -fst

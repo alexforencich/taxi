@@ -25,8 +25,10 @@ module fpga #
     parameter string FAMILY = "zynquplus",
     // Use 90 degree clock for RGMII transmit
     parameter logic USE_CLK90 = 1'b1,
-    // SFP rate selection (0 for 1G, 1 for 10G)
-    parameter logic SFP_RATE = 1'b1
+    // MAC configuration
+    parameter logic CFG_LOW_LATENCY = 1'b1,
+    parameter logic COMBINED_MAC_PCS = 1'b1,
+    parameter MAC_DATA_W = 32
 )
 (
     /*
@@ -388,106 +390,14 @@ phy3_rx_ctl_idelay (
     .CNTVALUEOUT()
 );
 
-// SFP
-wire sfp_tx_p_int;
-wire sfp_tx_n_int;
-
-wire sfp_gmii_clk_int;
-wire sfp_gmii_rst_int;
-wire sfp_gmii_clk_en_int = 1'b1;
-wire [7:0] sfp_gmii_txd_int;
-wire sfp_gmii_tx_en_int;
-wire sfp_gmii_tx_er_int;
-wire [7:0] sfp_gmii_rxd_int;
-wire sfp_gmii_rx_dv_int;
-wire sfp_gmii_rx_er_int;
-
-if (SFP_RATE == 0) begin : sfp_phy
-    // 1000BASE-X
-
-    wire sfp_gmii_txuserclk2;
-    wire sfp_gmii_resetdone;
-
-    assign sfp_gmii_clk_int = sfp_gmii_txuserclk2;
-
-    taxi_sync_reset #(
-        .N(4)
-    )
-    sync_reset_sfp_inst (
-        .clk(sfp_gmii_clk_int),
-        .rst(rst_125mhz_int || !sfp_gmii_resetdone),
-        .out(sfp_gmii_rst_int)
-    );
-
-    wire [15:0] sfp_status_vect;
-
-    wire sfp_status_link_status              = sfp_status_vect[0];
-    wire sfp_status_link_synchronization     = sfp_status_vect[1];
-    wire sfp_status_rudi_c                   = sfp_status_vect[2];
-    wire sfp_status_rudi_i                   = sfp_status_vect[3];
-    wire sfp_status_rudi_invalid             = sfp_status_vect[4];
-    wire sfp_status_rxdisperr                = sfp_status_vect[5];
-    wire sfp_status_rxnotintable             = sfp_status_vect[6];
-    wire sfp_status_phy_link_status          = sfp_status_vect[7];
-    wire [1:0] sfp_status_remote_fault_encdg = sfp_status_vect[9:8];
-    wire [1:0] sfp_status_speed              = sfp_status_vect[11:10];
-    wire sfp_status_duplex                   = sfp_status_vect[12];
-    wire sfp_status_remote_fault             = sfp_status_vect[13];
-    wire [1:0] sfp_status_pause              = sfp_status_vect[15:14];
-
-    wire [4:0] sfp_config_vect;
-
-    assign sfp_config_vect[4] = 1'b0; // autonegotiation enable
-    assign sfp_config_vect[3] = 1'b0; // isolate
-    assign sfp_config_vect[2] = 1'b0; // power down
-    assign sfp_config_vect[1] = 1'b0; // loopback enable
-    assign sfp_config_vect[0] = 1'b0; // unidirectional enable
-
-    basex_pcs_pma_0
-    sfp_pcspma (
-        .gtrefclk_p(sfp_mgt_refclk_p),
-        .gtrefclk_n(sfp_mgt_refclk_n),
-        .gtrefclk_out(),
-        .txn(sfp_tx_n),
-        .txp(sfp_tx_p),
-        .rxn(sfp_rx_n),
-        .rxp(sfp_rx_p),
-        .independent_clock_bufg(clk_62mhz_int),
-        .userclk_out(),
-        .userclk2_out(sfp_gmii_txuserclk2),
-        .rxuserclk_out(),
-        .rxuserclk2_out(),
-        .gtpowergood(),
-        .resetdone(sfp_gmii_resetdone),
-        .pma_reset_out(),
-        .mmcm_locked_out(),
-        .gmii_txd(sfp_gmii_txd_int),
-        .gmii_tx_en(sfp_gmii_tx_en_int),
-        .gmii_tx_er(sfp_gmii_tx_er_int),
-        .gmii_rxd(sfp_gmii_rxd_int),
-        .gmii_rx_dv(sfp_gmii_rx_dv_int),
-        .gmii_rx_er(sfp_gmii_rx_er_int),
-        .gmii_isolate(),
-        .configuration_vector(sfp_config_vect),
-        .status_vector(sfp_status_vect),
-        .reset(rst_125mhz_int),
-        .signal_detect(1'b1)
-    );
-
-end else begin
-    // 10GBASE-R
-
-    assign sfp_tx_p = sfp_tx_p_int;
-    assign sfp_tx_n = sfp_tx_n_int;
-
-end
-
 fpga_core #(
     .SIM(SIM),
     .VENDOR(VENDOR),
     .FAMILY(FAMILY),
     .USE_CLK90(USE_CLK90),
-    .SFP_RATE(SFP_RATE)
+    .CFG_LOW_LATENCY(CFG_LOW_LATENCY),
+    .COMBINED_MAC_PCS(COMBINED_MAC_PCS),
+    .MAC_DATA_W(MAC_DATA_W)
 )
 core_inst (
     /*
@@ -528,20 +438,10 @@ core_inst (
      */
     .sfp_rx_p(sfp_rx_p),
     .sfp_rx_n(sfp_rx_n),
-    .sfp_tx_p(sfp_tx_p_int),
-    .sfp_tx_n(sfp_tx_n_int),
+    .sfp_tx_p(sfp_tx_p),
+    .sfp_tx_n(sfp_tx_n),
     .sfp_mgt_refclk_p(sfp_mgt_refclk_p),
     .sfp_mgt_refclk_n(sfp_mgt_refclk_n),
-
-    .sfp_gmii_clk(sfp_gmii_clk_int),
-    .sfp_gmii_rst(sfp_gmii_rst_int),
-    .sfp_gmii_clk_en(sfp_gmii_clk_en_int),
-    .sfp_gmii_rxd(sfp_gmii_rxd_int),
-    .sfp_gmii_rx_dv(sfp_gmii_rx_dv_int),
-    .sfp_gmii_rx_er(sfp_gmii_rx_er_int),
-    .sfp_gmii_txd(sfp_gmii_txd_int),
-    .sfp_gmii_tx_en(sfp_gmii_tx_en_int),
-    .sfp_gmii_tx_er(sfp_gmii_tx_er_int),
 
     .sfp_tx_disable(sfp_tx_disable),
     .sfp_tx_fault(sfp_tx_fault_int),

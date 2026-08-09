@@ -245,7 +245,6 @@ def test_fpga_core(request, mac_data_w):
 
     verilog_sources = [
         os.path.join(rtl_dir, f"{dut}.sv"),
-        os.path.join(taxi_src_dir, "eth", "rtl", "taxi_eth_mac_1g_fifo.f"),
         os.path.join(taxi_src_dir, "eth", "rtl", "us", "taxi_eth_mac_25g_us.f"),
         os.path.join(taxi_src_dir, "eth", "rtl", "us", "taxi_eth_mac_1g_basex_us.f"),
         os.path.join(taxi_src_dir, "xfcp", "rtl", "taxi_xfcp_if_uart.f"),

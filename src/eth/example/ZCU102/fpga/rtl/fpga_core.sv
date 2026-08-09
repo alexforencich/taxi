@@ -23,8 +23,6 @@ module fpga_core #
     parameter string VENDOR = "XILINX",
     // device family
     parameter string FAMILY = "zynquplus",
-    // SFP rate selection (0 for 1G, 1 for 10G)
-    parameter logic SFP_RATE = 1'b1,
     // MAC configuration
     parameter logic CFG_LOW_LATENCY = 1'b1,
     parameter logic COMBINED_MAC_PCS = 1'b1,

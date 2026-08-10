@@ -51,7 +51,7 @@ Note that Zircon is still under active development and may not ready for product
 
 The Taxi transport library contains several Ethernet MAC and PCS variants, covering link rates from 10 Mbps to 25 Gbps.  The MAC modules support LFC and PFC pause frames, PTP timestamping, frame length enforcement, FCS computation and verification, and statistics reporting.  PTP TD leaf clocks and statistics collection components are also integrated, configurable via instance parameters.  Wrappers for low-speed operation support MII, GMII, and RGMII PHY-attach protocols for use with an external PHY chip.  Wrappers for 1000BASE-X and 10GBASE-R/25GBASE-R include device-specific transceiver instances for a fully-integrated solution.  Logic is available for a 10G/25G MAC, 10G/25G PCS, and 10G/25G "fused" MAC+PCS, with reduced latency and resource consumption.
 
-The 100G MAC/PHY/GT wrapper for UltraScale+ supports the hard CMAC for 100G and GTY transceivers.  Currently it only supports operation at 100Gbps, but integration of the 10G/25G MAC logic is planned to support runtime switching to lower link rates as well as breaking out the separate lanes.  Support for the UltraScale CMAC is also planned.
+The 100G MAC/PHY/GT wrapper for UltraScale/UltraScale+ supports the hard CMAC for 100G and GTY transceivers.  Currently it only supports operation at 100Gbps, but integration of the 10G/25G MAC logic is planned to support runtime switching to lower link rates as well as breaking out the separate lanes.  The wrapper only enables RS-FEC on UltraScale+ as the CMACE4 provides RS-FEC support in the hard logic, while the UltraScale CMACE3 requires separately-licensed soft logic for RS-FEC.
 
 The 10G/25G MAC/PHY/GT wrapper for 7-series/UltraScale/UltraScale+ supports GTX, GTH, and GTY transceivers.  On UltraScale and UltraScale+ devices, it can be configured for either a 32-bit or 64-bit datapath via the DATA_W parameter.  The 32-bit datapath supports 10G only, while the 64-bit datapath can be used for either 10G or 25G.  The core supports USXGMII for operation with NBASE-T PHYs and SFP modules (10M/100M/1G/2.5G/5G/10G), including dynamic detection of USXGMII modules.  TCL scripts for generating the GT cores are provided for both 10G and 25G and for several common reference clocks.  The core supports operation in either a normal latency mode or a low latency mode via the CFG_LOW_LATENCY paremter, which affects the clock frequency and transceiver configuration (async gearbox vs. sync gearbox and buffer bypass).  The low latency mode has a slightly higher clock frequency and resource consumption, so it is not recommended unless you really need to shave off a new nanoseconds of latency, or you need highest possible time sync precision.  On 7-series, the core only supports 32-bit low-latency mode.  The wrapper also provides an APB interface for configuring the transceivers and QPLLs.
 
@@ -161,7 +161,7 @@ The Taxi transport library contains many smaller components that can be composed
     *  RGMII PHY interface
     *  1000BASE-X/SGMII MAC/PHY/GT wrapper for UltraScale/UltraScale+
     *  10G/25G/USXGMII MAC/PHY/GT wrapper for 7-series/UltraScale/UltraScale+
-    *  100G MAC/PHY/GY wrapper for UltraScale+
+    *  100G MAC/PHY/GY wrapper for UltraScale/UltraScale+
 *  General input/output
     *  Switch debouncer
     *  LED shift register driver

@@ -65,14 +65,14 @@ class TB:
 
             mac = EthMac(
                 tx_clk=inst.ch[0].ch_inst.gt.gt_inst.gt_txoutclk,
-                tx_rst=inst.tx_rst_out[0],
+                tx_rst=inst.tx_rst_out,
                 tx_bus=AxiStreamBus.from_entity(inst.cmac.cmac_axis_tx),
                 # tx_ptp_time=inst.tx_ptp_ts_out,
                 # tx_ptp_ts=inst.tx_ptp_ts,
                 # tx_ptp_ts_tag=inst.tx_ptp_ts_tag,
                 # tx_ptp_ts_valid=inst.tx_ptp_ts_valid,
                 rx_clk=inst.ch[0].ch_inst.gt.gt_inst.gt_rxoutclk,
-                rx_rst=inst.rx_rst_out[0],
+                rx_rst=inst.rx_rst_out,
                 rx_bus=AxiStreamBus.from_entity(inst.cmac.cmac_axis_rx),
                 # rx_ptp_time=inst.rx_ptp_ts_out,
                 ifg=12, speed=100e9

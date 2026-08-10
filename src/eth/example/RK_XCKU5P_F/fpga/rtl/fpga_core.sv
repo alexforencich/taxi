@@ -270,17 +270,16 @@ assign qsfp_modsell = 1'b0;
 assign qsfp_resetl = 1'b1;
 assign qsfp_lpmode = 1'b0;
 
-wire qsfp_tx_clk[4];
-wire qsfp_tx_rst[4];
-wire qsfp_rx_clk[4];
-wire qsfp_rx_rst[4];
+wire qsfp_tx_clk[MAC_CNT];
+wire qsfp_tx_rst[MAC_CNT];
+wire qsfp_rx_clk[MAC_CNT];
+wire qsfp_rx_rst[MAC_CNT];
 
-wire qsfp_rx_status[4];
+wire qsfp_rx_status[MAC_CNT];
 
-assign led[0] = qsfp_rx_status[0];
-assign led[1] = qsfp_rx_status[1];
-assign led[2] = qsfp_rx_status[2];
-assign led[3] = qsfp_rx_status[3];
+for (genvar n = 0; n < MAC_CNT; n = n + 1) begin
+    assign led[n] = qsfp_rx_status[n];
+end
 
 wire qsfp_gtpowergood;
 
@@ -363,7 +362,7 @@ if (MAC_DATA_W == 512) begin: mac
         .VENDOR(VENDOR),
         .FAMILY(FAMILY),
 
-        .CNT(4),
+        .GT_CNT(4),
 
         // GT config
         .CFG_LOW_LATENCY(CFG_LOW_LATENCY),
@@ -422,12 +421,12 @@ if (MAC_DATA_W == 512) begin: mac
         /*
          * MAC clocks
          */
-        .rx_clk(qsfp_rx_clk),
-        .rx_rst_in('{4{1'b0}}),
-        .rx_rst_out(qsfp_rx_rst),
-        .tx_clk(qsfp_tx_clk),
-        .tx_rst_in('{4{1'b0}}),
-        .tx_rst_out(qsfp_tx_rst),
+        .rx_clk(qsfp_rx_clk[0]),
+        .rx_rst_in(1'b0),
+        .rx_rst_out(qsfp_rx_rst[0]),
+        .tx_clk(qsfp_tx_clk[0]),
+        .tx_rst_in(1'b0),
+        .tx_rst_out(qsfp_tx_rst[0]),
 
         /*
          * Transmit interface (AXI stream)

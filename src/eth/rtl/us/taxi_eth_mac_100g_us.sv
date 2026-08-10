@@ -21,7 +21,7 @@ module taxi_eth_mac_100g_us #
     parameter string VENDOR = "XILINX",
     parameter string FAMILY = "virtexuplus",
 
-    parameter CNT = 4,
+    parameter GT_CNT = 4,
 
     // GT config
     parameter logic CFG_LOW_LATENCY = 0,
@@ -35,19 +35,19 @@ module taxi_eth_mac_100g_us #
 
     // GT parameters
     // TODO switch to packed arrays; blocked on Verilator bug
-    parameter logic [CNT-1:0] GT_TX_PD = '0,
-    parameter logic [CNT-1:0] GT_TX_QPLL_SEL = '0,
-    parameter logic [CNT-1:0] GT_TX_POLARITY = '0,
-    parameter logic [CNT-1:0] GT_TX_ELECIDLE = '0,
-    parameter logic [CNT-1:0] GT_TX_INHIBIT = '0,
-    parameter logic [CNT-1:0][4:0] GT_TX_DIFFCTRL = '{CNT{5'd16}},
-    parameter logic [CNT-1:0][6:0] GT_TX_MAINCURSOR = '{CNT{7'd64}},
-    parameter logic [CNT-1:0][4:0] GT_TX_POSTCURSOR = '{CNT{5'd0}},
-    parameter logic [CNT-1:0][4:0] GT_TX_PRECURSOR = '{CNT{5'd0}},
-    parameter logic [CNT-1:0] GT_RX_PD = '0,
-    parameter logic [CNT-1:0] GT_RX_QPLL_SEL = '0,
-    parameter logic [CNT-1:0] GT_RX_LPM_EN = '1,
-    parameter logic [CNT-1:0] GT_RX_POLARITY = '0,
+    parameter logic [GT_CNT-1:0] GT_TX_PD = '0,
+    parameter logic [GT_CNT-1:0] GT_TX_QPLL_SEL = '0,
+    parameter logic [GT_CNT-1:0] GT_TX_POLARITY = '0,
+    parameter logic [GT_CNT-1:0] GT_TX_ELECIDLE = '0,
+    parameter logic [GT_CNT-1:0] GT_TX_INHIBIT = '0,
+    parameter logic [GT_CNT-1:0][4:0] GT_TX_DIFFCTRL = '{GT_CNT{5'd16}},
+    parameter logic [GT_CNT-1:0][6:0] GT_TX_MAINCURSOR = '{GT_CNT{7'd64}},
+    parameter logic [GT_CNT-1:0][4:0] GT_TX_POSTCURSOR = '{GT_CNT{5'd0}},
+    parameter logic [GT_CNT-1:0][4:0] GT_TX_PRECURSOR = '{GT_CNT{5'd0}},
+    parameter logic [GT_CNT-1:0] GT_RX_PD = '0,
+    parameter logic [GT_CNT-1:0] GT_RX_QPLL_SEL = '0,
+    parameter logic [GT_CNT-1:0] GT_RX_LPM_EN = '1,
+    parameter logic [GT_CNT-1:0] GT_RX_POLARITY = '0,
 
     // MAC/PHY parameters
     parameter logic PTP_TS_EN = 1'b0,
@@ -94,20 +94,20 @@ module taxi_eth_mac_100g_us #
     /*
      * Serial data
      */
-    output wire logic                 xcvr_txp[CNT],
-    output wire logic                 xcvr_txn[CNT],
-    input  wire logic                 xcvr_rxp[CNT],
-    input  wire logic                 xcvr_rxn[CNT],
+    output wire logic                 xcvr_txp[GT_CNT],
+    output wire logic                 xcvr_txn[GT_CNT],
+    input  wire logic                 xcvr_rxp[GT_CNT],
+    input  wire logic                 xcvr_rxn[GT_CNT],
 
     /*
      * MAC clocks
      */
-    output wire logic                 rx_clk[CNT],
-    input  wire logic                 rx_rst_in[CNT] = '{CNT{1'b0}},
-    output wire logic                 rx_rst_out[CNT],
-    output wire logic                 tx_clk[CNT],
-    input  wire logic                 tx_rst_in[CNT] = '{CNT{1'b0}},
-    output wire logic                 tx_rst_out[CNT],
+    output wire logic                 rx_clk,
+    input  wire logic                 rx_rst_in = 1'b0,
+    output wire logic                 rx_rst_out,
+    output wire logic                 tx_clk,
+    input  wire logic                 tx_rst_in = 1'b0,
+    output wire logic                 tx_rst_out,
 
     /*
      * Transmit interface (AXI stream)
@@ -301,14 +301,14 @@ taxi_apb_if #(
     .ADDR_W(16),
     .DATA_W(16)
 )
-ch_apb_ctrl[CNT]();
+ch_apb_ctrl[GT_CNT]();
 
 taxi_apb_interconnect_1s #(
-    .M_CNT(CNT),
+    .M_CNT(GT_CNT),
     .ADDR_W(s_apb_ctrl.ADDR_W),
     .M_REGIONS(1),
     .M_BASE_ADDR('0),
-    .M_ADDR_W({CNT{{1{32'd16}}}})
+    .M_ADDR_W({GT_CNT{{1{32'd16}}}})
 )
 ctrl_intercon_inst (
     .clk(xcvr_ctrl_clk),
@@ -329,20 +329,24 @@ ctrl_intercon_inst (
 localparam STAT_TX_CNT = STAT_TX_LEVEL == 0 ? 8 : (STAT_TX_LEVEL == 1 ? 16: 32);
 localparam STAT_RX_CNT = STAT_RX_LEVEL == 0 ? 8 : (STAT_RX_LEVEL == 1 ? 16: 32);
 
-wire tx_clk_out[CNT];
-wire rx_clk_out[CNT];
+wire tx_clk_int[GT_CNT];
+wire rx_clk_int[GT_CNT];
+wire tx_rst_int[GT_CNT];
+wire rx_rst_int[GT_CNT];
 
-assign tx_clk = '{CNT{tx_clk_out[0]}};
-assign rx_clk = rx_clk_out;
+assign tx_clk = tx_clk_int[0];
+assign rx_clk = rx_clk_int[0];
+assign tx_rst_out = tx_rst_int[0];
+assign rx_rst_out = rx_rst_int[0];
 
-wire [127:0] serdes_txdata[CNT];
-wire [15:0]  serdes_txctrl0[CNT];
-wire [15:0]  serdes_txctrl1[CNT];
-wire [127:0] serdes_rxdata[CNT];
-wire [15:0]  serdes_rxctrl0[CNT];
-wire [15:0]  serdes_rxctrl1[CNT];
+wire [127:0] serdes_txdata[GT_CNT];
+wire [15:0]  serdes_txctrl0[GT_CNT];
+wire [15:0]  serdes_txctrl1[GT_CNT];
+wire [127:0] serdes_rxdata[GT_CNT];
+wire [15:0]  serdes_rxctrl0[GT_CNT];
+wire [15:0]  serdes_rxctrl1[GT_CNT];
 
-for (genvar n = 0; n < CNT; n = n + 1) begin : ch
+for (genvar n = 0; n < GT_CNT; n = n + 1) begin : ch
 
     localparam HAS_COMMON = n == 0;
 
@@ -448,14 +452,14 @@ for (genvar n = 0; n < CNT; n = n + 1) begin : ch
         /*
          * MAC clocks
          */
-        .rx_clk_out(rx_clk_out[n]),
-        .rx_clk_in(rx_clk[n]),
-        .rx_rst_in(rx_rst_in[n]),
-        .rx_rst_out(rx_rst_out[n]),
-        .tx_clk_out(tx_clk_out[n]),
-        .tx_clk_in(tx_clk[n]),
-        .tx_rst_in(tx_rst_in[n]),
-        .tx_rst_out(tx_rst_out[n]),
+        .rx_clk_out(rx_clk_int[n]),
+        .rx_clk_in(rx_clk_int[n]),
+        .rx_rst_in(rx_rst_in),
+        .rx_rst_out(rx_rst_int[n]),
+        .tx_clk_out(tx_clk_int[n]),
+        .tx_clk_in(tx_clk),
+        .tx_rst_in(tx_rst_in),
+        .tx_rst_out(tx_rst_int[n]),
 
         /*
          * Serdes interface
@@ -477,7 +481,7 @@ wire [511:0] cmac_rxdata;
 wire [63:0]  cmac_rxctrl0;
 wire [63:0]  cmac_rxctrl1;
 
-for (genvar n = 0; n < 4; n = n + 1) begin
+for (genvar n = 0; n < GT_CNT; n = n + 1) begin
     assign serdes_txdata[n] = cmac_txdata[n*128 +: 128];
     assign serdes_txctrl0[n] = cmac_txctrl0[n*16 +: 16];
     assign serdes_txctrl1[n] = cmac_txctrl1[n*16 +: 16];
@@ -496,8 +500,8 @@ taxi_axis_pad #(
     .UNDERFLOW_DROP_EN(1'b1)
 )
 tx_pad_inst (
-    .clk(tx_clk[0]),
-    .rst(tx_rst_out[0]),
+    .clk(tx_clk),
+    .rst(tx_rst_out),
 
     /*
      * AXI4-Stream input (sink)
@@ -541,7 +545,7 @@ if (SIM) begin : cmac
         .m_axis(m_axis_rx)
     );
 
-    assign rx_status = !rx_rst_out[0];
+    assign rx_status = !rx_rst_out;
 
 end else if (GT_USP) begin : cmac
     // UltraScale+ CMACE4
@@ -671,7 +675,7 @@ end else if (GT_USP) begin : cmac
         .ctl_rx_force_resync('0),
         .ctl_rx_test_pattern('0),
 
-        .rx_clk(rx_clk[0]),
+        .rx_clk(rx_clk),
 
         .stat_rx_aligned(),
         .stat_rx_aligned_err(),
@@ -850,7 +854,7 @@ end else if (GT_USP) begin : cmac
         .ctl_tx_send_lfi('0),
         .ctl_tx_test_pattern('0),
 
-        .tx_clk(tx_clk[0]),
+        .tx_clk(tx_clk),
 
         .stat_tx_pause_valid(),
         .stat_tx_pause(stat_tx_lfc_pkt),
@@ -889,11 +893,11 @@ end else if (GT_USP) begin : cmac
         .tx_unfout(),
         .tx_preamblein(56'd0),
 
-        .tx_reset_done(tx_rst_out[0]),
-        .rx_reset_done(rx_rst_out[0]),
+        .tx_reset_done(tx_rst_out),
+        .rx_reset_done(rx_rst_out),
 
-        .rx_serdes_reset_done({6'h3f, rx_rst_out[3], rx_rst_out[2], rx_rst_out[1], rx_rst_out[0]}),
-        .rx_serdes_clk_in({6'd0, rx_clk[3], rx_clk[2], rx_clk[1], rx_clk[0]}),
+        .rx_serdes_reset_done({6'h3f, rx_rst_int[3], rx_rst_int[2], rx_rst_int[1], rx_rst_int[0]}),
+        .rx_serdes_clk_in({6'd0, rx_clk_int[3], rx_clk_int[2], rx_clk_int[1], rx_clk_int[0]}),
 
         .drp_clk('0),
         .drp_addr('0),
@@ -991,7 +995,7 @@ end else begin
         .ctl_rx_force_resync('0),
         .ctl_rx_test_pattern('0),
 
-        .rx_clk(rx_clk[0]),
+        .rx_clk(rx_clk),
 
         .stat_rx_aligned(),
         .stat_rx_aligned_err(),
@@ -1169,7 +1173,7 @@ end else begin
         .ctl_tx_send_rfi('0),
         .ctl_tx_test_pattern('0),
 
-        .tx_clk(tx_clk[0]),
+        .tx_clk(tx_clk),
 
         .stat_tx_pause_valid(),
         .stat_tx_pause(stat_tx_lfc_pkt),
@@ -1207,11 +1211,11 @@ end else begin
         .tx_ovfout(),
         .tx_unfout(),
 
-        .tx_reset_done(tx_rst_out[0]),
-        .rx_reset_done(rx_rst_out[0]),
+        .tx_reset_done(tx_rst_out),
+        .rx_reset_done(rx_rst_out),
 
-        .rx_serdes_reset_done({6'h3f, rx_rst_out[3], rx_rst_out[2], rx_rst_out[1], rx_rst_out[0]}),
-        .rx_serdes_clk_in({6'd0, rx_clk[3], rx_clk[2], rx_clk[1], rx_clk[0]}),
+        .rx_serdes_reset_done({6'h3f, rx_rst_int[3], rx_rst_int[2], rx_rst_int[1], rx_rst_int[0]}),
+        .rx_serdes_clk_in({6'd0, rx_clk_int[3], rx_clk_int[2], rx_clk_int[1], rx_clk_int[0]}),
 
         .drp_clk('0),
         .drp_addr('0),
@@ -1236,10 +1240,10 @@ if (STAT_EN) begin : stats
         .INC_W(7)
     )
     mac_stats_inst (
-        .rx_clk(rx_clk[0]),
-        .rx_rst(rx_rst_out[0]),
-        .tx_clk(tx_clk[0]),
-        .tx_rst(tx_rst_out[0]),
+        .rx_clk(rx_clk),
+        .rx_rst(rx_rst_out),
+        .tx_clk(tx_clk),
+        .tx_rst(tx_rst_out),
 
         /*
          * Statistics

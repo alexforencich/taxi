@@ -258,7 +258,7 @@ def process_f_files(files):
     return list(lst.values())
 
 
-@pytest.mark.parametrize("mac_data_w", [32, 64])
+@pytest.mark.parametrize("mac_data_w", [32, 64, 512])
 def test_fpga_core(request, mac_data_w):
     dut = "fpga_core"
     module = os.path.splitext(os.path.basename(__file__))[0]

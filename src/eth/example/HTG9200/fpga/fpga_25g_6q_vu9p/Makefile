@@ -7,7 +7,7 @@
 #
 
 # FPGA settings
-FPGA_PART = xcvu13p-fhgb2104-2-e
+FPGA_PART = xcvu9p-flgb2104-2-e
 FPGA_TOP = fpga
 FPGA_ARCH = virtexuplus
 
@@ -16,10 +16,10 @@ LIB_DIR = ../lib
 TAXI_SRC_DIR = $(LIB_DIR)/taxi/src
 
 # Files for synthesis
-SYN_FILES = $(RTL_DIR)/fpga.sv
+SYN_FILES = $(RTL_DIR)/fpga_6qsfp.sv
 SYN_FILES += $(RTL_DIR)/fpga_core.sv
-SYN_FILES += $(RTL_DIR)/../pll/si5341_i2c_init.sv
-SYN_FILES += $(TAXI_SRC_DIR)/eth/rtl/us/taxi_eth_mac_100g_us.f
+SYN_FILES += $(RTL_DIR)/../pll/si5341_i2c_init_6qsfp.sv
+SYN_FILES += $(TAXI_SRC_DIR)/eth/rtl/us/taxi_eth_mac_25g_us.f
 SYN_FILES += $(TAXI_SRC_DIR)/xfcp/rtl/taxi_xfcp_if_uart.f
 SYN_FILES += $(TAXI_SRC_DIR)/xfcp/rtl/taxi_xfcp_switch.sv
 SYN_FILES += $(TAXI_SRC_DIR)/xfcp/rtl/taxi_xfcp_mod_apb.f
@@ -36,15 +36,14 @@ XDC_FILES += ../syn/gpio.xdc
 XDC_FILES += ../syn/i2c.xdc
 XDC_FILES += ../syn/pll.xdc
 XDC_FILES += ../syn/qsfp.xdc
-XDC_FILES += ../syn/eth_cmac_vu13p.xdc
+XDC_FILES += ../syn/fmcp_htg_6qsfp.xdc
 XDC_FILES += $(TAXI_SRC_DIR)/eth/syn/vivado/taxi_eth_mac_fifo.tcl
 XDC_FILES += $(TAXI_SRC_DIR)/axis/syn/vivado/taxi_axis_async_fifo.tcl
 XDC_FILES += $(TAXI_SRC_DIR)/sync/syn/vivado/taxi_sync_reset.tcl
 XDC_FILES += $(TAXI_SRC_DIR)/sync/syn/vivado/taxi_sync_signal.tcl
 
 # IP
-IP_TCL_FILES += $(TAXI_SRC_DIR)/eth/rtl/us/taxi_eth_mac_100g_us_cmace4.tcl
-IP_TCL_FILES += $(TAXI_SRC_DIR)/eth/rtl/us/taxi_eth_mac_100g_us_gty_161.tcl
+IP_TCL_FILES = $(TAXI_SRC_DIR)/eth/rtl/us/taxi_eth_phy_25g_us_gty_25g_161.tcl
 
 # Configuration
 CONFIG_TCL_FILES = ./config.tcl

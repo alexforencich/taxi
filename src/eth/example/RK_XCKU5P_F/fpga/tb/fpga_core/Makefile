@@ -25,6 +25,7 @@ TOPLEVEL = $(COCOTB_TOPLEVEL)
 VERILOG_SOURCES += $(RTL_DIR)/$(DUT).sv
 VERILOG_SOURCES += $(TAXI_SRC_DIR)/eth/rtl/taxi_eth_mac_1g_rgmii_fifo.f
 VERILOG_SOURCES += $(TAXI_SRC_DIR)/eth/rtl/us/taxi_eth_mac_25g_us.f
+VERILOG_SOURCES += $(TAXI_SRC_DIR)/eth/rtl/us/taxi_eth_mac_100g_us.f
 VERILOG_SOURCES += $(TAXI_SRC_DIR)/xfcp/rtl/taxi_xfcp_if_uart.f
 VERILOG_SOURCES += $(TAXI_SRC_DIR)/xfcp/rtl/taxi_xfcp_switch.sv
 VERILOG_SOURCES += $(TAXI_SRC_DIR)/xfcp/rtl/taxi_xfcp_mod_apb.f
@@ -45,7 +46,7 @@ export PARAM_VENDOR := "\"XILINX\""
 export PARAM_FAMILY := "\"kintexuplus\""
 export PARAM_CFG_LOW_LATENCY := "1'b1"
 export PARAM_COMBINED_MAC_PCS := "1'b1"
-export PARAM_MAC_DATA_W := "64"
+export PARAM_MAC_DATA_W := "512"
 
 ifeq ($(SIM), icarus)
 	PLUSARGS += -fst

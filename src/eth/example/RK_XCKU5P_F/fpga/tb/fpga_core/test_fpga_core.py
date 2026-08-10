@@ -20,8 +20,11 @@ import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge, Timer, Combine
 
+from cocotbext.eth import EthMacFrame, EthMac
 from cocotbext.eth import RgmiiPhy
+from cocotbext.eth import GmiiFrame
 from cocotbext.eth import XgmiiFrame
+from cocotbext.axi import AxiStreamBus
 from cocotbext.uart import UartSource, UartSink
 
 try:
@@ -53,10 +56,40 @@ class TB:
         self.qsfp_sources = []
         self.qsfp_sinks = []
 
-        for ch in dut.qsfp_mac_inst.ch:
+        has_cmac = False
+
+        if dut.MAC_DATA_W.value == 512:
+            inst = dut.mac.qsfp_mac_inst
+
+            has_cmac = True
+
+            mac = EthMac(
+                tx_clk=inst.ch[0].ch_inst.gt.gt_inst.gt_txoutclk,
+                tx_rst=inst.tx_rst_out[0],
+                tx_bus=AxiStreamBus.from_entity(inst.cmac.cmac_axis_tx),
+                # tx_ptp_time=inst.tx_ptp_ts_out,
+                # tx_ptp_ts=inst.tx_ptp_ts,
+                # tx_ptp_ts_tag=inst.tx_ptp_ts_tag,
+                # tx_ptp_ts_valid=inst.tx_ptp_ts_valid,
+                rx_clk=inst.ch[0].ch_inst.gt.gt_inst.gt_rxoutclk,
+                rx_rst=inst.rx_rst_out[0],
+                rx_bus=AxiStreamBus.from_entity(inst.cmac.cmac_axis_rx),
+                # rx_ptp_time=inst.rx_ptp_ts_out,
+                ifg=12, speed=100e9
+            )
+
+            self.qsfp_sources.append(mac.rx)
+            self.qsfp_sinks.append(mac.tx)
+
+        for ch in dut.mac.qsfp_mac_inst.ch:
             gt_inst = ch.ch_inst.gt.gt_inst
 
-            if ch.ch_inst.DATA_W.value == 64:
+            if has_cmac:
+                clk = 3.102
+                cocotb.start_soon(Clock(gt_inst.gt_txoutclk, clk, units="ns").start())
+                cocotb.start_soon(Clock(gt_inst.gt_rxoutclk, clk, units="ns").start())
+                continue
+            elif ch.ch_inst.DATA_W.value == 64:
                 if ch.ch_inst.CFG_LOW_LATENCY.value:
                     clk = 2.482
                     gbx_cfg = (66, [64, 65])
@@ -129,7 +162,7 @@ class TB:
             await t
 
 
-async def mac_test(tb, source, sink):
+async def mac_test(tb, source, sink, frame_type=GmiiFrame):
     tb.log.info("Test MAC")
 
     sink.clear()
@@ -141,7 +174,7 @@ async def mac_test(tb, source, sink):
     pkts = [bytearray([(x+k) % 256 for x in range(60)]) for k in range(count)]
 
     for p in pkts:
-        await source.send(XgmiiFrame.from_payload(p))
+        await source.send(frame_type.from_payload(p))
 
     for k in range(count):
         rx_frame = await sink.recv()
@@ -158,7 +191,7 @@ async def mac_test(tb, source, sink):
     pkts = [bytearray([(x+k) % 256 for x in range(1514)]) for k in range(count)]
 
     for p in pkts:
-        await source.send(XgmiiFrame.from_payload(p))
+        await source.send(frame_type.from_payload(p))
 
     for k in range(count):
         rx_frame = await sink.recv()
@@ -186,12 +219,16 @@ async def run_test(dut):
 
     tb.log.info("Start BASE-T MAC loopback test")
 
-    tests.append(cocotb.start_soon(mac_test(tb, tb.baset_phy.rx, tb.baset_phy.tx)))
+    tests.append(cocotb.start_soon(mac_test(tb, tb.baset_phy.rx, tb.baset_phy.tx, GmiiFrame)))
+
+    ft = XgmiiFrame
+    if dut.MAC_DATA_W.value == 512:
+        ft = EthMacFrame
 
     for k in range(len(tb.qsfp_sources)):
         tb.log.info("Start QSFP %d MAC loopback test", k)
 
-        tests.append(cocotb.start_soon(mac_test(tb, tb.qsfp_sources[k], tb.qsfp_sinks[k])))
+        tests.append(cocotb.start_soon(mac_test(tb, tb.qsfp_sources[k], tb.qsfp_sinks[k], ft)))
 
     await Combine(*tests)
 

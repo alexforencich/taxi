@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 /*
 
-Copyright (c) 2014-2025 FPGA Ninja, LLC
+Copyright (c) 2014-2026 FPGA Ninja, LLC
 
 Authors:
 - Alex Forencich
@@ -23,10 +23,10 @@ module fpga #
     parameter string VENDOR = "XILINX",
     // device family
     parameter string FAMILY = "virtexuplus",
-    // 10G/25G MAC configuration
+    // MAC configuration
     parameter logic CFG_LOW_LATENCY = 1'b1,
     parameter logic COMBINED_MAC_PCS = 1'b1,
-    parameter MAC_DATA_W = 64
+    parameter MAC_DATA_W = 512
 )
 (
     /*

@@ -8,10 +8,10 @@
 
 set params [dict create]
 
-# 10G MAC configuration
+# MAC configuration
 dict set params CFG_LOW_LATENCY "1"
 dict set params COMBINED_MAC_PCS "1"
-dict set params MAC_DATA_W "64"
+dict set params MAC_DATA_W "512"
 
 # apply parameters to top-level
 set param_list {}

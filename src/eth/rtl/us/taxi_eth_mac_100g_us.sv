@@ -269,6 +269,9 @@ module taxi_eth_mac_100g_us #
     input  wire logic                 cfg_rx_pfc_en = 1'b0
 );
 
+localparam GT_USP = FAMILY == "kintexuplus" || FAMILY == "virtexuplus" || FAMILY == "virtexuplusHBM"
+    || FAMILY == "virtexuplus58G" || FAMILY == "zynquplus" || FAMILY == "zynquplusRFSOC" || FAMILY == "artixuplus";
+
 localparam DATA_W = s_axis_tx.DATA_W;
 localparam KEEP_W = s_axis_tx.KEEP_W;
 localparam TX_USER_W = 1;
@@ -521,10 +524,27 @@ tx_pad_inst (
 );
 
 if (SIM) begin : cmac
+    // simulation (no CMAC)
 
-    // TODO
+    taxi_axis_if #(.DATA_W(DATA_W), .KEEP_W(KEEP_W), .USER_EN(1), .USER_W(TX_USER_W), .ID_EN(1), .ID_W(TX_TAG_W)) cmac_axis_tx();
+    taxi_axis_if #(.DATA_W(DATA_W), .KEEP_W(KEEP_W), .USER_EN(1), .USER_W(RX_USER_W)) cmac_axis_rx();
 
-end else begin : cmac
+    taxi_axis_tie
+    tx_tie_inst (
+        .s_axis(axis_tx_pad),
+        .m_axis(cmac_axis_tx)
+    );
+
+    taxi_axis_tie
+    rx_tie_inst (
+        .s_axis(cmac_axis_rx),
+        .m_axis(m_axis_rx)
+    );
+
+    assign rx_status = !rx_rst_out[0];
+
+end else if (GT_USP) begin : cmac
+    // UltraScale+ CMAC
 
     taxi_eth_mac_100g_us_cmac cmac_inst (
         .txdata_in(cmac_txdata),
@@ -883,6 +903,10 @@ end else begin : cmac
         .drp_do(),
         .drp_rdy()
     );
+
+end else begin
+
+    $fatal(0, "Error: invalid configuration (%m)");
 
 end
 

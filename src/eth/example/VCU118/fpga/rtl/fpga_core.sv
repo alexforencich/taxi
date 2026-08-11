@@ -823,7 +823,7 @@ for (genvar n = 0; n < 2; n = n + 1) begin : gt_quad
             .VENDOR(VENDOR),
             .FAMILY(FAMILY),
 
-            .CNT(4),
+            .CNT(CNT),
 
             // GT config
             .CFG_LOW_LATENCY(CFG_LOW_LATENCY),
@@ -858,13 +858,13 @@ for (genvar n = 0; n < 2; n = n + 1) begin : gt_quad
             .xcvr_ctrl_rst(qsfp_rst),
 
             /*
-            * Transceiver control
-            */
+             * Transceiver control
+             */
             .s_apb_ctrl(gt_apb_ctrl),
 
             /*
-            * Common
-            */
+             * Common
+             */
             .xcvr_gtpowergood_out(qsfp_gtpowergood[n]),
             .xcvr_gtrefclk00_in(qsfp1_mgt_refclk_0),
             .xcvr_qpll0pd_in(1'b0),
@@ -882,16 +882,16 @@ for (genvar n = 0; n < 2; n = n + 1) begin : gt_quad
             .xcvr_qpll1refclk_out(),
 
             /*
-            * Serial data
-            */
+             * Serial data
+             */
             .xcvr_txp(qsfp_tx_p[n*CNT +: CNT]),
             .xcvr_txn(qsfp_tx_n[n*CNT +: CNT]),
             .xcvr_rxp(qsfp_rx_p[n*CNT +: CNT]),
             .xcvr_rxn(qsfp_rx_n[n*CNT +: CNT]),
 
             /*
-            * MAC clocks
-            */
+             * MAC clocks
+             */
             .rx_clk(qsfp_rx_clk[n*CNT +: CNT]),
             .rx_rst_in('{CNT{1'b0}}),
             .rx_rst_out(qsfp_rx_rst[n*CNT +: CNT]),
@@ -900,19 +900,19 @@ for (genvar n = 0; n < 2; n = n + 1) begin : gt_quad
             .tx_rst_out(qsfp_tx_rst[n*CNT +: CNT]),
 
             /*
-            * Transmit interface (AXI stream)
-            */
+             * Transmit interface (AXI stream)
+             */
             .s_axis_tx(axis_qsfp_tx[n*CNT +: CNT]),
             .m_axis_tx_cpl(axis_qsfp_tx_cpl[n*CNT +: CNT]),
 
             /*
-            * Receive interface (AXI stream)
-            */
+             * Receive interface (AXI stream)
+             */
             .m_axis_rx(axis_qsfp_rx[n*CNT +: CNT]),
 
             /*
-            * USXGMII autonegotiation
-            */
+             * USXGMII autonegotiation
+             */
             .an_en('{CNT{1'b1}}),
             .an_restart('{CNT{1'b0}}),
             .an_speedup('{CNT{1'b0}}),
@@ -931,8 +931,8 @@ for (genvar n = 0; n < 2; n = n + 1) begin : gt_quad
             .an_res_full_duplex(),
 
             /*
-            * PTP clock
-            */
+             * PTP clock
+             */
             .ptp_clk(1'b0),
             .ptp_rst(1'b0),
             .ptp_sample_clk(1'b0),
@@ -947,8 +947,8 @@ for (genvar n = 0; n < 2; n = n + 1) begin : gt_quad
             .rx_ptp_locked(),
 
             /*
-            * Link-level Flow Control (LFC) (IEEE 802.3 annex 31B PAUSE)
-            */
+             * Link-level Flow Control (LFC) (IEEE 802.3 annex 31B PAUSE)
+             */
             .tx_lfc_req('{CNT{1'b0}}),
             .tx_lfc_resend('{CNT{1'b0}}),
             .rx_lfc_en('{CNT{1'b0}}),
@@ -956,8 +956,8 @@ for (genvar n = 0; n < 2; n = n + 1) begin : gt_quad
             .rx_lfc_ack('{CNT{1'b0}}),
 
             /*
-            * Priority Flow Control (PFC) (IEEE 802.3 annex 31D PFC)
-            */
+             * Priority Flow Control (PFC) (IEEE 802.3 annex 31D PFC)
+             */
             .tx_pfc_req('{CNT{'0}}),
             .tx_pfc_resend('{CNT{1'b0}}),
             .rx_pfc_en('{CNT{'0}}),
@@ -965,22 +965,22 @@ for (genvar n = 0; n < 2; n = n + 1) begin : gt_quad
             .rx_pfc_ack('{CNT{'0}}),
 
             /*
-            * Pause interface
-            */
+             * Pause interface
+             */
             .tx_lfc_pause_en('{CNT{1'b0}}),
             .tx_pause_req('{CNT{1'b0}}),
             .tx_pause_ack(),
 
             /*
-            * Statistics
-            */
+             * Statistics
+             */
             .stat_clk(clk_125mhz),
             .stat_rst(rst_125mhz),
             .m_axis_stat(axis_eth_stat[n+1]),
 
             /*
-            * Status
-            */
+             * Status
+             */
             .tx_start_packet(),
             .stat_tx_byte(),
             .stat_tx_pkt_len(),
@@ -1035,8 +1035,8 @@ for (genvar n = 0; n < 2; n = n + 1) begin : gt_quad
             .stat_rx_pfc_paused(),
 
             /*
-            * Configuration
-            */
+             * Configuration
+             */
             .cfg_tx_pad_en('{CNT{1'b1}}),
             .cfg_tx_min_pkt_len('{CNT{8'd60-1}}),
             .cfg_tx_max_pkt_len('{CNT{16'd9218-1}}),

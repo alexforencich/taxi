@@ -193,19 +193,21 @@ stat_mux_inst (
 );
 
 // QSFP28
+localparam MAC_CNT = MAC_DATA_W > 64 ? GTY_QUAD_CNT : GTY_CNT;
+
 assign eth_port_resetl = '1;
 assign eth_port_lpmode = '0;
 
-wire eth_gty_tx_clk[GTY_CNT];
-wire eth_gty_tx_rst[GTY_CNT];
-taxi_axis_if #(.DATA_W(MAC_DATA_W), .ID_W(8), .USER_EN(1), .USER_W(1)) eth_gty_axis_tx[GTY_CNT]();
-taxi_axis_if #(.DATA_W(96), .KEEP_W(1), .ID_W(8)) eth_gty_axis_tx_cpl[GTY_CNT]();
+wire eth_gty_tx_clk[MAC_CNT];
+wire eth_gty_tx_rst[MAC_CNT];
+taxi_axis_if #(.DATA_W(MAC_DATA_W), .ID_W(8), .USER_EN(1), .USER_W(1)) eth_gty_axis_tx[MAC_CNT]();
+taxi_axis_if #(.DATA_W(96), .KEEP_W(1), .ID_W(8)) eth_gty_axis_tx_cpl[MAC_CNT]();
 
-wire eth_gty_rx_clk[GTY_CNT];
-wire eth_gty_rx_rst[GTY_CNT];
-taxi_axis_if #(.DATA_W(MAC_DATA_W), .ID_W(8), .USER_EN(1), .USER_W(1)) eth_gty_axis_rx[GTY_CNT]();
+wire eth_gty_rx_clk[MAC_CNT];
+wire eth_gty_rx_rst[MAC_CNT];
+taxi_axis_if #(.DATA_W(MAC_DATA_W), .ID_W(8), .USER_EN(1), .USER_W(1)) eth_gty_axis_rx[MAC_CNT]();
 
-wire eth_gty_rx_status[GTY_CNT];
+wire eth_gty_rx_status[MAC_CNT];
 
 wire [GTY_QUAD_CNT-1:0] eth_gty_gtpowergood;
 

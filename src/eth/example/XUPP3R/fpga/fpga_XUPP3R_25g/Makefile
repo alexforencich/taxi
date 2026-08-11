@@ -18,7 +18,7 @@ TAXI_SRC_DIR = $(LIB_DIR)/taxi/src
 # Files for synthesis
 SYN_FILES = $(RTL_DIR)/fpga_xupp3r.sv
 SYN_FILES += $(RTL_DIR)/fpga_core.sv
-SYN_FILES += $(TAXI_SRC_DIR)/eth/rtl/us/taxi_eth_mac_100g_us.f
+SYN_FILES += $(TAXI_SRC_DIR)/eth/rtl/us/taxi_eth_mac_25g_us.f
 SYN_FILES += $(TAXI_SRC_DIR)/xfcp/rtl/taxi_xfcp_if_uart.f
 SYN_FILES += $(TAXI_SRC_DIR)/xfcp/rtl/taxi_xfcp_switch.sv
 SYN_FILES += $(TAXI_SRC_DIR)/xfcp/rtl/taxi_xfcp_mod_apb.f
@@ -32,15 +32,13 @@ XDC_FILES += ../syn/XUPP3R/fpga.xdc
 XDC_FILES += ../syn/XUPP3R/gpio.xdc
 XDC_FILES += ../syn/XUPP3R/i2c.xdc
 XDC_FILES += ../syn/XUPP3R/qsfp.xdc
-XDC_FILES += ../syn/XUPP3R/eth_cmac.xdc
 XDC_FILES += $(TAXI_SRC_DIR)/eth/syn/vivado/taxi_eth_mac_fifo.tcl
 XDC_FILES += $(TAXI_SRC_DIR)/axis/syn/vivado/taxi_axis_async_fifo.tcl
 XDC_FILES += $(TAXI_SRC_DIR)/sync/syn/vivado/taxi_sync_reset.tcl
 XDC_FILES += $(TAXI_SRC_DIR)/sync/syn/vivado/taxi_sync_signal.tcl
 
 # IP
-IP_TCL_FILES += $(TAXI_SRC_DIR)/eth/rtl/us/taxi_eth_mac_100g_us_cmace4.tcl
-IP_TCL_FILES += $(TAXI_SRC_DIR)/eth/rtl/us/taxi_eth_mac_100g_us_gty_322.tcl
+IP_TCL_FILES += $(TAXI_SRC_DIR)/eth/rtl/us/taxi_eth_phy_25g_us_gty_25g_322.tcl
 
 # Configuration
 CONFIG_TCL_FILES = config.tcl

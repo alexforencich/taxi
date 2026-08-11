@@ -7,7 +7,7 @@
 #
 
 # FPGA settings
-FPGA_PART = xcu280-fsvh2892-2L-e
+FPGA_PART = xcu26-vsva1365-2LV-e
 FPGA_TOP = fpga
 FPGA_ARCH = virtexuplus
 
@@ -16,9 +16,9 @@ LIB_DIR = ../lib
 TAXI_SRC_DIR = $(LIB_DIR)/taxi/src
 
 # Files for synthesis
-SYN_FILES = $(RTL_DIR)/fpga_au280.sv
+SYN_FILES = $(RTL_DIR)/fpga_au45n.sv
 SYN_FILES += $(RTL_DIR)/fpga_core.sv
-SYN_FILES += $(TAXI_SRC_DIR)/eth/rtl/us/taxi_eth_mac_100g_us.f
+SYN_FILES += $(TAXI_SRC_DIR)/eth/rtl/us/taxi_eth_mac_25g_us.f
 SYN_FILES += $(TAXI_SRC_DIR)/xfcp/rtl/taxi_xfcp_if_uart.f
 SYN_FILES += $(TAXI_SRC_DIR)/xfcp/rtl/taxi_xfcp_switch.sv
 SYN_FILES += $(TAXI_SRC_DIR)/xfcp/rtl/taxi_xfcp_mod_apb.f
@@ -29,18 +29,16 @@ SYN_FILES += $(TAXI_SRC_DIR)/sync/rtl/taxi_sync_signal.sv
 SYN_FILES += $(TAXI_SRC_DIR)/io/rtl/taxi_debounce_switch.sv
 
 # XDC files
-XDC_FILES += ../syn/AU280/fpga.xdc
-XDC_FILES += ../syn/AU280/gpio.xdc
-XDC_FILES += ../syn/AU280/qsfp.xdc
-XDC_FILES += ../syn/AU280/eth_cmac.xdc
+XDC_FILES += ../syn/AU45N/fpga.xdc
+XDC_FILES += ../syn/AU45N/gpio.xdc
+XDC_FILES += ../syn/AU45N/qsfp1.xdc
 XDC_FILES += $(TAXI_SRC_DIR)/eth/syn/vivado/taxi_eth_mac_fifo.tcl
 XDC_FILES += $(TAXI_SRC_DIR)/axis/syn/vivado/taxi_axis_async_fifo.tcl
 XDC_FILES += $(TAXI_SRC_DIR)/sync/syn/vivado/taxi_sync_reset.tcl
 XDC_FILES += $(TAXI_SRC_DIR)/sync/syn/vivado/taxi_sync_signal.tcl
 
 # IP
-IP_TCL_FILES += $(TAXI_SRC_DIR)/eth/rtl/us/taxi_eth_mac_100g_us_cmace4.tcl
-IP_TCL_FILES += $(TAXI_SRC_DIR)/eth/rtl/us/taxi_eth_mac_100g_us_gty_156.tcl
+IP_TCL_FILES = $(TAXI_SRC_DIR)/eth/rtl/us/taxi_eth_phy_25g_us_gty_25g_161.tcl
 
 # Configuration
 CONFIG_TCL_FILES = ./config.tcl
@@ -59,7 +57,7 @@ program: $(PROJECT).bit
 	vivado -nojournal -nolog -mode batch -source program.tcl
 
 $(PROJECT).mcs $(PROJECT).prm: $(PROJECT).bit
-	echo "write_cfgmem -force -format mcs -size 128 -interface SPIx4 -loadbit {up 0x01002000 $*.bit} -checksum -file $*.mcs" > generate_mcs.tcl
+	echo "write_cfgmem -force -format mcs -size 256 -interface SPIx4 -loadbit {up 0x00000000 $*.bit} -checksum -file $*.mcs" > generate_mcs.tcl
 	echo "exit" >> generate_mcs.tcl
 	vivado -nojournal -nolog -mode batch -source generate_mcs.tcl
 	mkdir -p rev
@@ -77,7 +75,7 @@ flash: $(PROJECT).mcs $(PROJECT).prm
 	echo "open_hw_target" >> flash.tcl
 	echo "current_hw_device [lindex [get_hw_devices] 0]" >> flash.tcl
 	echo "refresh_hw_device -update_hw_probes false [current_hw_device]" >> flash.tcl
-	echo "create_hw_cfgmem -hw_device [current_hw_device] [lindex [get_cfgmem_parts {mt25qu01g-spi-x1_x2_x4}] 0]" >> flash.tcl
+	echo "create_hw_cfgmem -hw_device [current_hw_device] [lindex [get_cfgmem_parts {mt25qu02g-spi-x1_x2_x4}] 0]" >> flash.tcl
 	echo "current_hw_cfgmem -hw_device [current_hw_device] [get_property PROGRAM.HW_CFGMEM [current_hw_device]]" >> flash.tcl
 	echo "set_property PROGRAM.FILES [list \"$(PROJECT).mcs\"] [current_hw_cfgmem]" >> flash.tcl
 	echo "set_property PROGRAM.PRM_FILES [list \"$(PROJECT).prm\"] [current_hw_cfgmem]" >> flash.tcl

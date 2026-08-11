@@ -26,7 +26,7 @@ module test_fpga_core #
     parameter AXIS_PCIE_RQ_USER_W = AXIS_PCIE_DATA_W < 512 ? 62 : 137,
     parameter AXIS_PCIE_CQ_USER_W = AXIS_PCIE_DATA_W < 512 ? 85 : 183,
     parameter AXIS_PCIE_CC_USER_W = AXIS_PCIE_DATA_W < 512 ? 33 : 81,
-    // 10G/25G MAC configuration
+    // MAC configuration
     parameter logic CFG_LOW_LATENCY = 1'b1,
     parameter logic COMBINED_MAC_PCS = 1'b1,
     parameter MAC_DATA_W = 64
@@ -137,7 +137,7 @@ fpga_core #(
     .VENDOR(VENDOR),
     .FAMILY(FAMILY),
     .RQ_SEQ_NUM_W(RQ_SEQ_NUM_W),
-    // 10G/25G MAC configuration
+    // MAC configuration
     .CFG_LOW_LATENCY(CFG_LOW_LATENCY),
     .COMBINED_MAC_PCS(COMBINED_MAC_PCS),
     .MAC_DATA_W(MAC_DATA_W)

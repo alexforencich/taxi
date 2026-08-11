@@ -26,6 +26,7 @@ VERILOG_SOURCES += $(COCOTB_TOPLEVEL).sv
 VERILOG_SOURCES += $(RTL_DIR)/$(DUT).sv
 VERILOG_SOURCES += $(TAXI_SRC_DIR)/cndm_proto/rtl/cndm_proto_pcie_us.f
 VERILOG_SOURCES += $(TAXI_SRC_DIR)/eth/rtl/us/taxi_eth_mac_25g_us.f
+VERILOG_SOURCES += $(TAXI_SRC_DIR)/eth/rtl/us/taxi_eth_mac_1g_basex_us.f
 VERILOG_SOURCES += $(TAXI_SRC_DIR)/axis/rtl/taxi_axis_async_fifo.f
 VERILOG_SOURCES += $(TAXI_SRC_DIR)/sync/rtl/taxi_sync_reset.sv
 VERILOG_SOURCES += $(TAXI_SRC_DIR)/sync/rtl/taxi_sync_signal.sv

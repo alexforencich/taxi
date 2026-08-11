@@ -7,37 +7,35 @@
 #
 
 # FPGA settings
-FPGA_PART = xcvu5p-flva2104-2-e
+FPGA_PART = xcvu095-ffva2104-2-e
 FPGA_TOP = fpga
-FPGA_ARCH = virtexuplus
+FPGA_ARCH = virtexu
 
 RTL_DIR = ../rtl
 LIB_DIR = ../lib
 TAXI_SRC_DIR = $(LIB_DIR)/taxi/src
 
 # Files for synthesis
-SYN_FILES = $(RTL_DIR)/fpga_nt200a02.sv
+SYN_FILES = $(RTL_DIR)/fpga_nt200a01.sv
 SYN_FILES += $(RTL_DIR)/fpga_core.sv
 SYN_FILES += $(RTL_DIR)/../pll/si5340_i2c_init.sv
-SYN_FILES += $(TAXI_SRC_DIR)/eth/rtl/us/taxi_eth_mac_100g_us.f
+SYN_FILES += $(TAXI_SRC_DIR)/eth/rtl/us/taxi_eth_mac_25g_us.f
 SYN_FILES += $(TAXI_SRC_DIR)/lss/rtl/taxi_i2c_master.sv
 SYN_FILES += $(TAXI_SRC_DIR)/axis/rtl/taxi_axis_async_fifo.f
 SYN_FILES += $(TAXI_SRC_DIR)/sync/rtl/taxi_sync_reset.sv
 SYN_FILES += $(TAXI_SRC_DIR)/sync/rtl/taxi_sync_signal.sv
 
 # XDC files
-XDC_FILES += ../syn/NT200A02/fpga.xdc
-XDC_FILES += ../syn/NT200A02/gpio.xdc
-XDC_FILES += ../syn/NT200A02/qsfp.xdc
-XDC_FILES += ../syn/NT200A02/eth_cmac.xdc
+XDC_FILES += ../syn/NT200A01/fpga.xdc
+XDC_FILES += ../syn/NT200A01/gpio.xdc
+XDC_FILES += ../syn/NT200A01/qsfp.xdc
 XDC_FILES += $(TAXI_SRC_DIR)/eth/syn/vivado/taxi_eth_mac_fifo.tcl
 XDC_FILES += $(TAXI_SRC_DIR)/axis/syn/vivado/taxi_axis_async_fifo.tcl
 XDC_FILES += $(TAXI_SRC_DIR)/sync/syn/vivado/taxi_sync_reset.tcl
 XDC_FILES += $(TAXI_SRC_DIR)/sync/syn/vivado/taxi_sync_signal.tcl
 
 # IP
-IP_TCL_FILES += $(TAXI_SRC_DIR)/eth/rtl/us/taxi_eth_mac_100g_us_cmace4.tcl
-IP_TCL_FILES += $(TAXI_SRC_DIR)/eth/rtl/us/taxi_eth_mac_100g_us_gty_322.tcl
+IP_TCL_FILES += $(TAXI_SRC_DIR)/eth/rtl/us/taxi_eth_phy_25g_us_gty_25g_322.tcl
 
 # Configuration
 CONFIG_TCL_FILES = config.tcl
@@ -74,7 +72,7 @@ program: $(FPGA_TOP).bit
 	vivado -nojournal -nolog -mode batch -source program.tcl
 
 %.mcs %.prm: %.bit
-	echo "write_cfgmem -force -format mcs -size 256 -interface SPIx4 -loadbit {up 0x00000000 $*.bit} -checksum -file $*.mcs" > generate_mcs.tcl
+	echo "write_cfgmem -force -format mcs -size 64 -interface SPIx4 -loadbit {up 0x00000000 $*.bit} -checksum -file $*.mcs" > generate_mcs.tcl
 	echo "exit" >> generate_mcs.tcl
 	vivado -nojournal -nolog -mode batch -source generate_mcs.tcl
 	mkdir -p rev
@@ -87,7 +85,7 @@ program: $(FPGA_TOP).bit
 	echo "Output: rev/$*_rev$$COUNT$$x"; done;
 
 %_fallback.mcs %_fallback.prm: %_fallback.bit
-	echo "write_cfgmem -force -format mcs -size 256 -interface SPIx4 -loadbit {up 0x0C000000 $*_fallback.bit} -checksum -file $*_fallback.mcs" > generate_fallback_mcs.tcl
+	echo "write_cfgmem -force -format mcs -size 64 -interface SPIx4 -loadbit {up 0x03000000 $*_fallback.bit} -checksum -file $*_fallback.mcs" > generate_fallback_mcs.tcl
 	echo "exit" >> generate_fallback_mcs.tcl
 	vivado -nojournal -nolog -mode batch -source generate_fallback_mcs.tcl
 	mkdir -p rev
@@ -100,7 +98,7 @@ program: $(FPGA_TOP).bit
 	echo "Output: rev/$*_fallback_rev$$COUNT$$x"; done;
 
 %_full.mcs %_full.prm: %_fallback.bit %.bit
-	echo "write_cfgmem -force -format mcs -size 256 -interface SPIx4 -loadbit {up 0x00000000 $*.bit up 0x0C000000 $*_fallback.bit} -checksum -file $*_full.mcs" > generate_full_mcs.tcl
+	echo "write_cfgmem -force -format mcs -size 64 -interface SPIx4 -loadbit {up 0x00000000 $*.bit up 0x03000000 $*_fallback.bit} -checksum -file $*_full.mcs" > generate_full_mcs.tcl
 	echo "exit" >> generate_full_mcs.tcl
 	vivado -nojournal -nolog -mode batch -source generate_full_mcs.tcl
 	mkdir -p rev
@@ -118,7 +116,7 @@ flash: $(FPGA_TOP).mcs $(FPGA_TOP).prm
 	echo "open_hw_target" >> flash.tcl
 	echo "current_hw_device [lindex [get_hw_devices] 0]" >> flash.tcl
 	echo "refresh_hw_device -update_hw_probes false [current_hw_device]" >> flash.tcl
-	echo "create_hw_cfgmem -hw_device [current_hw_device] [lindex [get_cfgmem_parts {mt25qu02g-spi-x1_x2_x4}] 0]" >> flash.tcl
+	echo "create_hw_cfgmem -hw_device [current_hw_device] [lindex [get_cfgmem_parts {mt25ql512-spi-x1_x2_x4}] 0]" >> flash.tcl
 	echo "current_hw_cfgmem -hw_device [current_hw_device] [get_property PROGRAM.HW_CFGMEM [current_hw_device]]" >> flash.tcl
 	echo "set_property PROGRAM.FILES [list \"$(FPGA_TOP).mcs\"] [current_hw_cfgmem]" >> flash.tcl
 	echo "set_property PROGRAM.PRM_FILES [list \"$(FPGA_TOP).prm\"] [current_hw_cfgmem]" >> flash.tcl
@@ -142,7 +140,7 @@ flash%: $(FPGA_TOP)%.mcs $(FPGA_TOP)%.prm
 	echo "open_hw_target" >> flash$*.tcl
 	echo "current_hw_device [lindex [get_hw_devices] 0]" >> flash$*.tcl
 	echo "refresh_hw_device -update_hw_probes false [current_hw_device]" >> flash$*.tcl
-	echo "create_hw_cfgmem -hw_device [current_hw_device] [lindex [get_cfgmem_parts {mt25qu02g-spi-x1_x2_x4}] 0]" >> flash$*.tcl
+	echo "create_hw_cfgmem -hw_device [current_hw_device] [lindex [get_cfgmem_parts {mt25ql512-spi-x1_x2_x4}] 0]" >> flash$*.tcl
 	echo "current_hw_cfgmem -hw_device [current_hw_device] [get_property PROGRAM.HW_CFGMEM [current_hw_device]]" >> flash$*.tcl
 	echo "set_property PROGRAM.FILES [list \"$(FPGA_TOP)$*.mcs\"] [current_hw_cfgmem]" >> flash$*.tcl
 	echo "set_property PROGRAM.PRM_FILES [list \"$(FPGA_TOP)$*.prm\"] [current_hw_cfgmem]" >> flash$*.tcl

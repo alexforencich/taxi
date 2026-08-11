@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: MIT
 #
-# Copyright (c) 2020-2026 FPGA Ninja, LLC
+# Copyright (c) 2020-2025 FPGA Ninja, LLC
 #
 # Authors:
 # - Alex Forencich
@@ -24,6 +24,7 @@ MODULE   = $(COCOTB_TEST_MODULES)
 TOPLEVEL = $(COCOTB_TOPLEVEL)
 VERILOG_SOURCES += $(RTL_DIR)/$(DUT).sv
 VERILOG_SOURCES += $(TAXI_SRC_DIR)/eth/rtl/us/taxi_eth_mac_25g_us.f
+VERILOG_SOURCES += $(TAXI_SRC_DIR)/eth/rtl/us/taxi_eth_mac_100g_us.f
 VERILOG_SOURCES += $(TAXI_SRC_DIR)/axis/rtl/taxi_axis_async_fifo.f
 VERILOG_SOURCES += $(TAXI_SRC_DIR)/sync/rtl/taxi_sync_reset.sv
 VERILOG_SOURCES += $(TAXI_SRC_DIR)/sync/rtl/taxi_sync_signal.sv
@@ -44,7 +45,7 @@ export PARAM_GTY_CNT := $(shell echo $$(( 4 * $(PARAM_GTY_QUAD_CNT) )))
 export PARAM_GTY_CLK_CNT := $(PARAM_GTY_QUAD_CNT)
 export PARAM_CFG_LOW_LATENCY := "1'b1"
 export PARAM_COMBINED_MAC_PCS := "1'b1"
-export PARAM_MAC_DATA_W := "64"
+export PARAM_MAC_DATA_W := "512"
 
 ifeq ($(SIM), icarus)
 	PLUSARGS += -fst

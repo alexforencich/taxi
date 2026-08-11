@@ -19,7 +19,7 @@ TAXI_SRC_DIR = $(LIB_DIR)/taxi/src
 SYN_FILES = $(RTL_DIR)/fpga_nt200a02.sv
 SYN_FILES += $(RTL_DIR)/fpga_core.sv
 SYN_FILES += $(RTL_DIR)/../pll/si5340_i2c_init.sv
-SYN_FILES += $(TAXI_SRC_DIR)/eth/rtl/us/taxi_eth_mac_100g_us.f
+SYN_FILES += $(TAXI_SRC_DIR)/eth/rtl/us/taxi_eth_mac_25g_us.f
 SYN_FILES += $(TAXI_SRC_DIR)/lss/rtl/taxi_i2c_master.sv
 SYN_FILES += $(TAXI_SRC_DIR)/axis/rtl/taxi_axis_async_fifo.f
 SYN_FILES += $(TAXI_SRC_DIR)/sync/rtl/taxi_sync_reset.sv
@@ -29,15 +29,13 @@ SYN_FILES += $(TAXI_SRC_DIR)/sync/rtl/taxi_sync_signal.sv
 XDC_FILES += ../syn/NT200A02/fpga.xdc
 XDC_FILES += ../syn/NT200A02/gpio.xdc
 XDC_FILES += ../syn/NT200A02/qsfp.xdc
-XDC_FILES += ../syn/NT200A02/eth_cmac.xdc
 XDC_FILES += $(TAXI_SRC_DIR)/eth/syn/vivado/taxi_eth_mac_fifo.tcl
 XDC_FILES += $(TAXI_SRC_DIR)/axis/syn/vivado/taxi_axis_async_fifo.tcl
 XDC_FILES += $(TAXI_SRC_DIR)/sync/syn/vivado/taxi_sync_reset.tcl
 XDC_FILES += $(TAXI_SRC_DIR)/sync/syn/vivado/taxi_sync_signal.tcl
 
 # IP
-IP_TCL_FILES += $(TAXI_SRC_DIR)/eth/rtl/us/taxi_eth_mac_100g_us_cmace4.tcl
-IP_TCL_FILES += $(TAXI_SRC_DIR)/eth/rtl/us/taxi_eth_mac_100g_us_gty_322.tcl
+IP_TCL_FILES += $(TAXI_SRC_DIR)/eth/rtl/us/taxi_eth_phy_25g_us_gty_25g_322.tcl
 
 # Configuration
 CONFIG_TCL_FILES = config.tcl

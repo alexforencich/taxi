@@ -431,7 +431,7 @@ taxi_axis_async_fifo #(
     .USER_BAD_FRAME_MASK(1'b1),
     .DROP_OVERSIZE_FRAME(1),
     .DROP_BAD_FRAME(1),
-    .DROP_WHEN_FULL(1)
+    .DROP_WHEN_FULL(0)
 )
 tx_fifo (
     /*

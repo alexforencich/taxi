@@ -16,7 +16,7 @@ set_property -dict {LOC AV5  IOSTANDARD LVDS_25} [get_ports fpga_refclk_n] ;# U7
 create_clock -period 4.000 -name fpga_refclk [get_ports fpga_refclk_p]
 
 # Source pin is in an HDIO bank, so it must be routed to an MMCM via a BUFG
-set_property CLOCK_DEDICATED_ROUTE ANY_CMT_COLUMN [get_nets fpga_refclk_int fpga_refclk_bufg_inst_n_0]
+set_property CLOCK_DEDICATED_ROUTE ANY_CMT_COLUMN [get_nets {fpga_refclk_int fpga_refclk_bufg_inst_n_0}]
 
 # PLL sysref from U78
 set_property -dict {LOC AP20 IOSTANDARD LVDS} [get_ports fpga_sysref_p] ;# U78.22 CLKout5_P

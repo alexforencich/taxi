@@ -29,12 +29,14 @@ from cocotbext.pcie.xilinx.us import UltraScalePlusPcieDevice
 
 try:
     from baser import BaseRSerdesSource, BaseRSerdesSink
+    from basex import BaseXSerdesSource, BaseXSerdesSink
     import cndm
 except ImportError:
     # attempt import from current directory
     sys.path.insert(0, os.path.join(os.path.dirname(__file__)))
     try:
         from baser import BaseRSerdesSource, BaseRSerdesSink
+        from basex import BaseXSerdesSource, BaseXSerdesSink
         import cndm
     finally:
         del sys.path[0]
@@ -284,47 +286,77 @@ class TB:
         self.sfp_sources = []
         self.sfp_sinks = []
 
-        for ch in dut.uut.sfp_mac_inst.ch:
+        for ch in dut.uut.sfp_mac.sfp_mac_inst.ch:
             gt_inst = ch.ch_inst.gt.gt_inst
 
-            if ch.ch_inst.DATA_W.value == 64:
+            if dut.MAC_DATA_W.value == 16:
                 if ch.ch_inst.CFG_LOW_LATENCY.value:
-                    clk = 2.482
-                    gbx_cfg = (66, [64, 65])
-                else:
-                    clk = 2.56
+                    clk = 16
                     gbx_cfg = None
+                else:
+                    clk = 16
+                    gbx_cfg = None
+
+                cocotb.start_soon(Clock(gt_inst.tx_clk, clk, units="ns").start())
+                cocotb.start_soon(Clock(gt_inst.rx_clk, clk, units="ns").start())
+
+                self.sfp_sources.append(BaseXSerdesSource(
+                    data=gt_inst.serdes_rx_data,
+                    data_k=gt_inst.serdes_rx_data_k,
+                    data_valid=gt_inst.serdes_rx_data_valid,
+                    clock=gt_inst.rx_clk,
+                    enc_8b10b=False,
+                    gbx_cfg=gbx_cfg
+                ))
+                self.sfp_sinks.append(BaseXSerdesSink(
+                    data=gt_inst.serdes_tx_data,
+                    data_k=gt_inst.serdes_tx_data_k,
+                    data_valid=gt_inst.serdes_tx_data_valid,
+                    gbx_sync=gt_inst.serdes_tx_gbx_sync,
+                    clock=gt_inst.tx_clk,
+                    dec_8b10b=False,
+                    gbx_cfg=gbx_cfg
+                ))
+
             else:
-                if ch.ch_inst.CFG_LOW_LATENCY.value:
-                    clk = 3.102
-                    gbx_cfg = (66, [64, 65])
+                if ch.ch_inst.DATA_W.value == 64:
+                    if ch.ch_inst.CFG_LOW_LATENCY.value:
+                        clk = 2.482
+                        gbx_cfg = (66, [64, 65])
+                    else:
+                        clk = 2.56
+                        gbx_cfg = None
                 else:
-                    clk = 3.2
-                    gbx_cfg = None
+                    if ch.ch_inst.CFG_LOW_LATENCY.value:
+                        clk = 3.102
+                        gbx_cfg = (66, [64, 65])
+                    else:
+                        clk = 3.2
+                        gbx_cfg = None
 
-            cocotb.start_soon(Clock(gt_inst.tx_clk, clk, units="ns").start())
-            cocotb.start_soon(Clock(gt_inst.rx_clk, clk, units="ns").start())
+                cocotb.start_soon(Clock(gt_inst.tx_clk, clk, units="ns").start())
+                cocotb.start_soon(Clock(gt_inst.rx_clk, clk, units="ns").start())
 
-            self.sfp_sources.append(BaseRSerdesSource(
-                data=gt_inst.serdes_rx_data,
-                data_valid=gt_inst.serdes_rx_data_valid,
-                hdr=gt_inst.serdes_rx_hdr,
-                hdr_valid=gt_inst.serdes_rx_hdr_valid,
-                clock=gt_inst.rx_clk,
-                slip=gt_inst.serdes_rx_bitslip,
-                reverse=True,
-                gbx_cfg=gbx_cfg
-            ))
-            self.sfp_sinks.append(BaseRSerdesSink(
-                data=gt_inst.serdes_tx_data,
-                data_valid=gt_inst.serdes_tx_data_valid,
-                hdr=gt_inst.serdes_tx_hdr,
-                hdr_valid=gt_inst.serdes_tx_hdr_valid,
-                gbx_sync=gt_inst.serdes_tx_gbx_sync,
-                clock=gt_inst.tx_clk,
-                reverse=True,
-                gbx_cfg=gbx_cfg
-            ))
+                self.sfp_sources.append(BaseRSerdesSource(
+                    data=gt_inst.serdes_rx_data,
+                    data_valid=gt_inst.serdes_rx_data_valid,
+                    hdr=gt_inst.serdes_rx_hdr,
+                    hdr_valid=gt_inst.serdes_rx_hdr_valid,
+                    clock=gt_inst.rx_clk,
+                    slip=gt_inst.serdes_rx_bitslip,
+                    reverse=True,
+                    gbx_cfg=gbx_cfg
+                ))
+                self.sfp_sinks.append(BaseRSerdesSink(
+                    data=gt_inst.serdes_tx_data,
+                    data_valid=gt_inst.serdes_tx_data_valid,
+                    hdr=gt_inst.serdes_tx_hdr,
+                    hdr_valid=gt_inst.serdes_tx_hdr_valid,
+                    gbx_sync=gt_inst.serdes_tx_gbx_sync,
+                    clock=gt_inst.tx_clk,
+                    reverse=True,
+                    gbx_cfg=gbx_cfg
+                ))
 
         dut.sfp_npres.setimmediatevalue(0)
         dut.sfp_tx_fault.setimmediatevalue(0)
@@ -524,7 +556,7 @@ def process_f_files(files):
     return list(lst.values())
 
 
-@pytest.mark.parametrize("mac_data_w", [32, 64])
+@pytest.mark.parametrize("mac_data_w", [16, 32, 64])
 def test_fpga_core(request, mac_data_w):
     dut = "fpga_core"
     module = os.path.splitext(os.path.basename(__file__))[0]
@@ -536,6 +568,7 @@ def test_fpga_core(request, mac_data_w):
         os.path.join(taxi_src_dir, "cndm", "rtl", "cndm_micro_pcie_us.f"),
         os.path.join(taxi_src_dir, "cndm", "rtl", "cndm_brd_ctrl_i2c.f"),
         os.path.join(taxi_src_dir, "eth", "rtl", "us", "taxi_eth_mac_25g_us.f"),
+        os.path.join(taxi_src_dir, "eth", "rtl", "us", "taxi_eth_mac_1g_basex_us.f"),
         os.path.join(taxi_src_dir, "axis", "rtl", "taxi_axis_async_fifo.f"),
         os.path.join(taxi_src_dir, "sync", "rtl", "taxi_sync_reset.sv"),
         os.path.join(taxi_src_dir, "sync", "rtl", "taxi_sync_signal.sv"),

@@ -13,7 +13,7 @@ set preset {GTY-Gigabit_Ethernet}
 set freerun_freq {62.5}
 set line_rate {1.25}
 set refclk_freq {156.25}
-set sec_line_rate {0}
+set sec_line_rate $line_rate
 set sec_refclk_freq $refclk_freq
 set qpll_fracn [expr {int(fmod($line_rate*1000/2 / $refclk_freq, 1)*pow(2, 24))}]
 set sec_qpll_fracn [expr {int(fmod($sec_line_rate*1000/2 / $sec_refclk_freq, 1)*pow(2, 24))}]

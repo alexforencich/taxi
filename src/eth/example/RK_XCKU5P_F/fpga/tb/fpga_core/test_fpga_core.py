@@ -257,7 +257,7 @@ def process_f_files(files):
     return list(lst.values())
 
 
-@pytest.mark.parametrize("mac_data_w", [32, 64])
+@pytest.mark.parametrize("mac_data_w", [32, 64, 512])
 def test_fpga_core(request, mac_data_w):
     dut = "fpga_core"
     module = os.path.splitext(os.path.basename(__file__))[0]
@@ -267,6 +267,7 @@ def test_fpga_core(request, mac_data_w):
         os.path.join(rtl_dir, f"{dut}.sv"),
         os.path.join(taxi_src_dir, "eth", "rtl", "taxi_eth_mac_1g_rgmii_fifo.f"),
         os.path.join(taxi_src_dir, "eth", "rtl", "us", "taxi_eth_mac_25g_us.f"),
+        os.path.join(taxi_src_dir, "eth", "rtl", "us", "taxi_eth_mac_100g_us.f"),
         os.path.join(taxi_src_dir, "xfcp", "rtl", "taxi_xfcp_if_uart.f"),
         os.path.join(taxi_src_dir, "xfcp", "rtl", "taxi_xfcp_switch.sv"),
         os.path.join(taxi_src_dir, "xfcp", "rtl", "taxi_xfcp_mod_apb.f"),

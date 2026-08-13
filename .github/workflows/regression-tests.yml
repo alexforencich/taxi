@@ -21,7 +21,7 @@ jobs:
     - name: Install Verilator
       uses: v0xnihili/install-verilator-action@main
       with:
-        version: v5.038
+        version: v5.050
 
     - name: Install Python dependencies
       run: |

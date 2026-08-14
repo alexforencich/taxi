@@ -346,6 +346,43 @@ wire [127:0] serdes_rxdata[GT_CNT];
 wire [15:0]  serdes_rxctrl0[GT_CNT];
 wire [15:0]  serdes_rxctrl1[GT_CNT];
 
+// watchdog
+localparam WDT_W = 28;
+
+reg [WDT_W-1:0] wdt_count_reg = '1, wdt_count_next;
+logic cmac_rx_reset_req_reg = 1'b0, cmac_rx_reset_req_next;
+
+always_comb begin
+    wdt_count_next = wdt_count_reg;
+    cmac_rx_reset_req_next = 1'b0;
+
+    if (wdt_count_reg == 0) begin
+        cmac_rx_reset_req_next = 1'b1;
+    end else begin
+        wdt_count_next = wdt_count_reg - 1;
+    end
+
+    if (rx_status) begin
+        wdt_count_next = '1;
+    end
+end
+
+always_ff @(posedge rx_clk) begin
+    wdt_count_reg <= wdt_count_next;
+
+    if (rx_rst_out) begin
+        wdt_count_reg <= '1;
+    end
+end
+
+always_ff @(posedge rx_clk or posedge rx_rst_out) begin
+    if (rx_rst_out) begin
+        cmac_rx_reset_req_reg <= 1'b0;
+    end else begin
+        cmac_rx_reset_req_reg <= cmac_rx_reset_req_next;
+    end
+end
+
 for (genvar n = 0; n < GT_CNT; n = n + 1) begin : ch
 
     localparam HAS_COMMON = n == 0;
@@ -454,7 +491,7 @@ for (genvar n = 0; n < GT_CNT; n = n + 1) begin : ch
          */
         .rx_clk_out(rx_clk_int[n]),
         .rx_clk_in(rx_clk_int[n]),
-        .rx_rst_in(rx_rst_in),
+        .rx_rst_in(rx_rst_in || cmac_rx_reset_req_reg),
         .rx_rst_out(rx_rst_int[n]),
         .tx_clk_out(tx_clk_int[n]),
         .tx_clk_in(tx_clk),

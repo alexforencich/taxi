@@ -262,6 +262,12 @@ always_ff @(posedge clk) begin
     end
 
     if (rst) begin
+        dma_rd_desc_req.req_valid <= 1'b0;
+        dma_desc.req_valid <= 1'b0;
+        wq_req_valid_reg <= 1'b0;
+        wq_rsp_ready_reg <= 1'b0;
+        s_axis_desc_req_tready_reg <= 1'b0;
+        s_axis_desc_req_tready_reg <= 1'b0;
         slot_start_ptr_reg <= '0;
         slot_rd_ptr_reg <= '0;
         slot_finish_ptr_reg <= '0;

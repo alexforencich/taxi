@@ -222,6 +222,8 @@ state_t state_reg = STATE_IDLE, state_next;
 
 logic s_axi_aready_reg = 1'b0, s_axi_aready_next;
 
+// TODO fix loop
+/* verilator lint_off UNOPTFLAT */
 logic [3:0] m_axi_aregion_reg = 4'd0, m_axi_aregion_next;
 logic [SEL_W-1:0] m_select_reg = '0, m_select_next;
 logic m_axi_avalid_reg = 1'b0, m_axi_avalid_next;

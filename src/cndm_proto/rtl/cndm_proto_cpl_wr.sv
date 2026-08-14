@@ -170,6 +170,9 @@ always_ff @(posedge clk) begin
 
     if (rst) begin
         state_reg <= STATE_IDLE;
+
+        cpl_comb.tready <= 1'b0;
+        dma_wr_desc_req.req_valid <= 1'b0;
         txcq_prod_ptr_reg <= '0;
         rxcq_prod_ptr_reg <= '0;
         irq_reg <= 1'b0;

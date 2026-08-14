@@ -187,6 +187,10 @@ always_ff @(posedge clk) begin
 
     if (rst) begin
         state_reg <= STATE_IDLE;
+
+        dma_rd_desc_req.req_valid <= 1'b0;
+        dma_desc.req_valid <= 1'b0;
+        desc_req_reg <= '0;
     end
 end
 

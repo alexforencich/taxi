@@ -51,6 +51,7 @@ class TB:
 
         self.source = GmiiSource(dut.gmii_txd, dut.gmii_tx_er, dut.gmii_tx_en,
             dut.clk, dut.rst)
+        dut.gmii_tx_valid.setimmediatevalue(1)
         self.sink = BaseXSerdesSink(
             data=dut.encoded_tx_data,
             data_k=dut.encoded_tx_data_k,

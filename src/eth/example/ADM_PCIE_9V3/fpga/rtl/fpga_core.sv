@@ -197,15 +197,7 @@ for (genvar n = 0; n < 2; n = n + 1) begin : gt_quad
              */
             .xcvr_gtpowergood_out(qsfp_gtpowergood[n]),
             .xcvr_gtrefclk00_in(qsfp_0_mgt_refclk),
-            .xcvr_qpll0pd_in(1'b0),
-            .xcvr_qpll0lock_out(),
-            .xcvr_qpll0clk_out(),
-            .xcvr_qpll0refclk_out(),
             .xcvr_gtrefclk01_in(qsfp_0_mgt_refclk),
-            .xcvr_qpll1pd_in(1'b0),
-            .xcvr_qpll1lock_out(),
-            .xcvr_qpll1clk_out(),
-            .xcvr_qpll1refclk_out(),
 
             /*
              * Serial data

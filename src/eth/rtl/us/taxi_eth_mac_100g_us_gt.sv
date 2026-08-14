@@ -63,12 +63,10 @@ module taxi_eth_mac_100g_us_gt #
      * PLL out
      */
     input  wire logic               xcvr_gtrefclk00_in = 1'b0,
-    input  wire logic               xcvr_qpll0pd_in = 1'b0,
     output wire logic               xcvr_qpll0lock_out,
     output wire logic               xcvr_qpll0clk_out,
     output wire logic               xcvr_qpll0refclk_out,
     input  wire logic               xcvr_gtrefclk01_in = 1'b0,
-    input  wire logic               xcvr_qpll1pd_in = 1'b0,
     output wire logic               xcvr_qpll1lock_out,
     output wire logic               xcvr_qpll1clk_out,
     output wire logic               xcvr_qpll1refclk_out,

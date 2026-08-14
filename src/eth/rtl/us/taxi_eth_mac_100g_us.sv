@@ -81,15 +81,7 @@ module taxi_eth_mac_100g_us #
      */
     output wire logic                 xcvr_gtpowergood_out,
     input  wire logic                 xcvr_gtrefclk00_in = 1'b0,
-    input  wire logic                 xcvr_qpll0pd_in = 1'b0,
-    output wire logic                 xcvr_qpll0lock_out,
-    output wire logic                 xcvr_qpll0clk_out,
-    output wire logic                 xcvr_qpll0refclk_out,
     input  wire logic                 xcvr_gtrefclk01_in = 1'b0,
-    input  wire logic                 xcvr_qpll1pd_in = 1'b0,
-    output wire logic                 xcvr_qpll1lock_out,
-    output wire logic                 xcvr_qpll1clk_out,
-    output wire logic                 xcvr_qpll1refclk_out,
 
     /*
      * Serial data
@@ -329,6 +321,13 @@ ctrl_intercon_inst (
 localparam STAT_TX_CNT = STAT_TX_LEVEL == 0 ? 8 : (STAT_TX_LEVEL == 1 ? 16: 32);
 localparam STAT_RX_CNT = STAT_RX_LEVEL == 0 ? 8 : (STAT_RX_LEVEL == 1 ? 16: 32);
 
+wire xcvr_qpll0lock;
+wire xcvr_qpll0clk;
+wire xcvr_qpll0refclk;
+wire xcvr_qpll1lock;
+wire xcvr_qpll1clk;
+wire xcvr_qpll1refclk;
+
 wire tx_clk_int[GT_CNT];
 wire rx_clk_int[GT_CNT];
 wire tx_rst_int[GT_CNT];
@@ -400,12 +399,12 @@ for (genvar n = 0; n < GT_CNT; n = n + 1) begin : ch
         // drive outputs from common
         assign xcvr_gtpowergood_out = ch_gtpowergood_out;
 
-        assign xcvr_qpll0lock_out = ch_qpll0lock_out;
-        assign xcvr_qpll0clk_out = ch_qpll0clk_out;
-        assign xcvr_qpll0refclk_out = ch_qpll0refclk_out;
-        assign xcvr_qpll1lock_out = ch_qpll1lock_out;
-        assign xcvr_qpll1clk_out = ch_qpll1clk_out;
-        assign xcvr_qpll1refclk_out = ch_qpll1refclk_out;
+        assign xcvr_qpll0lock = ch_qpll0lock_out;
+        assign xcvr_qpll0clk = ch_qpll0clk_out;
+        assign xcvr_qpll0refclk = ch_qpll0refclk_out;
+        assign xcvr_qpll1lock = ch_qpll1lock_out;
+        assign xcvr_qpll1clk = ch_qpll1clk_out;
+        assign xcvr_qpll1refclk = ch_qpll1refclk_out;
     end
 
     taxi_eth_mac_100g_us_ch #(
@@ -458,12 +457,10 @@ for (genvar n = 0; n < GT_CNT; n = n + 1) begin : ch
          * PLL out
          */
         .xcvr_gtrefclk00_in(xcvr_gtrefclk00_in),
-        .xcvr_qpll0pd_in(xcvr_qpll0pd_in),
         .xcvr_qpll0lock_out(ch_qpll0lock_out),
         .xcvr_qpll0clk_out(ch_qpll0clk_out),
         .xcvr_qpll0refclk_out(ch_qpll0refclk_out),
         .xcvr_gtrefclk01_in(xcvr_gtrefclk01_in),
-        .xcvr_qpll1pd_in(xcvr_qpll1pd_in),
         .xcvr_qpll1lock_out(ch_qpll1lock_out),
         .xcvr_qpll1clk_out(ch_qpll1clk_out),
         .xcvr_qpll1refclk_out(ch_qpll1refclk_out),
@@ -471,12 +468,12 @@ for (genvar n = 0; n < GT_CNT; n = n + 1) begin : ch
         /*
          * PLL in
          */
-        .xcvr_qpll0lock_in(xcvr_qpll0lock_out),
-        .xcvr_qpll0clk_in(xcvr_qpll0clk_out),
-        .xcvr_qpll0refclk_in(xcvr_qpll0refclk_out),
-        .xcvr_qpll1lock_in(xcvr_qpll1lock_out),
-        .xcvr_qpll1clk_in(xcvr_qpll1clk_out),
-        .xcvr_qpll1refclk_in(xcvr_qpll1refclk_out),
+        .xcvr_qpll0lock_in(xcvr_qpll0lock),
+        .xcvr_qpll0clk_in(xcvr_qpll0clk),
+        .xcvr_qpll0refclk_in(xcvr_qpll0refclk),
+        .xcvr_qpll1lock_in(xcvr_qpll1lock),
+        .xcvr_qpll1clk_in(xcvr_qpll1clk),
+        .xcvr_qpll1refclk_in(xcvr_qpll1refclk),
 
         /*
          * Serial data

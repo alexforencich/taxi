@@ -70,12 +70,10 @@ module taxi_eth_mac_100g_us_ch #
      * PLL out
      */
     input  wire logic                 xcvr_gtrefclk00_in = 1'b0,
-    input  wire logic                 xcvr_qpll0pd_in = 1'b0,
     output wire logic                 xcvr_qpll0lock_out,
     output wire logic                 xcvr_qpll0clk_out,
     output wire logic                 xcvr_qpll0refclk_out,
     input  wire logic                 xcvr_gtrefclk01_in = 1'b0,
-    input  wire logic                 xcvr_qpll1pd_in = 1'b0,
     output wire logic                 xcvr_qpll1lock_out,
     output wire logic                 xcvr_qpll1clk_out,
     output wire logic                 xcvr_qpll1refclk_out,
@@ -245,12 +243,10 @@ if (CFG_LOW_LATENCY) begin : gt
          * PLL out
          */
         .xcvr_gtrefclk00_in(xcvr_gtrefclk00_in),
-        .xcvr_qpll0pd_in(xcvr_qpll0pd_in),
         .xcvr_qpll0lock_out(xcvr_qpll0lock_out),
         .xcvr_qpll0clk_out(xcvr_qpll0clk_out),
         .xcvr_qpll0refclk_out(xcvr_qpll0refclk_out),
         .xcvr_gtrefclk01_in(xcvr_gtrefclk01_in),
-        .xcvr_qpll1pd_in(xcvr_qpll1pd_in),
         .xcvr_qpll1lock_out(xcvr_qpll1lock_out),
         .xcvr_qpll1clk_out(xcvr_qpll1clk_out),
         .xcvr_qpll1refclk_out(xcvr_qpll1refclk_out),
@@ -345,12 +341,10 @@ end else if (!CFG_LOW_LATENCY) begin : gt
          * PLL out
          */
         .xcvr_gtrefclk00_in(xcvr_gtrefclk00_in),
-        .xcvr_qpll0pd_in(xcvr_qpll0pd_in),
         .xcvr_qpll0lock_out(xcvr_qpll0lock_out),
         .xcvr_qpll0clk_out(xcvr_qpll0clk_out),
         .xcvr_qpll0refclk_out(xcvr_qpll0refclk_out),
         .xcvr_gtrefclk01_in(xcvr_gtrefclk01_in),
-        .xcvr_qpll1pd_in(xcvr_qpll1pd_in),
         .xcvr_qpll1lock_out(xcvr_qpll1lock_out),
         .xcvr_qpll1clk_out(xcvr_qpll1clk_out),
         .xcvr_qpll1refclk_out(xcvr_qpll1refclk_out),

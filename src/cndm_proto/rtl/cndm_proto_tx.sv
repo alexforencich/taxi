@@ -164,6 +164,12 @@ always_ff @(posedge clk) begin
 
     if (rst) begin
         state_reg <= STATE_IDLE;
+
+        desc_req_reg <= 1'b0;
+        axis_desc.tready <= 1'b0;
+        dma_rd_desc_req.req_valid <= 1'b0;
+        dma_desc.req_valid <= 1'b0;
+        axis_cpl.tvalid <= 1'b0;
     end
 end
 

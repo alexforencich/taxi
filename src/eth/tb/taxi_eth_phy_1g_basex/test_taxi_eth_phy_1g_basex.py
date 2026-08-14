@@ -52,6 +52,7 @@ class TB:
 
         self.gmii_source = GmiiSource(dut.gmii_txd, dut.gmii_tx_er, dut.gmii_tx_en,
             dut.tx_clk, dut.tx_rst)
+        dut.gmii_tx_valid.setimmediatevalue(1)
         self.gmii_sink = GmiiSink(dut.gmii_rxd, dut.gmii_rx_er, dut.gmii_rx_dv,
             dut.rx_clk, dut.rx_rst)
 

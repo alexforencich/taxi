@@ -51,6 +51,7 @@ class TB:
         cocotb.start_soon(Clock(dut.rx_clk, self.clk_period, units="ns").start())
 
         self.xgmii_source = XgmiiSource(dut.xgmii_txd, dut.xgmii_txc, dut.tx_clk, dut.tx_rst)
+        dut.xgmii_tx_valid.setimmediatevalue(1)
         self.xgmii_sink = XgmiiSink(dut.xgmii_rxd, dut.xgmii_rxc, dut.rx_clk, dut.rx_rst)
 
         self.serdes_source = BaseRSerdesSource(

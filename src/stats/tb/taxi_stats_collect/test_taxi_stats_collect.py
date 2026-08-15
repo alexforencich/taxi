@@ -20,7 +20,6 @@ import cocotb
 from cocotb.clock import Clock
 from cocotb.queue import Queue
 from cocotb.triggers import RisingEdge, Timer
-from cocotb.regression import TestFactory
 
 from cocotbext.axi import AxiStreamBus, AxiStreamSink
 
@@ -64,6 +63,14 @@ class TB(object):
         await RisingEdge(self.dut.clk)
 
 
+def cycle_pause():
+    return itertools.cycle([1, 1, 1, 0])
+
+
+@cocotb.test()
+@cocotb.parametrize(
+    ("backpressure_inserter", [None, cycle_pause]),
+)
 async def run_test_acc(dut, backpressure_inserter=None):
 
     tb = TB(dut)
@@ -105,6 +112,10 @@ async def run_test_acc(dut, backpressure_inserter=None):
     await RisingEdge(dut.clk)
 
 
+@cocotb.test()
+@cocotb.parametrize(
+    ("backpressure_inserter", [None, cycle_pause]),
+)
 async def run_test_max(dut, backpressure_inserter=None):
 
     tb = TB(dut)
@@ -144,6 +155,10 @@ async def run_test_max(dut, backpressure_inserter=None):
     await RisingEdge(dut.clk)
 
 
+@cocotb.test()
+@cocotb.parametrize(
+    ("backpressure_inserter", [None, cycle_pause]),
+)
 async def run_test_str(dut, backpressure_inserter=None):
 
     tb = TB(dut)
@@ -192,6 +207,10 @@ async def run_test_str(dut, backpressure_inserter=None):
     await RisingEdge(dut.clk)
 
 
+@cocotb.test()
+@cocotb.parametrize(
+    ("backpressure_inserter", [None, cycle_pause]),
+)
 async def run_stress_test(dut, backpressure_inserter=None):
 
     tb = TB(dut)
@@ -269,24 +288,6 @@ async def run_stress_test(dut, backpressure_inserter=None):
 
     await RisingEdge(dut.clk)
     await RisingEdge(dut.clk)
-
-
-def cycle_pause():
-    return itertools.cycle([1, 1, 1, 0])
-
-
-if getattr(cocotb, 'top', None) is not None:
-
-    for test in [
-                run_test_acc,
-                run_test_max,
-                run_test_str,
-                run_stress_test,
-            ]:
-
-        factory = TestFactory(test)
-        factory.add_option("backpressure_inserter", [None, cycle_pause])
-        factory.generate_tests()
 
 
 # cocotb-test

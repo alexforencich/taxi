@@ -18,7 +18,6 @@ import cocotb_test.simulator
 import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge, Timer
-from cocotb.regression import TestFactory
 
 from cocotbext.axi import AxiLiteBus, AxiLiteMaster
 from cocotbext.axi import AxiStreamBus, AxiStreamSource, AxiStreamFrame
@@ -61,6 +60,15 @@ class TB(object):
         await RisingEdge(self.dut.clk)
 
 
+def cycle_pause():
+    return itertools.cycle([1, 1, 1, 0])
+
+
+@cocotb.test()
+@cocotb.parametrize(
+    ("idle_inserter", [None, cycle_pause]),
+    ("backpressure_inserter", [None, cycle_pause]),
+)
 async def run_test_strings(dut, idle_inserter=None, backpressure_inserter=None):
 
     tb = TB(dut)
@@ -107,20 +115,6 @@ async def run_test_strings(dut, idle_inserter=None, backpressure_inserter=None):
 
     await RisingEdge(dut.clk)
     await RisingEdge(dut.clk)
-
-
-def cycle_pause():
-    return itertools.cycle([1, 1, 1, 0])
-
-
-if getattr(cocotb, 'top', None) is not None:
-
-    for test in [run_test_strings]:
-
-        factory = TestFactory(test)
-        factory.add_option("idle_inserter", [None, cycle_pause])
-        factory.add_option("backpressure_inserter", [None, cycle_pause])
-        factory.generate_tests()
 
 
 # cocotb-test

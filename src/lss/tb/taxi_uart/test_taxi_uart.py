@@ -18,7 +18,6 @@ import cocotb_test.simulator
 import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge, Timer
-from cocotb.regression import TestFactory
 
 from cocotbext.axi import AxiStreamSource, AxiStreamSink, AxiStreamBus
 from cocotbext.uart import UartSource, UartSink
@@ -53,6 +52,34 @@ class TB:
         await RisingEdge(self.dut.clk)
 
 
+def prbs31(state=0x7fffffff):
+    while True:
+        for i in range(8):
+            if bool(state & 0x08000000) ^ bool(state & 0x40000000):
+                state = ((state & 0x3fffffff) << 1) | 1
+            else:
+                state = (state & 0x3fffffff) << 1
+        yield state & 0xff
+
+
+def size_list():
+    return list(range(1, 16)) + [128]
+
+
+def incrementing_payload(length):
+    return bytearray(itertools.islice(itertools.cycle(range(256)), length))
+
+
+def prbs_payload(length):
+    gen = prbs31()
+    return bytearray([next(gen) for x in range(length)])
+
+
+@cocotb.test()
+@cocotb.parametrize(
+    ("payload_lengths", [size_list]),
+    ("payload_data", [incrementing_payload, prbs_payload]),
+)
 async def run_test_tx(dut, payload_lengths=None, payload_data=None):
 
     tb = TB(dut)
@@ -78,6 +105,11 @@ async def run_test_tx(dut, payload_lengths=None, payload_data=None):
     await RisingEdge(dut.clk)
 
 
+@cocotb.test()
+@cocotb.parametrize(
+    ("payload_lengths", [size_list]),
+    ("payload_data", [incrementing_payload, prbs_payload]),
+)
 async def run_test_rx(dut, payload_lengths=None, payload_data=None):
 
     tb = TB(dut)
@@ -101,38 +133,6 @@ async def run_test_rx(dut, payload_lengths=None, payload_data=None):
 
     await RisingEdge(dut.clk)
     await RisingEdge(dut.clk)
-
-
-def prbs31(state=0x7fffffff):
-    while True:
-        for i in range(8):
-            if bool(state & 0x08000000) ^ bool(state & 0x40000000):
-                state = ((state & 0x3fffffff) << 1) | 1
-            else:
-                state = (state & 0x3fffffff) << 1
-        yield state & 0xff
-
-
-def size_list():
-    return list(range(1, 16)) + [128]
-
-
-def incrementing_payload(length):
-    return bytearray(itertools.islice(itertools.cycle(range(256)), length))
-
-
-def prbs_payload(length):
-    gen = prbs31()
-    return bytearray([next(gen) for x in range(length)])
-
-
-if getattr(cocotb, 'top', None) is not None:
-
-    for test in [run_test_tx, run_test_rx]:
-        factory = TestFactory(test)
-        factory.add_option("payload_lengths", [size_list])
-        factory.add_option("payload_data", [incrementing_payload, prbs_payload])
-        factory.generate_tests()
 
 
 # cocotb-test

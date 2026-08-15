@@ -17,7 +17,6 @@ import cocotb_test.simulator
 import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge, FallingEdge
-from cocotb.regression import TestFactory
 
 from cocotbext.axi import AxiStreamSource, AxiStreamSink, AxiStreamBus
 from cocotbext.i2c import I2cMemory
@@ -96,6 +95,7 @@ class TB:
             await FallingEdge(self.dut.bus_active)
 
 
+@cocotb.test()
 async def run_test_write(dut):
 
     tb = TB(dut)
@@ -121,6 +121,7 @@ async def run_test_write(dut):
     await RisingEdge(dut.clk)
 
 
+@cocotb.test()
 async def run_test_read(dut):
 
     tb = TB(dut)
@@ -146,6 +147,7 @@ async def run_test_read(dut):
     await RisingEdge(dut.clk)
 
 
+@cocotb.test()
 async def run_test_nack(dut):
 
     tb = TB(dut)
@@ -159,18 +161,6 @@ async def run_test_nack(dut):
 
     await RisingEdge(dut.clk)
     await RisingEdge(dut.clk)
-
-
-if getattr(cocotb, 'top', None) is not None:
-
-    for test in [
-                run_test_write,
-                run_test_read,
-                run_test_nack,
-            ]:
-
-        factory = TestFactory(test)
-        factory.generate_tests()
 
 
 # cocotb-test

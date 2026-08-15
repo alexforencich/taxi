@@ -19,7 +19,6 @@ import cocotb_test.simulator
 import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge
-from cocotb.regression import TestFactory
 
 
 class TB:
@@ -72,7 +71,7 @@ def descramble_64b66b(data, state=0x3ffffffffffffff):
             if bool(state & (1 << 38)) ^ bool(state & (1 << 57)) ^ bool(d & (1 << i)):
                 b = b | (1 << i)
             state = (state & 0x1ffffffffffffff) << 1 | bool(d & (1 << i))
-        data_out += bytearray([b])
+        data_out.append(b)
     return data_out
 
 
@@ -104,6 +103,26 @@ def scramble_pcie_gen3(data, state=0x1efedc, poly=0x524042):
     return data_out
 
 
+ref_scramble = None
+ref_descramble = None
+if getattr(cocotb, 'top', None) is not None:
+    # if cocotb.top.LFSR_POLY.value == 0x8000000001:
+    if int(cocotb.top.LFSR_W.value) == 58:
+        ref_scramble = scramble_64b66b
+        ref_descramble = descramble_64b66b
+    if cocotb.top.LFSR_POLY.value == 0x0039:
+        ref_scramble = scramble_pcie
+        ref_descramble = scramble_pcie
+    if cocotb.top.LFSR_POLY.value == 0x210125:
+        ref_scramble = scramble_pcie_gen3
+        ref_descramble = scramble_pcie_gen3
+
+
+@cocotb.test()
+@cocotb.parametrize(
+    ("ref_scramble", [ref_scramble]),
+    ("ref_descramble", [ref_descramble]),
+)
 async def run_test_descramble(dut, ref_scramble, ref_descramble):
 
     data_width = len(dut.data_in)
@@ -143,25 +162,6 @@ async def run_test_descramble(dut, ref_scramble, ref_descramble):
     dut.data_in_valid.value = 0
 
     await RisingEdge(dut.clk)
-
-
-if getattr(cocotb, 'top', None) is not None:
-
-    # if cocotb.top.LFSR_POLY.value == 0x8000000001:
-    if int(cocotb.top.LFSR_W.value) == 58:
-        factory = TestFactory(run_test_descramble)
-        factory.add_option(("ref_scramble", "ref_descramble"), [(scramble_64b66b, descramble_64b66b)])
-        factory.generate_tests()
-
-    if cocotb.top.LFSR_POLY.value == 0x0039:
-        factory = TestFactory(run_test_descramble)
-        factory.add_option(("ref_scramble", "ref_descramble"), [(scramble_pcie, scramble_pcie)])
-        factory.generate_tests()
-
-    if cocotb.top.LFSR_POLY.value == 0x210125:
-        factory = TestFactory(run_test_descramble)
-        factory.add_option(("ref_scramble", "ref_descramble"), [(scramble_pcie_gen3, scramble_pcie_gen3)])
-        factory.generate_tests()
 
 
 # cocotb-test

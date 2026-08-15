@@ -20,7 +20,6 @@ import cocotb_test.simulator
 import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge
-from cocotb.regression import TestFactory
 
 
 class TB:
@@ -66,6 +65,18 @@ def crc32c(data, crc=0xffffffff, poly=0x82f63b78):
     return ~crc & 0xffffffff
 
 
+ref_crc = None
+if getattr(cocotb, 'top', None) is not None:
+    if int(cocotb.top.LFSR_POLY.value) == 0x4c11db7:
+        ref_crc = crc32
+    if int(cocotb.top.LFSR_POLY.value) == 0x1edc6f41:
+        ref_crc = crc32c
+
+
+@cocotb.test()
+@cocotb.parametrize(
+    ("ref_crc", [ref_crc]),
+)
 async def run_test_crc(dut, ref_crc):
 
     data_width = len(dut.data_in)
@@ -110,19 +121,6 @@ async def run_test_crc(dut, ref_crc):
 
     await RisingEdge(dut.clk)
     await RisingEdge(dut.clk)
-
-
-if getattr(cocotb, 'top', None) is not None:
-
-    if int(cocotb.top.LFSR_POLY.value) == 0x4c11db7:
-        factory = TestFactory(run_test_crc)
-        factory.add_option("ref_crc", [crc32])
-        factory.generate_tests()
-
-    if int(cocotb.top.LFSR_POLY.value) == 0x1edc6f41:
-        factory = TestFactory(run_test_crc)
-        factory.add_option("ref_crc", [crc32c])
-        factory.generate_tests()
 
 
 # cocotb-test

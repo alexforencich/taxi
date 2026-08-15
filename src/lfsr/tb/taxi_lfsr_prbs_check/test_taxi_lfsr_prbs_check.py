@@ -19,7 +19,6 @@ import cocotb_test.simulator
 import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge
-from cocotb.regression import TestFactory
 
 
 class TB:
@@ -78,6 +77,18 @@ def count_set_bits(n):
     return cnt
 
 
+ref_prbs = None
+if getattr(cocotb, 'top', None) is not None:
+    if int(cocotb.top.LFSR_POLY.value) == 0x021:
+        ref_prbs = prbs9
+    if int(cocotb.top.LFSR_POLY.value) == 0x10000001:
+        ref_prbs = prbs31
+
+
+@cocotb.test()
+@cocotb.parametrize(
+    ("ref_prbs", [ref_prbs]),
+)
 async def run_test_prbs(dut, ref_prbs):
 
     data_width = len(dut.data_out)
@@ -144,19 +155,6 @@ async def run_test_prbs(dut, ref_prbs):
 
     # one bit set per tap
     assert err_cnt == 3
-
-
-if getattr(cocotb, 'top', None) is not None:
-
-    if int(cocotb.top.LFSR_POLY.value) == 0x021:
-        factory = TestFactory(run_test_prbs)
-        factory.add_option("ref_prbs", [prbs9])
-        factory.generate_tests()
-
-    if int(cocotb.top.LFSR_POLY.value) == 0x10000001:
-        factory = TestFactory(run_test_prbs)
-        factory.add_option("ref_prbs", [prbs31])
-        factory.generate_tests()
 
 
 # cocotb-test

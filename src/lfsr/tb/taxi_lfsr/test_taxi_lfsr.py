@@ -12,14 +12,12 @@ Authors:
 import itertools
 import logging
 import os
-import zlib
 
 import pytest
 import cocotb_test.simulator
 
 import cocotb
 from cocotb.triggers import Timer
-from cocotb.regression import TestFactory
 
 
 class TB:
@@ -84,6 +82,46 @@ def crc32c(data, crc=0xffffffff, poly=0x82f63b78):
     return ~crc & 0xffffffff
 
 
+def prbs9(state=0x1ff):
+    while True:
+        for i in range(8):
+            if bool(state & 0x10) ^ bool(state & 0x100):
+                state = ((state & 0xff) << 1) | 1
+            else:
+                state = (state & 0xff) << 1
+        yield ~state & 0xff
+
+
+def prbs31(state=0x7fffffff):
+    while True:
+        for i in range(8):
+            if bool(state & 0x08000000) ^ bool(state & 0x40000000):
+                state = ((state & 0x3fffffff) << 1) | 1
+            else:
+                state = (state & 0x3fffffff) << 1
+        yield ~state & 0xff
+
+
+ref_crc = None
+ref_prbs = None
+if getattr(cocotb, 'top', None) is not None:
+    if cocotb.top.LFSR_POLY.value == 0x4c11db7:
+        if cocotb.top.STATE_SHIFT_PRE.value == 0:
+            ref_crc = crc32
+        else:
+            pass
+    if cocotb.top.LFSR_POLY.value == 0x1edc6f41:
+        ref_crc = crc32c
+    if cocotb.top.LFSR_POLY.value == 0x021:
+        ref_prbs = prbs9
+    if cocotb.top.LFSR_POLY.value == 0x10000001:
+        ref_prbs = prbs31
+
+
+@cocotb.test(skip=(ref_crc is None))
+@cocotb.parametrize(
+    ("ref_crc", [ref_crc]),
+)
 async def run_test_crc(dut, ref_crc):
 
     data_width = len(dut.data_in)
@@ -129,26 +167,10 @@ async def run_test_crc(dut, ref_crc):
     await Timer(10, 'ns')
 
 
-def prbs9(state=0x1ff):
-    while True:
-        for i in range(8):
-            if bool(state & 0x10) ^ bool(state & 0x100):
-                state = ((state & 0xff) << 1) | 1
-            else:
-                state = (state & 0xff) << 1
-        yield ~state & 0xff
-
-
-def prbs31(state=0x7fffffff):
-    while True:
-        for i in range(8):
-            if bool(state & 0x08000000) ^ bool(state & 0x40000000):
-                state = ((state & 0x3fffffff) << 1) | 1
-            else:
-                state = (state & 0x3fffffff) << 1
-        yield ~state & 0xff
-
-
+@cocotb.test(skip=(ref_prbs is None))
+@cocotb.parametrize(
+    ("ref_prbs", [ref_prbs]),
+)
 async def run_test_prbs(dut, ref_prbs):
 
     data_width = len(dut.data_in)
@@ -181,6 +203,7 @@ async def run_test_prbs(dut, ref_prbs):
         await Timer(10, 'ns')
 
 
+@cocotb.test(skip=(ref_crc is not None or ref_prbs is not None))
 async def run_test_shift_crc(dut):
 
     data_width = len(dut.data_in)
@@ -228,33 +251,6 @@ async def run_test_shift_crc(dut):
         assert crc == ref
 
         await Timer(10, 'ns')
-
-
-if getattr(cocotb, 'top', None) is not None:
-
-    if cocotb.top.LFSR_POLY.value == 0x4c11db7:
-        if cocotb.top.STATE_SHIFT_PRE.value == 0:
-            factory = TestFactory(run_test_crc)
-            factory.add_option("ref_crc", [crc32])
-            factory.generate_tests()
-        else:
-            factory = TestFactory(run_test_shift_crc)
-            factory.generate_tests()
-
-    if cocotb.top.LFSR_POLY.value == 0x1edc6f41:
-        factory = TestFactory(run_test_crc)
-        factory.add_option("ref_crc", [crc32c])
-        factory.generate_tests()
-
-    if cocotb.top.LFSR_POLY.value == 0x021:
-        factory = TestFactory(run_test_prbs)
-        factory.add_option("ref_prbs", [prbs9])
-        factory.generate_tests()
-
-    if cocotb.top.LFSR_POLY.value == 0x10000001:
-        factory = TestFactory(run_test_prbs)
-        factory.add_option("ref_prbs", [prbs31])
-        factory.generate_tests()
 
 
 # cocotb-test

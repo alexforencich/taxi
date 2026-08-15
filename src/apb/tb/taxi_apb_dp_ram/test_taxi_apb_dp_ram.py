@@ -20,7 +20,6 @@ import pytest
 import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge, Timer
-from cocotb.regression import TestFactory
 
 from cocotbext.axi import ApbBus, ApbMaster
 
@@ -61,7 +60,16 @@ class TB(object):
         await RisingEdge(self.dut.a_clk)
 
 
-async def run_test_write(dut, port=0, data_in=None, idle_inserter=None):
+def cycle_pause():
+    return itertools.cycle([1, 1, 1, 0])
+
+
+@cocotb.test()
+@cocotb.parametrize(
+    ("idle_inserter", [None, cycle_pause]),
+    ("port", [0, 1]),
+)
+async def run_test_write(dut, port=0, idle_inserter=None):
 
     tb = TB(dut)
 
@@ -90,7 +98,12 @@ async def run_test_write(dut, port=0, data_in=None, idle_inserter=None):
     await RisingEdge(dut.a_clk)
 
 
-async def run_test_read(dut, port=0, data_in=None, idle_inserter=None):
+@cocotb.test()
+@cocotb.parametrize(
+    ("idle_inserter", [None, cycle_pause]),
+    ("port", [0, 1]),
+)
+async def run_test_read(dut, port=0, idle_inserter=None):
 
     tb = TB(dut)
 
@@ -117,7 +130,11 @@ async def run_test_read(dut, port=0, data_in=None, idle_inserter=None):
     await RisingEdge(dut.a_clk)
 
 
-async def run_test_arb(dut, data_in=None, idle_inserter=None):
+@cocotb.test()
+@cocotb.parametrize(
+    ("idle_inserter", [None, cycle_pause]),
+)
+async def run_test_arb(dut, idle_inserter=None):
 
     tb = TB(dut)
 
@@ -145,6 +162,10 @@ async def run_test_arb(dut, data_in=None, idle_inserter=None):
     await RisingEdge(dut.a_clk)
 
 
+@cocotb.test()
+@cocotb.parametrize(
+    ("idle_inserter", [None, cycle_pause]),
+)
 async def run_stress_test(dut, idle_inserter=None):
 
     tb = TB(dut)
@@ -178,28 +199,6 @@ async def run_stress_test(dut, idle_inserter=None):
 
     await RisingEdge(dut.a_clk)
     await RisingEdge(dut.a_clk)
-
-
-def cycle_pause():
-    return itertools.cycle([1, 1, 1, 0])
-
-
-if getattr(cocotb, 'top', None) is not None:
-
-    for test in [run_test_write, run_test_read]:
-
-        factory = TestFactory(test)
-        factory.add_option("idle_inserter", [None, cycle_pause])
-        factory.add_option("port", [0, 1])
-        factory.generate_tests()
-
-    factory = TestFactory(run_test_arb)
-    factory.add_option("idle_inserter", [None, cycle_pause])
-    factory.generate_tests()
-
-    factory = TestFactory(run_stress_test)
-    factory.add_option("idle_inserter", [None, cycle_pause])
-    factory.generate_tests()
 
 
 # cocotb-test

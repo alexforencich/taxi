@@ -20,7 +20,6 @@ import pytest
 import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge, Timer
-from cocotb.regression import TestFactory
 
 from cocotbext.axi import ApbBus, ApbMaster
 
@@ -52,7 +51,15 @@ class TB(object):
         await RisingEdge(self.dut.clk)
 
 
-async def run_test_write(dut, data_in=None, idle_inserter=None):
+def cycle_pause():
+    return itertools.cycle([1, 1, 1, 0])
+
+
+@cocotb.test()
+@cocotb.parametrize(
+    ("idle_inserter", [None, cycle_pause]),
+)
+async def run_test_write(dut, idle_inserter=None):
 
     tb = TB(dut)
 
@@ -80,7 +87,11 @@ async def run_test_write(dut, data_in=None, idle_inserter=None):
     await RisingEdge(dut.clk)
 
 
-async def run_test_read(dut, data_in=None, idle_inserter=None):
+@cocotb.test()
+@cocotb.parametrize(
+    ("idle_inserter", [None, cycle_pause]),
+)
+async def run_test_read(dut, idle_inserter=None):
 
     tb = TB(dut)
 
@@ -106,6 +117,10 @@ async def run_test_read(dut, data_in=None, idle_inserter=None):
     await RisingEdge(dut.clk)
 
 
+@cocotb.test()
+@cocotb.parametrize(
+    ("idle_inserter", [None, cycle_pause]),
+)
 async def run_stress_test(dut, idle_inserter=None):
 
     tb = TB(dut)
@@ -139,19 +154,6 @@ async def run_stress_test(dut, idle_inserter=None):
 
     await RisingEdge(dut.clk)
     await RisingEdge(dut.clk)
-
-
-def cycle_pause():
-    return itertools.cycle([1, 1, 1, 0])
-
-
-if getattr(cocotb, 'top', None) is not None:
-
-    for test in [run_test_write, run_test_read, run_stress_test]:
-
-        factory = TestFactory(test)
-        factory.add_option("idle_inserter", [None, cycle_pause])
-        factory.generate_tests()
 
 
 # cocotb-test

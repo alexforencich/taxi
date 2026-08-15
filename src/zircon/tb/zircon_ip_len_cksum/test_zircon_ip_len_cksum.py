@@ -28,7 +28,6 @@ import pytest
 import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge
-from cocotb.regression import TestFactory
 
 from cocotbext.axi import AxiStreamBus, AxiStreamSource, AxiStreamSink, AxiStreamFrame
 
@@ -63,6 +62,7 @@ class TB:
         await RisingEdge(self.dut.clk)
 
 
+@cocotb.test()
 async def run_test(dut):
 
     tb = TB(dut)
@@ -223,12 +223,6 @@ async def run_test(dut):
 
     await RisingEdge(dut.clk)
     await RisingEdge(dut.clk)
-
-
-if getattr(cocotb, 'top', None) is not None:
-
-    factory = TestFactory(run_test)
-    factory.generate_tests()
 
 
 # cocotb-test

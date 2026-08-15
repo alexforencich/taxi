@@ -144,6 +144,7 @@ async def run_stress_test(dut, idle_inserter=None, backpressure_inserter=None):
     while workers:
         await workers.pop(0).join()
 
+    await tb.stat_source.wait()
     await Timer(1000, 'ns')
 
     data_ref = [0]*2**stat_id_width

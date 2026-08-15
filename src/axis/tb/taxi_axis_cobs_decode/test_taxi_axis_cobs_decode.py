@@ -18,7 +18,6 @@ import cocotb_test.simulator
 import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge
-from cocotb.regression import TestFactory
 
 from cocotbext.axi import AxiStreamBus, AxiStreamFrame, AxiStreamSource, AxiStreamSink
 
@@ -123,34 +122,6 @@ class TB(object):
         await RisingEdge(self.dut.clk)
 
 
-async def run_test(dut, payload_lengths=None, payload_data=None, idle_inserter=None, backpressure_inserter=None):
-
-    tb = TB(dut)
-
-    await tb.reset()
-
-    tb.set_idle_generator(idle_inserter)
-    tb.set_backpressure_generator(backpressure_inserter)
-
-    test_frames = [payload_data(x) for x in payload_lengths()]
-
-    for test_data in test_frames:
-        enc = cobs_encode(test_data)
-        test_frame = AxiStreamFrame(enc)
-        await tb.source.send(test_frame)
-
-    for test_data in test_frames:
-        rx_frame = await tb.sink.recv()
-
-        assert rx_frame.tdata == test_data
-        assert not rx_frame.tuser
-
-    assert tb.sink.empty()
-
-    await RisingEdge(dut.clk)
-    await RisingEdge(dut.clk)
-
-
 def cycle_pause():
     return itertools.cycle([1, 1, 1, 0])
 
@@ -180,14 +151,39 @@ def prbs_payload(length):
     return bytearray([next(gen) for x in range(length)])
 
 
-if getattr(cocotb, 'top', None) is not None:
+@cocotb.test()
+@cocotb.parametrize(
+    ("payload_lengths", [size_list]),
+    ("payload_data", [zero_payload, nonzero_incrementing_payload, nonzero_incrementing_payload_zero_framed, prbs_payload]),
+    ("idle_inserter", [None, cycle_pause]),
+    ("backpressure_inserter", [None, cycle_pause]),
+)
+async def run_test(dut, payload_lengths=None, payload_data=None, idle_inserter=None, backpressure_inserter=None):
 
-    factory = TestFactory(run_test)
-    factory.add_option("payload_lengths", [size_list])
-    factory.add_option("payload_data", [zero_payload, nonzero_incrementing_payload, nonzero_incrementing_payload_zero_framed, prbs_payload])
-    factory.add_option("idle_inserter", [None, cycle_pause])
-    factory.add_option("backpressure_inserter", [None, cycle_pause])
-    factory.generate_tests()
+    tb = TB(dut)
+
+    await tb.reset()
+
+    tb.set_idle_generator(idle_inserter)
+    tb.set_backpressure_generator(backpressure_inserter)
+
+    test_frames = [payload_data(x) for x in payload_lengths()]
+
+    for test_data in test_frames:
+        enc = cobs_encode(test_data)
+        test_frame = AxiStreamFrame(enc)
+        await tb.source.send(test_frame)
+
+    for test_data in test_frames:
+        rx_frame = await tb.sink.recv()
+
+        assert rx_frame.tdata == test_data
+        assert not rx_frame.tuser
+
+    assert tb.sink.empty()
+
+    await RisingEdge(dut.clk)
+    await RisingEdge(dut.clk)
 
 
 # cocotb-test

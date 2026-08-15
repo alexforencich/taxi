@@ -20,7 +20,6 @@ import pytest
 import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge
-from cocotb.regression import TestFactory
 
 from cocotbext.axi import AxiStreamBus, AxiStreamFrame, AxiStreamSource, AxiStreamSink
 
@@ -89,6 +88,27 @@ class TB(object):
             await RisingEdge(self.dut.m_clk)
 
 
+def cycle_pause():
+    return itertools.cycle([1, 1, 1, 0])
+
+
+def size_list():
+    data_width = len(cocotb.top.m_axis.tdata)
+    byte_lanes = data_width // 8
+    return list(range(1, byte_lanes*4+1))+[512]+[1]*64
+
+
+def incrementing_payload(length):
+    return bytearray(itertools.islice(itertools.cycle(range(256)), length))
+
+
+@cocotb.test()
+@cocotb.parametrize(
+    ("payload_lengths", [size_list]),
+    ("payload_data", [incrementing_payload]),
+    ("idle_inserter", [None, cycle_pause]),
+    ("backpressure_inserter", [None, cycle_pause]),
+)
 async def run_test(dut, payload_lengths=None, payload_data=None, idle_inserter=None, backpressure_inserter=None):
 
     tb = TB(dut)
@@ -128,6 +148,7 @@ async def run_test(dut, payload_lengths=None, payload_data=None, idle_inserter=N
     await RisingEdge(dut.s_clk)
 
 
+@cocotb.test()
 async def run_test_tuser_assert(dut):
 
     tb = TB(dut)
@@ -154,6 +175,7 @@ async def run_test_tuser_assert(dut):
     await RisingEdge(dut.s_clk)
 
 
+@cocotb.test()
 async def run_test_init_sink_pause(dut):
 
     tb = TB(dut)
@@ -182,6 +204,7 @@ async def run_test_init_sink_pause(dut):
     await RisingEdge(dut.s_clk)
 
 
+@cocotb.test()
 async def run_test_init_sink_pause_reset(dut):
 
     tb = TB(dut)
@@ -210,6 +233,7 @@ async def run_test_init_sink_pause_reset(dut):
     await RisingEdge(dut.s_clk)
 
 
+@cocotb.test()
 async def run_test_init_sink_pause_source_reset(dut):
 
     tb = TB(dut)
@@ -242,6 +266,7 @@ async def run_test_init_sink_pause_source_reset(dut):
     await RisingEdge(dut.s_clk)
 
 
+@cocotb.test()
 async def run_test_init_sink_pause_sink_reset(dut):
 
     tb = TB(dut)
@@ -270,6 +295,7 @@ async def run_test_init_sink_pause_sink_reset(dut):
     await RisingEdge(dut.s_clk)
 
 
+@cocotb.test()
 async def run_test_shift_in_source_reset(dut):
 
     tb = TB(dut)
@@ -302,6 +328,7 @@ async def run_test_shift_in_source_reset(dut):
     await RisingEdge(dut.s_clk)
 
 
+@cocotb.test()
 async def run_test_shift_in_sink_reset(dut):
 
     tb = TB(dut)
@@ -326,6 +353,7 @@ async def run_test_shift_in_sink_reset(dut):
     await RisingEdge(dut.s_clk)
 
 
+@cocotb.test()
 async def run_test_shift_out_source_reset(dut):
 
     tb = TB(dut)
@@ -356,6 +384,7 @@ async def run_test_shift_out_source_reset(dut):
     await RisingEdge(dut.s_clk)
 
 
+@cocotb.test()
 async def run_test_shift_out_sink_reset(dut):
 
     tb = TB(dut)
@@ -382,6 +411,7 @@ async def run_test_shift_out_sink_reset(dut):
     await RisingEdge(dut.s_clk)
 
 
+@cocotb.test()
 async def run_test_pause(dut):
 
     tb = TB(dut)
@@ -432,6 +462,7 @@ async def run_test_pause(dut):
     await RisingEdge(dut.s_clk)
 
 
+@cocotb.test()
 async def run_test_overflow(dut):
 
     tb = TB(dut)
@@ -493,6 +524,7 @@ async def run_test_overflow(dut):
     await RisingEdge(dut.s_clk)
 
 
+@cocotb.test()
 async def run_test_oversize(dut):
 
     tb = TB(dut)
@@ -532,6 +564,11 @@ async def run_test_oversize(dut):
     await RisingEdge(dut.s_clk)
 
 
+@cocotb.test()
+@cocotb.parametrize(
+    ("idle_inserter", [None, cycle_pause]),
+    ("backpressure_inserter", [None, cycle_pause]),
+)
 async def run_stress_test(dut, idle_inserter=None, backpressure_inserter=None):
 
     tb = TB(dut)
@@ -596,53 +633,6 @@ async def run_stress_test(dut, idle_inserter=None, backpressure_inserter=None):
 
     await RisingEdge(dut.s_clk)
     await RisingEdge(dut.s_clk)
-
-
-def cycle_pause():
-    return itertools.cycle([1, 1, 1, 0])
-
-
-def size_list():
-    data_width = len(cocotb.top.m_axis.tdata)
-    byte_width = data_width // 8
-    return list(range(1, byte_width*4+1))+[512]+[1]*64
-
-
-def incrementing_payload(length):
-    return bytearray(itertools.islice(itertools.cycle(range(256)), length))
-
-
-if getattr(cocotb, 'top', None) is not None:
-
-    factory = TestFactory(run_test)
-    factory.add_option("payload_lengths", [size_list])
-    factory.add_option("payload_data", [incrementing_payload])
-    factory.add_option("idle_inserter", [None, cycle_pause])
-    factory.add_option("backpressure_inserter", [None, cycle_pause])
-    factory.generate_tests()
-
-    for test in [
-                run_test_tuser_assert,
-                run_test_init_sink_pause,
-                run_test_init_sink_pause_reset,
-                run_test_init_sink_pause_source_reset,
-                run_test_init_sink_pause_sink_reset,
-                run_test_shift_in_source_reset,
-                run_test_shift_in_sink_reset,
-                run_test_shift_out_source_reset,
-                run_test_shift_out_sink_reset,
-                run_test_pause,
-                run_test_overflow,
-                run_test_oversize
-            ]:
-
-        factory = TestFactory(test)
-        factory.generate_tests()
-
-    factory = TestFactory(run_stress_test)
-    factory.add_option("idle_inserter", [None, cycle_pause])
-    factory.add_option("backpressure_inserter", [None, cycle_pause])
-    factory.generate_tests()
 
 
 # cocotb-test

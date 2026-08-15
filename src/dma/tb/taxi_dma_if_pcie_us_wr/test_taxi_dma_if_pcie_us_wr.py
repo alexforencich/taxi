@@ -19,7 +19,6 @@ import pytest
 
 import cocotb
 from cocotb.triggers import RisingEdge, FallingEdge, Timer
-from cocotb.regression import TestFactory
 
 from cocotbext.axi import AxiStreamBus
 from cocotbext.pcie.core import RootComplex
@@ -162,6 +161,14 @@ class TB(object):
             self.dma_ram.set_pause_generator(generator())
 
 
+def cycle_pause():
+    return itertools.cycle([1, 1, 1, 0])
+
+
+@cocotb.test()
+@cocotb.parametrize(
+    (("idle_inserter", "backpressure_inserter"), [(None, None), (cycle_pause, cycle_pause)]),
+)
 async def run_test_write(dut, idle_inserter=None, backpressure_inserter=None):
 
     tb = TB(dut)
@@ -226,17 +233,6 @@ async def run_test_write(dut, idle_inserter=None, backpressure_inserter=None):
 
     await RisingEdge(dut.clk)
     await RisingEdge(dut.clk)
-
-
-def cycle_pause():
-    return itertools.cycle([1, 1, 1, 0])
-
-
-if getattr(cocotb, 'top', None) is not None:
-
-    factory = TestFactory(run_test_write)
-    factory.add_option(("idle_inserter", "backpressure_inserter"), [(None, None), (cycle_pause, cycle_pause)])
-    factory.generate_tests()
 
 
 # cocotb-test

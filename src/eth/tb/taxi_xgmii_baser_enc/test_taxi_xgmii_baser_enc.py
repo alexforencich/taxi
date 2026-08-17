@@ -20,7 +20,6 @@ import cocotb_test.simulator
 import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge
-from cocotb.regression import TestFactory
 
 from cocotbext.eth import XgmiiSource, XgmiiFrame
 
@@ -79,6 +78,27 @@ class TB:
         await RisingEdge(self.dut.clk)
 
 
+def size_list():
+    return list(range(60, 128)) + [512, 1514, 9214] + [60]*10
+
+
+def incrementing_payload(length):
+    return bytearray(itertools.islice(itertools.cycle(range(256)), length))
+
+
+data_w = 64
+if getattr(cocotb, 'top', None) is not None:
+    data_w = len(cocotb.top.xgmii_txd)
+
+
+@cocotb.test()
+@cocotb.parametrize(
+    ("payload_lengths", [size_list]),
+    ("payload_data", [incrementing_payload]),
+    ("ifg", [12]),
+    ("enable_dic", [True, False]),
+    ("force_offset_start", [False, True]),
+)
 async def run_test(dut, payload_lengths=None, payload_data=None, ifg=12, enable_dic=True,
         force_offset_start=False):
 
@@ -108,6 +128,13 @@ async def run_test(dut, payload_lengths=None, payload_data=None, ifg=12, enable_
     await RisingEdge(dut.clk)
 
 
+@cocotb.test(skip=(data_w != 64))
+@cocotb.parametrize(
+    ("payload_data", [incrementing_payload]),
+    ("ifg", [12]),
+    ("enable_dic", [True, False]),
+    ("force_offset_start", [False, True]),
+)
 async def run_test_alignment(dut, payload_data=None, ifg=12, enable_dic=True,
         force_offset_start=False):
 
@@ -181,6 +208,7 @@ async def run_test_alignment(dut, payload_data=None, ifg=12, enable_dic=True,
     await RisingEdge(dut.clk)
 
 
+@cocotb.test()
 async def run_test_os(dut):
 
     tb = TB(dut)
@@ -220,40 +248,6 @@ async def run_test_os(dut):
 
     for k in range(10):
         await RisingEdge(dut.clk)
-
-
-def size_list():
-    return list(range(60, 128)) + [512, 1514, 9214] + [60]*10
-
-
-def incrementing_payload(length):
-    return bytearray(itertools.islice(itertools.cycle(range(256)), length))
-
-
-def cycle_en():
-    return itertools.cycle([0, 0, 0, 1])
-
-
-if getattr(cocotb, 'top', None) is not None:
-
-    factory = TestFactory(run_test)
-    factory.add_option("payload_lengths", [size_list])
-    factory.add_option("payload_data", [incrementing_payload])
-    factory.add_option("ifg", [12])
-    factory.add_option("enable_dic", [True, False])
-    factory.add_option("force_offset_start", [False, True])
-    factory.generate_tests()
-
-    if len(cocotb.top.xgmii_txd) == 64:
-        factory = TestFactory(run_test_alignment)
-        factory.add_option("payload_data", [incrementing_payload])
-        factory.add_option("ifg", [12])
-        factory.add_option("enable_dic", [True, False])
-        factory.add_option("force_offset_start", [False, True])
-        factory.generate_tests()
-
-    factory = TestFactory(run_test_os)
-    factory.generate_tests()
 
 
 # cocotb-test

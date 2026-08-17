@@ -24,7 +24,6 @@ import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge, Timer
 from cocotb.utils import get_time_from_sim_steps
-from cocotb.regression import TestFactory
 
 from cocotbext.eth import XgmiiFrame, PtpClockSimTime
 from cocotbext.axi import AxiStreamBus, AxiStreamSource, AxiStreamSink, AxiStreamFrame
@@ -212,6 +211,24 @@ class TB:
         self.ptp_td_source.set_ts_rel_sim_time()
 
 
+def size_list():
+    return list(range(60, 128)) + [512, 1514, 9214] + [60]*10
+
+
+def incrementing_payload(length):
+    return bytearray(itertools.islice(itertools.cycle(range(256)), length))
+
+
+data_w = 64
+pfc_en = False
+usxgmii_en = False
+if getattr(cocotb, 'top', None) is not None:
+    data_w = int(cocotb.top.DATA_W.value)
+    pfc_en = bool(cocotb.top.PFC_EN.value)
+    usxgmii_en = bool(cocotb.top.USXGMII_EN.value)
+
+
+@cocotb.test()
 async def run_test_regs(dut):
     tb = TB(dut)
     await tb.reset()
@@ -230,6 +247,12 @@ async def run_test_regs(dut):
         await RisingEdge(dut.xcvr_ctrl_clk)
 
 
+@cocotb.test()
+@cocotb.parametrize(
+    ("payload_lengths", [size_list]),
+    ("payload_data", [incrementing_payload]),
+    ("ifg", [12, 0]),
+)
 async def run_test_rx(dut, port=0, payload_lengths=None, payload_data=None, ifg=12):
 
     if dut.DATA_W.value == 64:
@@ -310,6 +333,12 @@ async def run_test_rx(dut, port=0, payload_lengths=None, payload_data=None, ifg=
         await RisingEdge(dut.xcvr_ctrl_clk)
 
 
+@cocotb.test()
+@cocotb.parametrize(
+    ("payload_lengths", [size_list]),
+    ("payload_data", [incrementing_payload]),
+    ("ifg", [12, 0]),
+)
 async def run_test_tx(dut, port=0, payload_lengths=None, payload_data=None, ifg=12):
 
     if dut.DATA_W.value == 64:
@@ -382,6 +411,11 @@ async def run_test_tx(dut, port=0, payload_lengths=None, payload_data=None, ifg=
         await RisingEdge(dut.xcvr_ctrl_clk)
 
 
+@cocotb.test(skip=(data_w != 64))
+@cocotb.parametrize(
+    ("payload_data", [incrementing_payload]),
+    ("ifg", [12]),
+)
 async def run_test_tx_alignment(dut, port=0, payload_data=None, ifg=12):
 
     dic_en = int(cocotb.top.DIC_EN.value)
@@ -499,6 +533,10 @@ async def run_test_tx_alignment(dut, port=0, payload_data=None, ifg=12):
         await RisingEdge(dut.xcvr_ctrl_clk)
 
 
+@cocotb.test()
+@cocotb.parametrize(
+    ("ifg", [12]),
+)
 async def run_test_tx_underrun(dut, port=0, ifg=12):
 
     tb = TB(dut)
@@ -605,6 +643,7 @@ async def run_test_tx_error(dut, port=0, ifg=12):
         await RisingEdge(dut.xcvr_ctrl_clk)
 
 
+@cocotb.test()
 async def run_test_rx_frame_sync(dut):
 
     tb = TB(dut)
@@ -648,6 +687,10 @@ async def run_test_rx_frame_sync(dut):
         await RisingEdge(dut.xcvr_ctrl_clk)
 
 
+@cocotb.test(skip=(not pfc_en))
+@cocotb.parametrize(
+    ("ifg", [12]),
+)
 async def run_test_lfc(dut, port=0, ifg=12):
 
     tb = TB(dut)
@@ -812,6 +855,10 @@ async def run_test_lfc(dut, port=0, ifg=12):
         await RisingEdge(dut.xcvr_ctrl_clk)
 
 
+@cocotb.test(skip=(not pfc_en))
+@cocotb.parametrize(
+    ("ifg", [12]),
+)
 async def run_test_pfc(dut, port=0, ifg=12):
 
     tb = TB(dut)
@@ -1061,6 +1108,7 @@ async def run_usxgmii_an(tb, port=0, cfg=0x0001):
     return None
 
 
+@cocotb.test(skip=(not usxgmii_en))
 async def run_test_usxgmii(dut, port=0):
 
     tb = TB(dut)
@@ -1120,58 +1168,6 @@ async def run_test_usxgmii(dut, port=0):
 
     for k in range(10):
         await RisingEdge(dut.tx_clk[port])
-
-
-def size_list():
-    return list(range(60, 128)) + [512, 1514, 9214] + [60]*10
-
-
-def incrementing_payload(length):
-    return bytearray(itertools.islice(itertools.cycle(range(256)), length))
-
-
-def cycle_en():
-    return itertools.cycle([0, 0, 0, 1])
-
-
-if getattr(cocotb, 'top', None) is not None:
-
-    factory = TestFactory(run_test_regs)
-    factory.generate_tests()
-
-    for test in [run_test_rx, run_test_tx]:
-
-        factory = TestFactory(test)
-        factory.add_option("payload_lengths", [size_list])
-        factory.add_option("payload_data", [incrementing_payload])
-        factory.add_option("ifg", [12, 0])
-        factory.generate_tests()
-
-    if cocotb.top.DATA_W.value == 64:
-        factory = TestFactory(run_test_tx_alignment)
-        factory.add_option("payload_data", [incrementing_payload])
-        factory.add_option("ifg", [12])
-        factory.generate_tests()
-
-    for test in [run_test_tx_underrun, run_test_tx_error]:
-
-        factory = TestFactory(test)
-        factory.add_option("ifg", [12])
-        factory.generate_tests()
-
-    factory = TestFactory(run_test_rx_frame_sync)
-    factory.generate_tests()
-
-    if cocotb.top.PFC_EN.value:
-        for test in [run_test_lfc, run_test_pfc]:
-            factory = TestFactory(test)
-            factory.add_option("ifg", [12])
-            factory.generate_tests()
-
-    if cocotb.top.USXGMII_EN.value:
-        for test in [run_test_usxgmii]:
-            factory = TestFactory(test)
-            factory.generate_tests()
 
 
 # cocotb-test

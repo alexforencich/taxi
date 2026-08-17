@@ -20,7 +20,6 @@ import pytest
 import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge
-from cocotb.regression import TestFactory
 
 from cocotbext.eth import GmiiFrame, GmiiSink
 
@@ -73,6 +72,21 @@ class TB:
         await RisingEdge(self.dut.clk)
 
 
+def size_list():
+    return list(range(60, 128)) + [512, 1514, 9214] + [60]*10 + [i for i in range(64, 73) for k in range(8)]
+
+
+def incrementing_payload(length):
+    return bytearray(itertools.islice(itertools.cycle(range(256)), length))
+
+
+@cocotb.test()
+@cocotb.parametrize(
+    ("payload_lengths", [size_list]),
+    ("payload_data", [incrementing_payload]),
+    ("ifg", list(range(0, 13))),
+    ("pre_trunc", [False, True]),
+)
 async def run_test(dut, gbx_cfg=None, payload_lengths=None, payload_data=None, ifg=12, pre_trunc=8):
 
     tb = TB(dut, gbx_cfg)
@@ -101,6 +115,7 @@ async def run_test(dut, gbx_cfg=None, payload_lengths=None, payload_data=None, i
         await RisingEdge(dut.clk)
 
 
+@cocotb.test()
 async def run_test_an(dut, gbx_cfg=None):
 
     tb = TB(dut, gbx_cfg)
@@ -131,27 +146,6 @@ async def run_test_an(dut, gbx_cfg=None):
 
     for k in range(10):
         await RisingEdge(dut.clk)
-
-
-def size_list():
-    return list(range(60, 128)) + [512, 1514, 9214] + [60]*10 + [i for i in range(64, 73) for k in range(8)]
-
-
-def incrementing_payload(length):
-    return bytearray(itertools.islice(itertools.cycle(range(256)), length))
-
-
-if getattr(cocotb, 'top', None) is not None:
-
-    factory = TestFactory(run_test)
-    factory.add_option("payload_lengths", [size_list])
-    factory.add_option("payload_data", [incrementing_payload])
-    factory.add_option("ifg", list(range(0, 13)))
-    factory.add_option("pre_trunc", [False, True])
-    factory.generate_tests()
-
-    factory = TestFactory(run_test_an)
-    factory.generate_tests()
 
 
 # cocotb-test

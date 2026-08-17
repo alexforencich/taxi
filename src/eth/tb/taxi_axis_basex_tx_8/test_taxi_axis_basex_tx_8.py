@@ -21,7 +21,6 @@ import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge
 from cocotb.utils import get_time_from_sim_steps
-from cocotb.regression import TestFactory
 
 from cocotbext.eth import PtpClockSimTime
 from cocotbext.axi import AxiStreamBus, AxiStreamSource, AxiStreamSink, AxiStreamFrame
@@ -128,6 +127,33 @@ class TB:
                 self.stats[stat] += int(getattr(self.dut, stat).value)
 
 
+def size_list():
+    return list(range(16, 128)) + [512, 1514, 9214] + [60]*10 + [i for i in range(64, 73) for k in range(8)]
+
+
+def incrementing_payload(length):
+    return bytearray(itertools.islice(itertools.cycle(range(256)), length))
+
+
+gbx_cfgs = [None]
+an_en = False
+sgmii_speeds = [None]
+if getattr(cocotb, 'top', None) is not None:
+    if cocotb.top.GBX_IF_EN.value:
+        gbx_cfgs.append((5, [4]))
+    an_en = bool(cocotb.top.AN_EN.value)
+    if cocotb.top.SGMII_EN.value:
+        sgmii_speeds.extend([1, 2])
+
+
+@cocotb.test()
+@cocotb.parametrize(
+    ("payload_lengths", [size_list]),
+    ("payload_data", [incrementing_payload]),
+    ("ifg", [12]),
+    ("sgmii_speed", sgmii_speeds),
+    ("gbx_cfg", gbx_cfgs),
+)
 async def run_test(dut, gbx_cfg=None, sgmii_speed=None, payload_lengths=None, payload_data=None, ifg=12):
 
     tb = TB(dut, gbx_cfg, sgmii_speed)
@@ -191,6 +217,12 @@ async def run_test(dut, gbx_cfg=None, sgmii_speed=None, payload_lengths=None, pa
         await RisingEdge(dut.clk)
 
 
+@cocotb.test()
+@cocotb.parametrize(
+    ("ifg", [12]),
+    ("sgmii_speed", sgmii_speeds),
+    ("gbx_cfg", gbx_cfgs),
+)
 async def run_test_underrun(dut, gbx_cfg=None, sgmii_speed=None, ifg=12):
 
     tb = TB(dut, gbx_cfg, sgmii_speed)
@@ -253,6 +285,12 @@ async def run_test_underrun(dut, gbx_cfg=None, sgmii_speed=None, ifg=12):
         await RisingEdge(dut.clk)
 
 
+@cocotb.test()
+@cocotb.parametrize(
+    ("ifg", [12]),
+    ("sgmii_speed", sgmii_speeds),
+    ("gbx_cfg", gbx_cfgs),
+)
 async def run_test_error(dut, gbx_cfg=None, sgmii_speed=None, ifg=12):
 
     tb = TB(dut, gbx_cfg, sgmii_speed)
@@ -307,6 +345,12 @@ async def run_test_error(dut, gbx_cfg=None, sgmii_speed=None, ifg=12):
         await RisingEdge(dut.clk)
 
 
+@cocotb.test()
+@cocotb.parametrize(
+    ("ifg", [12]),
+    ("sgmii_speed", sgmii_speeds),
+    ("gbx_cfg", gbx_cfgs),
+)
 async def run_test_oversize(dut, gbx_cfg=None, sgmii_speed=None, ifg=12):
 
     tb = TB(dut, gbx_cfg, sgmii_speed)
@@ -396,6 +440,11 @@ async def run_test_oversize(dut, gbx_cfg=None, sgmii_speed=None, ifg=12):
         await RisingEdge(dut.clk)
 
 
+@cocotb.test(skip=(not an_en))
+@cocotb.parametrize(
+    ("sgmii_speed", sgmii_speeds),
+    ("gbx_cfg", gbx_cfgs),
+)
 async def run_test_an(dut, gbx_cfg=None, sgmii_speed=None):
 
     tb = TB(dut, gbx_cfg, sgmii_speed)
@@ -427,51 +476,6 @@ async def run_test_an(dut, gbx_cfg=None, sgmii_speed=None):
 
     for k in range(10):
         await RisingEdge(dut.clk)
-
-
-def size_list():
-    return list(range(16, 128)) + [512, 1514, 9214] + [60]*10 + [i for i in range(64, 73) for k in range(8)]
-
-
-def incrementing_payload(length):
-    return bytearray(itertools.islice(itertools.cycle(range(256)), length))
-
-
-def cycle_en():
-    return itertools.cycle([0, 0, 0, 1])
-
-
-if getattr(cocotb, 'top', None) is not None:
-
-    gbx_cfgs = [None]
-
-    if cocotb.top.GBX_IF_EN.value:
-        gbx_cfgs.append((5, [4]))
-
-    factory = TestFactory(run_test)
-    factory.add_option("payload_lengths", [size_list])
-    factory.add_option("payload_data", [incrementing_payload])
-    factory.add_option("ifg", [12])
-    factory.add_option("sgmii_speed", [None, 1, 2])
-    factory.add_option("gbx_cfg", gbx_cfgs)
-    factory.generate_tests()
-
-    for test in [
-                run_test_underrun,
-                run_test_error,
-                run_test_oversize
-            ]:
-
-        factory = TestFactory(test)
-        factory.add_option("ifg", [12])
-        factory.add_option("sgmii_speed", [None, 1, 2])
-        factory.add_option("gbx_cfg", gbx_cfgs)
-        factory.generate_tests()
-
-    factory = TestFactory(run_test_an)
-    factory.add_option("sgmii_speed", [None, 1, 2])
-    factory.add_option("gbx_cfg", gbx_cfgs)
-    factory.generate_tests()
 
 
 # cocotb-test

@@ -24,7 +24,6 @@ import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge, Timer
 from cocotb.utils import get_time_from_sim_steps
-from cocotb.regression import TestFactory
 
 from cocotbext.eth import GmiiFrame, PtpClockSimTime
 from cocotbext.axi import AxiStreamBus, AxiStreamSource, AxiStreamSink, AxiStreamFrame
@@ -202,6 +201,22 @@ class TB:
         self.ptp_td_source.set_ts_rel_sim_time()
 
 
+def size_list():
+    return list(range(60, 128)) + [512, 1514, 9214] + [60]*10
+
+
+def incrementing_payload(length):
+    return bytearray(itertools.islice(itertools.cycle(range(256)), length))
+
+
+pfc_en = False
+an_en = False
+if getattr(cocotb, 'top', None) is not None:
+    pfc_en = bool(cocotb.top.PFC_EN.value)
+    an_en = bool(cocotb.top.AN_EN.value)
+
+
+@cocotb.test()
 async def run_test_regs(dut):
     tb = TB(dut)
     await tb.reset()
@@ -220,6 +235,12 @@ async def run_test_regs(dut):
         await RisingEdge(dut.xcvr_ctrl_clk)
 
 
+@cocotb.test()
+@cocotb.parametrize(
+    ("payload_lengths", [size_list]),
+    ("payload_data", [incrementing_payload]),
+    ("ifg", [12, 0]),
+)
 async def run_test_rx(dut, port=0, payload_lengths=None, payload_data=None, ifg=12):
 
     if dut.COMBINED_MAC_PCS.value:
@@ -291,6 +312,12 @@ async def run_test_rx(dut, port=0, payload_lengths=None, payload_data=None, ifg=
         await RisingEdge(dut.xcvr_ctrl_clk)
 
 
+@cocotb.test()
+@cocotb.parametrize(
+    ("payload_lengths", [size_list]),
+    ("payload_data", [incrementing_payload]),
+    ("ifg", [12, 0]),
+)
 async def run_test_tx(dut, port=0, payload_lengths=None, payload_data=None, ifg=12):
 
     if dut.COMBINED_MAC_PCS.value:
@@ -356,6 +383,10 @@ async def run_test_tx(dut, port=0, payload_lengths=None, payload_data=None, ifg=
         await RisingEdge(dut.xcvr_ctrl_clk)
 
 
+@cocotb.test()
+@cocotb.parametrize(
+    ("ifg", [12]),
+)
 async def run_test_tx_underrun(dut, port=0, ifg=12):
 
     tb = TB(dut)
@@ -413,6 +444,10 @@ async def run_test_tx_underrun(dut, port=0, ifg=12):
         await RisingEdge(dut.xcvr_ctrl_clk)
 
 
+@cocotb.test()
+@cocotb.parametrize(
+    ("ifg", [12]),
+)
 async def run_test_tx_error(dut, port=0, ifg=12):
 
     tb = TB(dut)
@@ -462,6 +497,10 @@ async def run_test_tx_error(dut, port=0, ifg=12):
         await RisingEdge(dut.xcvr_ctrl_clk)
 
 
+@cocotb.test(skip=(not pfc_en))
+@cocotb.parametrize(
+    ("ifg", [12]),
+)
 async def run_test_lfc(dut, port=0, ifg=12):
 
     tb = TB(dut)
@@ -626,6 +665,10 @@ async def run_test_lfc(dut, port=0, ifg=12):
         await RisingEdge(dut.xcvr_ctrl_clk)
 
 
+@cocotb.test(skip=(not pfc_en))
+@cocotb.parametrize(
+    ("ifg", [12]),
+)
 async def run_test_pfc(dut, port=0, ifg=12):
 
     tb = TB(dut)
@@ -862,6 +905,10 @@ async def run_basex_an(tb, port=0, cfg=0x0020, sgmii=False):
     return None
 
 
+@cocotb.test(skip=(not an_en))
+@cocotb.parametrize(
+    (("sgmii_en", "sgmii_auto"), [(False, False), (True, False), (False, True)]),
+)
 async def run_test_an(dut, port=0, sgmii_en=False, sgmii_auto=False):
 
     tb = TB(dut)
@@ -975,51 +1022,6 @@ async def run_test_an(dut, port=0, sgmii_en=False, sgmii_auto=False):
 
     for k in range(10):
         await RisingEdge(dut.tx_clk[port])
-
-
-def size_list():
-    return list(range(60, 128)) + [512, 1514, 9214] + [60]*10
-
-
-def incrementing_payload(length):
-    return bytearray(itertools.islice(itertools.cycle(range(256)), length))
-
-
-def cycle_en():
-    return itertools.cycle([0, 0, 0, 1])
-
-
-if getattr(cocotb, 'top', None) is not None:
-
-    factory = TestFactory(run_test_regs)
-    factory.generate_tests()
-
-    for test in [run_test_rx, run_test_tx]:
-
-        factory = TestFactory(test)
-        factory.add_option("payload_lengths", [size_list])
-        factory.add_option("payload_data", [incrementing_payload])
-        factory.add_option("ifg", [12, 0])
-        factory.generate_tests()
-
-    for test in [run_test_tx_underrun, run_test_tx_error]:
-
-        factory = TestFactory(test)
-        factory.add_option("ifg", [12])
-        factory.generate_tests()
-
-    if cocotb.top.PFC_EN.value:
-        for test in [run_test_lfc, run_test_pfc]:
-            factory = TestFactory(test)
-            factory.add_option("ifg", [12])
-            factory.generate_tests()
-
-    if cocotb.top.AN_EN.value:
-        for test in [run_test_an]:
-            factory = TestFactory(test)
-            factory.add_option(("sgmii_en", "sgmii_auto"),
-                [(False, False), (True, False), (False, True)])
-            factory.generate_tests()
 
 
 # cocotb-test

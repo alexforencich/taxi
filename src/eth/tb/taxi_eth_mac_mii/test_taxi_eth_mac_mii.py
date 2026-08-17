@@ -23,7 +23,6 @@ import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge
 from cocotb.utils import get_time_from_sim_steps
-from cocotb.regression import TestFactory
 
 from cocotbext.eth import GmiiFrame, MiiPhy, PtpClockSimTime
 from cocotbext.axi import AxiStreamBus, AxiStreamSource, AxiStreamSink, AxiStreamFrame
@@ -120,6 +119,26 @@ class TB:
         await RisingEdge(self.dut.tx_clk)
 
 
+def size_list():
+    return list(range(60, 128)) + [512, 1514] + [60]*10
+
+
+def incrementing_payload(length):
+    return bytearray(itertools.islice(itertools.cycle(range(256)), length))
+
+
+pfc_en = False
+if getattr(cocotb, 'top', None) is not None:
+    pfc_en = bool(cocotb.top.PFC_EN.value)
+
+
+@cocotb.test()
+@cocotb.parametrize(
+    ("payload_lengths", [size_list]),
+    ("payload_data", [incrementing_payload]),
+    ("ifg", [12]),
+    ("speed", [100e6, 10e6]),
+)
 async def run_test_rx(dut, payload_lengths=None, payload_data=None, ifg=12, speed=100e6):
 
     tb = TB(dut, speed)
@@ -168,6 +187,13 @@ async def run_test_rx(dut, payload_lengths=None, payload_data=None, ifg=12, spee
     await RisingEdge(dut.rx_clk)
 
 
+@cocotb.test()
+@cocotb.parametrize(
+    ("payload_lengths", [size_list]),
+    ("payload_data", [incrementing_payload]),
+    ("ifg", [12]),
+    ("speed", [100e6, 10e6]),
+)
 async def run_test_tx(dut, payload_lengths=None, payload_data=None, ifg=12, speed=100e6):
 
     tb = TB(dut, speed)
@@ -202,6 +228,10 @@ async def run_test_tx(dut, payload_lengths=None, payload_data=None, ifg=12, spee
     await RisingEdge(dut.tx_clk)
 
 
+@cocotb.test()
+@cocotb.parametrize(
+    ("ifg", [12]),
+)
 async def run_test_tx_underrun(dut, ifg=12):
 
     tb = TB(dut)
@@ -250,6 +280,10 @@ async def run_test_tx_underrun(dut, ifg=12):
     await RisingEdge(dut.tx_clk)
 
 
+@cocotb.test()
+@cocotb.parametrize(
+    ("ifg", [12]),
+)
 async def run_test_tx_error(dut, ifg=12):
 
     tb = TB(dut)
@@ -290,6 +324,11 @@ async def run_test_tx_error(dut, ifg=12):
     await RisingEdge(dut.tx_clk)
 
 
+@cocotb.test(skip=(not pfc_en))
+@cocotb.parametrize(
+    ("ifg", [12]),
+    ("speed", [100e6, 10e6]),
+)
 async def run_test_lfc(dut, ifg=12, speed=1000e6):
 
     tb = TB(dut, speed)
@@ -442,6 +481,11 @@ async def run_test_lfc(dut, ifg=12, speed=1000e6):
     await RisingEdge(dut.tx_clk)
 
 
+@cocotb.test(skip=(not pfc_en))
+@cocotb.parametrize(
+    ("ifg", [12]),
+    ("speed", [100e6, 10e6]),
+)
 async def run_test_pfc(dut, ifg=12, speed=1000e6):
 
     tb = TB(dut, speed)
@@ -582,43 +626,6 @@ async def run_test_pfc(dut, ifg=12, speed=1000e6):
 
     await RisingEdge(dut.tx_clk)
     await RisingEdge(dut.tx_clk)
-
-
-def size_list():
-    return list(range(60, 128)) + [512, 1514] + [60]*10
-
-
-def incrementing_payload(length):
-    return bytearray(itertools.islice(itertools.cycle(range(256)), length))
-
-
-def cycle_en():
-    return itertools.cycle([0, 0, 0, 1])
-
-
-if getattr(cocotb, 'top', None) is not None:
-
-    for test in [run_test_rx, run_test_tx]:
-
-        factory = TestFactory(test)
-        factory.add_option("payload_lengths", [size_list])
-        factory.add_option("payload_data", [incrementing_payload])
-        factory.add_option("ifg", [12])
-        factory.add_option("speed", [100e6, 10e6])
-        factory.generate_tests()
-
-    for test in [run_test_tx_underrun, run_test_tx_error]:
-
-        factory = TestFactory(test)
-        factory.add_option("ifg", [12])
-        factory.generate_tests()
-
-    if cocotb.top.PFC_EN.value:
-        for test in [run_test_lfc, run_test_pfc]:
-            factory = TestFactory(test)
-            factory.add_option("ifg", [12])
-            factory.add_option("speed", [100e6, 10e6])
-            factory.generate_tests()
 
 
 # cocotb-test

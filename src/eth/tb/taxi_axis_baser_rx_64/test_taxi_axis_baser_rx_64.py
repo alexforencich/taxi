@@ -21,7 +21,6 @@ import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge
 from cocotb.utils import get_time_from_sim_steps
-from cocotb.regression import TestFactory
 
 from cocotbext.eth import XgmiiFrame, PtpClockSimTime
 from cocotbext.axi import AxiStreamBus, AxiStreamSink
@@ -145,6 +144,32 @@ class TB:
                 self.stats[stat] += int(getattr(self.dut, stat).value)
 
 
+def size_list():
+    return list(range(60, 128)) + [512, 1514, 9214] + [60]*10 + [i for i in range(64, 73) for k in range(8)]
+
+
+def incrementing_payload(length):
+    return bytearray(itertools.islice(itertools.cycle(range(256)), length))
+
+
+gbx_cfgs = [None]
+usxgmii_speeds = [None]
+if getattr(cocotb, 'top', None) is not None:
+    if cocotb.top.GBX_IF_EN.value:
+        gbx_cfgs.append((33, [32]))
+        gbx_cfgs.append((66, [64, 65]))
+    if cocotb.top.USXGMII_EN.value:
+        usxgmii_speeds.extend([2, 4, 5, 3, 10, 12, 13])
+
+@cocotb.test()
+@cocotb.parametrize(
+    ("payload_lengths", [size_list]),
+    ("payload_data", [incrementing_payload]),
+    ("ifg", [0, 1, 11, 12]),
+    ("offset_start", [False, True]),
+    ("usxgmii_speed", usxgmii_speeds),
+    ("gbx_cfg", gbx_cfgs),
+)
 async def run_test(dut, gbx_cfg=None, offset_start=False, usxgmii_speed=None, payload_lengths=None, payload_data=None, ifg=12):
 
     if dut.USXGMII_EN.value:
@@ -217,6 +242,12 @@ async def run_test(dut, gbx_cfg=None, offset_start=False, usxgmii_speed=None, pa
         await RisingEdge(dut.clk)
 
 
+@cocotb.test()
+@cocotb.parametrize(
+    # ("ifg", [0, 1, 11, 12]),
+    ("usxgmii_speed", usxgmii_speeds),
+    ("gbx_cfg", gbx_cfgs),
+)
 async def run_test_oversize(dut, gbx_cfg=None, usxgmii_speed=None, ifg=12):
 
     tb = TB(dut, gbx_cfg, usxgmii_speed)
@@ -306,6 +337,11 @@ async def run_test_oversize(dut, gbx_cfg=None, usxgmii_speed=None, ifg=12):
         await RisingEdge(dut.clk)
 
 
+@cocotb.test()
+@cocotb.parametrize(
+    ("usxgmii_speed", usxgmii_speeds),
+    ("gbx_cfg", gbx_cfgs),
+)
 async def run_test_os(dut, gbx_cfg=None, usxgmii_speed=None):
 
     tb = TB(dut, gbx_cfg, usxgmii_speed)
@@ -331,50 +367,6 @@ async def run_test_os(dut, gbx_cfg=None, usxgmii_speed=None):
 
     for k in range(10):
         await RisingEdge(dut.clk)
-
-
-def size_list():
-    return list(range(60, 128)) + [512, 1514, 9214] + [60]*10 + [i for i in range(64, 73) for k in range(8)]
-
-
-def incrementing_payload(length):
-    return bytearray(itertools.islice(itertools.cycle(range(256)), length))
-
-
-def cycle_en():
-    return itertools.cycle([0, 0, 0, 1])
-
-
-if getattr(cocotb, 'top', None) is not None:
-
-    gbx_cfgs = [None]
-
-    if cocotb.top.GBX_IF_EN.value:
-        gbx_cfgs.append((33, [32]))
-        gbx_cfgs.append((66, [64, 65]))
-
-    factory = TestFactory(run_test)
-    factory.add_option("payload_lengths", [size_list])
-    factory.add_option("payload_data", [incrementing_payload])
-    factory.add_option("ifg", [0, 1, 11, 12])
-    factory.add_option("offset_start", [False, True])
-    if cocotb.top.USXGMII_EN.value:
-        factory.add_option("usxgmii_speed", [None, 2, 4, 5, 3, 10, 12, 13])
-    factory.add_option("gbx_cfg", gbx_cfgs)
-    factory.generate_tests()
-
-    factory = TestFactory(run_test_oversize)
-    # factory.add_option("ifg", [0, 1, 11, 12])
-    if cocotb.top.USXGMII_EN.value:
-        factory.add_option("usxgmii_speed", [None, 2, 4, 5, 3, 10, 12, 13])
-    factory.add_option("gbx_cfg", gbx_cfgs)
-    factory.generate_tests()
-
-    factory = TestFactory(run_test_os)
-    if cocotb.top.USXGMII_EN.value:
-        factory.add_option("usxgmii_speed", [None, 2, 4, 5, 3, 10, 12, 13])
-    factory.add_option("gbx_cfg", gbx_cfgs)
-    factory.generate_tests()
 
 
 # cocotb-test

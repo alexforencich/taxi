@@ -21,7 +21,6 @@ import cocotb_test.simulator
 import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge
-from cocotb.regression import TestFactory
 from cocotb.utils import get_sim_time
 
 from cocotbext.axi.stream import define_stream
@@ -79,6 +78,7 @@ class TB:
         await self.mcf_source.send(mcf)
 
 
+@cocotb.test()
 async def run_test_lfc(dut):
 
     tb = TB(dut)
@@ -188,6 +188,7 @@ async def run_test_lfc(dut):
     await RisingEdge(dut.clk)
 
 
+@cocotb.test()
 async def run_test_pfc(dut):
 
     tb = TB(dut)
@@ -362,14 +363,6 @@ async def run_test_pfc(dut):
 
     await RisingEdge(dut.clk)
     await RisingEdge(dut.clk)
-
-
-if getattr(cocotb, 'top', None) is not None:
-
-    for test in [run_test_lfc, run_test_pfc]:
-
-        factory = TestFactory(test)
-        factory.generate_tests()
 
 
 # cocotb-test

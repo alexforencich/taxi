@@ -22,7 +22,6 @@ import cocotb_test.simulator
 import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge
-from cocotb.regression import TestFactory
 
 from cocotbext.axi import AxiStreamBus, AxiStreamSource, AxiStreamSink, AxiStreamFrame
 from cocotbext.axi.stream import define_stream
@@ -104,6 +103,29 @@ class TB:
         return Ether(data)
 
 
+def cycle_pause():
+    return itertools.cycle([1, 1, 1, 0])
+
+
+def size_list():
+    return list(range(1, 128)) + [512, 1514, 9214] + [60]*10
+
+
+def mcf_size_list():
+    return list(range(1, 19))
+
+
+def incrementing_payload(length):
+    return bytes(itertools.islice(itertools.cycle(range(256)), length))
+
+
+@cocotb.test()
+@cocotb.parametrize(
+    ("payload_lengths", [size_list]),
+    ("payload_data", [incrementing_payload]),
+    ("idle_inserter", [None, cycle_pause]),
+    ("backpressure_inserter", [None, cycle_pause]),
+)
 async def run_test_data(dut, payload_lengths=None, payload_data=None, idle_inserter=None, backpressure_inserter=None):
 
     tb = TB(dut)
@@ -152,6 +174,13 @@ async def run_test_data(dut, payload_lengths=None, payload_data=None, idle_inser
     await RisingEdge(dut.clk)
 
 
+@cocotb.test()
+@cocotb.parametrize(
+    ("payload_lengths", [mcf_size_list]),
+    ("payload_data", [incrementing_payload]),
+    ("idle_inserter", [None, cycle_pause]),
+    ("backpressure_inserter", [None, cycle_pause]),
+)
 async def run_test_mcf(dut, payload_lengths=None, payload_data=None, idle_inserter=None, backpressure_inserter=None):
 
     tb = TB(dut)
@@ -225,6 +254,7 @@ async def run_test_mcf(dut, payload_lengths=None, payload_data=None, idle_insert
     await RisingEdge(dut.clk)
 
 
+@cocotb.test()
 async def run_test_tuser_assert(dut):
 
     tb = TB(dut)
@@ -279,6 +309,7 @@ async def run_test_tuser_assert(dut):
     await RisingEdge(dut.clk)
 
 
+@cocotb.test()
 async def run_test_mcf_filter(dut):
 
     tb = TB(dut)
@@ -395,6 +426,11 @@ async def run_test_mcf_filter(dut):
     await RisingEdge(dut.clk)
 
 
+@cocotb.test()
+@cocotb.parametrize(
+    ("idle_inserter", [None, cycle_pause]),
+    ("backpressure_inserter", [None, cycle_pause]),
+)
 async def run_stress_test(dut, idle_inserter=None, backpressure_inserter=None):
 
     tb = TB(dut)
@@ -487,50 +523,6 @@ async def run_stress_test(dut, idle_inserter=None, backpressure_inserter=None):
 
     await RisingEdge(dut.clk)
     await RisingEdge(dut.clk)
-
-
-def cycle_pause():
-    return itertools.cycle([1, 1, 1, 0])
-
-
-def size_list():
-    return list(range(1, 128)) + [512, 1514, 9214] + [60]*10
-
-
-def mcf_size_list():
-    return list(range(1, 19))
-
-
-def incrementing_payload(length):
-    return bytes(itertools.islice(itertools.cycle(range(256)), length))
-
-
-if getattr(cocotb, 'top', None) is not None:
-
-    factory = TestFactory(run_test_data)
-    factory.add_option("payload_lengths", [size_list])
-    factory.add_option("payload_data", [incrementing_payload])
-    factory.add_option("idle_inserter", [None, cycle_pause])
-    factory.add_option("backpressure_inserter", [None, cycle_pause])
-    factory.generate_tests()
-
-    factory = TestFactory(run_test_mcf)
-    factory.add_option("payload_lengths", [mcf_size_list])
-    factory.add_option("payload_data", [incrementing_payload])
-    factory.add_option("idle_inserter", [None, cycle_pause])
-    factory.add_option("backpressure_inserter", [None, cycle_pause])
-    factory.generate_tests()
-
-    factory = TestFactory(run_test_tuser_assert)
-    factory.generate_tests()
-
-    factory = TestFactory(run_test_mcf_filter)
-    factory.generate_tests()
-
-    factory = TestFactory(run_stress_test)
-    factory.add_option("idle_inserter", [None, cycle_pause])
-    factory.add_option("backpressure_inserter", [None, cycle_pause])
-    factory.generate_tests()
 
 
 # cocotb-test

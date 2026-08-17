@@ -65,7 +65,7 @@ def cycle_pause():
     ("idle_inserter", [None, cycle_pause]),
     ("backpressure_inserter", [None, cycle_pause]),
 )
-async def run_test_write(dut, data_in=None, idle_inserter=None, backpressure_inserter=None):
+async def run_test_write(dut, idle_inserter=None, backpressure_inserter=None):
 
     tb = TB(dut)
 
@@ -101,7 +101,7 @@ async def run_test_write(dut, data_in=None, idle_inserter=None, backpressure_ins
     ("idle_inserter", [None, cycle_pause]),
     ("backpressure_inserter", [None, cycle_pause]),
 )
-async def run_test_read(dut, data_in=None, idle_inserter=None, backpressure_inserter=None):
+async def run_test_read(dut, idle_inserter=None, backpressure_inserter=None):
 
     tb = TB(dut)
 

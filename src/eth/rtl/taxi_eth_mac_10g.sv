@@ -26,6 +26,7 @@ module taxi_eth_mac_10g #
     parameter logic PTP_TS_EN = 1'b0,
     parameter logic PTP_TD_EN = PTP_TS_EN,
     parameter logic PTP_TS_FMT_TOD = 1'b1,
+    parameter PTP_TS_FNS_W = 16,
     parameter PTP_TS_W = PTP_TS_FMT_TOD ? 96 : 64,
     parameter PTP_TD_SDI_PIPELINE = 2,
     parameter logic PFC_EN = 1'b0,
@@ -277,9 +278,9 @@ if (PTP_TS_EN && PTP_TD_EN) begin : ptp
     taxi_ptp_td_leaf #(
         .TS_REL_EN(!PTP_TS_FMT_TOD),
         .TS_TOD_EN(PTP_TS_FMT_TOD),
-        .TS_FNS_W(16),
-        .TS_REL_NS_W(PTP_TS_FMT_TOD ? 48 : PTP_TS_W-16),
-        .TS_TOD_S_W(PTP_TS_FMT_TOD ? PTP_TS_W-32-16 : 48),
+        .TS_FNS_W(PTP_TS_FNS_W),
+        .TS_REL_NS_W(PTP_TS_FMT_TOD ? 48 : PTP_TS_W-PTP_TS_FNS_W),
+        .TS_TOD_S_W(PTP_TS_FMT_TOD ? PTP_TS_W-32-PTP_TS_FNS_W : 48),
         .TS_REL_W(PTP_TS_W),
         .TS_TOD_W(PTP_TS_W),
         .TD_SDI_PIPELINE(PTP_TD_SDI_PIPELINE)
@@ -328,9 +329,9 @@ if (PTP_TS_EN && PTP_TD_EN) begin : ptp
     taxi_ptp_td_leaf #(
         .TS_REL_EN(!PTP_TS_FMT_TOD),
         .TS_TOD_EN(PTP_TS_FMT_TOD),
-        .TS_FNS_W(16),
-        .TS_REL_NS_W(PTP_TS_FMT_TOD ? 48 : PTP_TS_W-16),
-        .TS_TOD_S_W(PTP_TS_FMT_TOD ? PTP_TS_W-32-16 : 48),
+        .TS_FNS_W(PTP_TS_FNS_W),
+        .TS_REL_NS_W(PTP_TS_FMT_TOD ? 48 : PTP_TS_W-PTP_TS_FNS_W),
+        .TS_TOD_S_W(PTP_TS_FMT_TOD ? PTP_TS_W-32-PTP_TS_FNS_W : 48),
         .TS_REL_W(PTP_TS_W),
         .TS_TOD_W(PTP_TS_W),
         .TD_SDI_PIPELINE(PTP_TD_SDI_PIPELINE)

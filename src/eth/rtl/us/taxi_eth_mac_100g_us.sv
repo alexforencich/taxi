@@ -53,6 +53,7 @@ module taxi_eth_mac_100g_us #
     parameter logic PTP_TS_EN = 1'b0,
     parameter logic PTP_TD_EN = PTP_TS_EN,
     parameter logic PTP_TS_FMT_TOD = 1'b1,
+    parameter PTP_TS_FNS_W = 16,
     parameter PTP_TS_W = PTP_TS_FMT_TOD ? 96 : 64,
     parameter PTP_TD_SDI_PIPELINE = 2,
     parameter TX_SERDES_PIPELINE = 1,

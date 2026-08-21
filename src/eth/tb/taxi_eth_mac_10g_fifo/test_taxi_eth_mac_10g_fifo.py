@@ -380,6 +380,7 @@ def test_taxi_eth_mac_10g_fifo(request, data_w, dic_en):
     parameters['PTP_TS_EN'] = 1
     parameters['PTP_TD_EN'] = parameters['PTP_TS_EN']
     parameters['PTP_TS_FMT_TOD'] = 1
+    parameters['PTP_TS_FNS_W'] = 16
     parameters['PTP_TS_W'] = 96 if parameters['PTP_TS_FMT_TOD'] else 64
     parameters['PTP_TD_SDI_PIPELINE'] = 2
     parameters['TX_TAG_W'] = 16

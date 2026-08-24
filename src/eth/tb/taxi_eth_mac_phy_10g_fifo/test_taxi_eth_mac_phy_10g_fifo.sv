@@ -9,7 +9,7 @@ Authors:
 */
 
 `resetall
-`timescale 1ns / 1ps
+`timescale 1ns / 1fs
 `default_nettype none
 
 /*
@@ -30,6 +30,8 @@ module test_taxi_eth_mac_phy_10g_fifo #
     parameter logic PTP_TS_FMT_TOD = 1'b1,
     parameter PTP_TS_FNS_W = 16,
     parameter PTP_TS_W = PTP_TS_FMT_TOD ? 96 : 64,
+    parameter logic PTP_TS_COR_EN = PTP_TS_EN && (TX_GBX_IF_EN || RX_GBX_IF_EN),
+    parameter PTP_TS_COR_W = PTP_TS_FNS_W+4,
     parameter PTP_TD_SDI_PIPELINE = 2,
     parameter TX_TAG_W = 16,
     parameter logic BIT_REVERSE = 1'b0,
@@ -119,9 +121,13 @@ logic ptp_ts_step_in;
 logic [PTP_TS_W-1:0] tx_ptp_ts_out;
 logic tx_ptp_ts_step_out;
 logic tx_ptp_locked;
+logic tx_ptp_ts_cor_sync;
+logic [PTP_TS_COR_W-1:0] tx_ptp_ts_cor_val;
 logic [PTP_TS_W-1:0] rx_ptp_ts_out;
 logic rx_ptp_ts_step_out;
 logic rx_ptp_locked;
+logic rx_ptp_ts_cor_sync;
+logic [PTP_TS_COR_W-1:0] rx_ptp_ts_cor_val;
 
 logic stat_clk;
 logic stat_rst;
@@ -164,6 +170,8 @@ taxi_eth_mac_phy_10g_fifo #(
     .PTP_TS_FMT_TOD(PTP_TS_FMT_TOD),
     .PTP_TS_FNS_W(PTP_TS_FNS_W),
     .PTP_TS_W(PTP_TS_W),
+    .PTP_TS_COR_EN(PTP_TS_COR_EN),
+    .PTP_TS_COR_W(PTP_TS_COR_W),
     .PTP_TD_SDI_PIPELINE(PTP_TD_SDI_PIPELINE),
     .BIT_REVERSE(BIT_REVERSE),
     .SCRAMBLER_DISABLE(SCRAMBLER_DISABLE),
@@ -263,9 +271,13 @@ uut (
     .tx_ptp_ts_out(tx_ptp_ts_out),
     .tx_ptp_ts_step_out(tx_ptp_ts_step_out),
     .tx_ptp_locked(tx_ptp_locked),
+    .tx_ptp_ts_cor_sync(tx_ptp_ts_cor_sync),
+    .tx_ptp_ts_cor_val(tx_ptp_ts_cor_val),
     .rx_ptp_ts_out(rx_ptp_ts_out),
     .rx_ptp_ts_step_out(rx_ptp_ts_step_out),
     .rx_ptp_locked(rx_ptp_locked),
+    .rx_ptp_ts_cor_sync(rx_ptp_ts_cor_sync),
+    .rx_ptp_ts_cor_val(rx_ptp_ts_cor_val),
 
     /*
      * Statistics

@@ -26,67 +26,71 @@ module taxi_axis_baser_tx_64 #
     parameter logic PTP_TS_EN = 1'b0,
     parameter logic PTP_TS_FMT_TOD = 1'b1,
     parameter PTP_TS_W = PTP_TS_FMT_TOD ? 96 : 64,
+    parameter logic PTP_TS_COR_EN = PTP_TS_EN && GBX_IF_EN,
+    parameter PTP_TS_COR_W = 16+4,
     parameter logic TX_CPL_CTRL_IN_TUSER = 1'b1
 )
 (
-    input  wire logic                 clk,
-    input  wire logic                 rst,
+    input  wire logic                     clk,
+    input  wire logic                     rst,
 
     /*
      * Transmit interface (AXI stream)
      */
-    taxi_axis_if.snk                  s_axis_tx,
-    taxi_axis_if.src                  m_axis_tx_cpl,
+    taxi_axis_if.snk                      s_axis_tx,
+    taxi_axis_if.src                      m_axis_tx_cpl,
 
     /*
      * 10GBASE-R encoded interface
      */
-    output wire logic [DATA_W-1:0]    encoded_tx_data,
-    output wire logic                 encoded_tx_data_valid,
-    output wire logic [HDR_W-1:0]     encoded_tx_hdr,
-    output wire logic                 encoded_tx_hdr_valid,
-    input  wire logic [GBX_CNT-1:0]   tx_gbx_req_sync = '0,
-    input  wire logic                 tx_gbx_req_stall = '0,
-    output wire logic [GBX_CNT-1:0]   tx_gbx_sync,
+    output wire logic [DATA_W-1:0]        encoded_tx_data,
+    output wire logic                     encoded_tx_data_valid,
+    output wire logic [HDR_W-1:0]         encoded_tx_hdr,
+    output wire logic                     encoded_tx_hdr_valid,
+    input  wire logic [GBX_CNT-1:0]       tx_gbx_req_sync = '0,
+    input  wire logic                     tx_gbx_req_stall = '0,
+    output wire logic [GBX_CNT-1:0]       tx_gbx_sync,
 
     /*
      * Ordered sets
      */
-    input  wire logic [23:0]          tx_os = '0,
-    input  wire logic                 tx_os_sig = 1'b0,
-    input  wire logic                 tx_os_valid = 1'b0,
-    output wire logic                 tx_os_ready,
+    input  wire logic [23:0]              tx_os = '0,
+    input  wire logic                     tx_os_sig = 1'b0,
+    input  wire logic                     tx_os_valid = 1'b0,
+    output wire logic                     tx_os_ready,
 
     /*
      * PTP
      */
-    input  wire logic [PTP_TS_W-1:0]  ptp_ts,
+    input  wire logic [PTP_TS_W-1:0]      ptp_ts,
+    output wire logic                     ptp_ts_cor_sync,
+    input  wire logic [PTP_TS_COR_W-1:0]  ptp_ts_cor_val = '0,
 
     /*
      * Configuration
      */
-    input  wire logic [15:0]          cfg_tx_max_pkt_len = 16'd1518-1,
-    input  wire logic [7:0]           cfg_tx_ifg = 8'd12,
-    input  wire logic                 cfg_tx_enable,
-    input  wire logic                 cfg_tx_usxgmii_en = 1'b1,
-    input  wire logic                 cfg_tx_usxgmii_5g = 1'b0,
-    input  wire logic [2:0]           cfg_tx_usxgmii_speed = 3'b011,
+    input  wire logic [15:0]              cfg_tx_max_pkt_len = 16'd1518-1,
+    input  wire logic [7:0]               cfg_tx_ifg = 8'd12,
+    input  wire logic                     cfg_tx_enable,
+    input  wire logic                     cfg_tx_usxgmii_en = 1'b1,
+    input  wire logic                     cfg_tx_usxgmii_5g = 1'b0,
+    input  wire logic [2:0]               cfg_tx_usxgmii_speed = 3'b011,
 
     /*
      * Status
      */
-    output wire logic [1:0]           tx_start_packet,
-    output wire logic [3:0]           stat_tx_byte,
-    output wire logic [15:0]          stat_tx_pkt_len,
-    output wire logic                 stat_tx_pkt_ucast,
-    output wire logic                 stat_tx_pkt_mcast,
-    output wire logic                 stat_tx_pkt_bcast,
-    output wire logic                 stat_tx_pkt_vlan,
-    output wire logic                 stat_tx_pkt_good,
-    output wire logic                 stat_tx_pkt_bad,
-    output wire logic                 stat_tx_err_oversize,
-    output wire logic                 stat_tx_err_user,
-    output wire logic                 stat_tx_err_underflow
+    output wire logic [1:0]               tx_start_packet,
+    output wire logic [3:0]               stat_tx_byte,
+    output wire logic [15:0]              stat_tx_pkt_len,
+    output wire logic                     stat_tx_pkt_ucast,
+    output wire logic                     stat_tx_pkt_mcast,
+    output wire logic                     stat_tx_pkt_bcast,
+    output wire logic                     stat_tx_pkt_vlan,
+    output wire logic                     stat_tx_pkt_good,
+    output wire logic                     stat_tx_pkt_bad,
+    output wire logic                     stat_tx_err_oversize,
+    output wire logic                     stat_tx_err_user,
+    output wire logic                     stat_tx_err_underflow
 );
 
 // extract parameters
@@ -260,6 +264,8 @@ logic stat_tx_err_underflow_reg = 1'b0, stat_tx_err_underflow_next;
 
 logic [4+16-1:0] last_ts_reg = '0;
 logic [4+16-1:0] ts_inc_reg = '0;
+logic [4+16-1:0] ts_offs_reg = '0;
+logic gbx_en_reg = 1'b0;
 
 assign s_axis_tx.tready = s_axis_tx_tready_reg && (!GBX_IF_EN || !tx_gbx_req_stall) && (!USXGMII_EN || !rep_stall_reg);
 
@@ -279,6 +285,8 @@ assign m_axis_tx_cpl.tdest = '0;
 assign m_axis_tx_cpl.tuser = '0;
 
 assign tx_os_ready = tx_os_ready_reg;
+
+assign ptp_ts_cor_sync = (GBX_IF_EN && PTP_TS_COR_EN) ? tx_gbx_req_sync : 1'b0;
 
 assign tx_start_packet = start_packet_reg;
 
@@ -1073,16 +1081,16 @@ always_ff @(posedge clk) begin
                 if (PTP_TS_FMT_TOD) begin
                     // workaround for verilator lint bug: unreachable by parameter value
                     /* verilator lint_off SELRANGE */
-                    m_axis_tx_cpl_ts_reg[45:0] <= ptp_ts[45:0] + 46'(ts_inc_reg >> 1);
+                    m_axis_tx_cpl_ts_reg[45:0] <= ptp_ts[45:0] + (GBX_IF_EN ? 46'(ts_offs_reg) : 46'(ts_inc_reg >> 1)) + (PTP_TS_COR_EN ? 46'(ptp_ts_cor_val) : '0);
                     m_axis_tx_cpl_ts_reg[95:48] <= ptp_ts[95:48];
                     /* verilator lint_on SELRANGE */
                 end else begin
-                    m_axis_tx_cpl_ts_reg <= ptp_ts + PTP_TS_W'(ts_inc_reg >> 1);
+                    m_axis_tx_cpl_ts_reg <= ptp_ts + (GBX_IF_EN ? PTP_TS_W'(ts_offs_reg) : PTP_TS_W'(ts_inc_reg >> 1)) + (PTP_TS_COR_EN ? PTP_TS_W'(ptp_ts_cor_val) : '0);
                 end
             end
         end else if (output_start_packet_remap[0]) begin
             if (PTP_TS_EN) begin
-                m_axis_tx_cpl_ts_reg <= ptp_ts;
+                m_axis_tx_cpl_ts_reg <= ptp_ts + (PTP_TS_COR_EN ? PTP_TS_W'(ptp_ts_cor_val) : '0);
             end
         end
         if (output_start_packet_remap != 0) begin
@@ -1176,6 +1184,11 @@ always_ff @(posedge clk) begin
 
     last_ts_reg <= (4+16)'(ptp_ts);
     ts_inc_reg <= (4+16)'(ptp_ts) - last_ts_reg;
+    ts_offs_reg <= (ts_inc_reg >> 1) + (gbx_en_reg ? ts_inc_reg >> 6 : '0);
+
+    if (tx_gbx_req_sync || tx_gbx_req_stall) begin
+        gbx_en_reg <= 1'b1;
+    end
 
     if (rst) begin
         state_reg <= STATE_IDLE;
@@ -1204,6 +1217,8 @@ always_ff @(posedge clk) begin
         encoded_tx_hdr_reg <= SYNC_CTRL;
         encoded_tx_hdr_valid_reg <= 1'b0;
         tx_gbx_sync_reg <= '0;
+
+        gbx_en_reg <= 1'b0;
 
         output_data_reg <= '0;
         output_type_reg <= OUT_TYPE_IDLE;

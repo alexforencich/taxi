@@ -18,12 +18,11 @@ import sys
 from scapy.layers.l2 import Ether
 
 import pytest
-import cocotb_test.simulator
-
 import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge, Timer
 from cocotb.utils import get_time_from_sim_steps
+from cocotb_tools.runner import get_runner
 
 from cocotbext.eth import XgmiiFrame, PtpClockSimTime
 from cocotbext.axi import AxiStreamBus, AxiStreamSource, AxiStreamSink, AxiStreamFrame
@@ -51,7 +50,7 @@ class TB:
 
         cocotb.start_soon(Clock(dut.xcvr_ctrl_clk, 8, units="ns").start())
         cocotb.start_soon(Clock(dut.stat_clk, 8, units="ns").start())
-        cocotb.start_soon(Clock(dut.xcvr_gtrefclk00_in, 6.206, units="ns").start())
+        cocotb.start_soon(Clock(dut.xcvr_gtrefclk00_in, 6.206206, units="ns").start())
 
         self.apb_ctrl = ApbMaster(ApbBus.from_entity(dut.s_apb_ctrl), dut.xcvr_ctrl_clk, dut.xcvr_ctrl_rst)
 
@@ -65,14 +64,14 @@ class TB:
 
             if ch.ch_inst.DATA_W.value == 64:
                 if ch.ch_inst.CFG_LOW_LATENCY.value:
-                    clk = 2.482
+                    clk = 2.482482
                     gbx_cfg = (66, [64, 65])
                 else:
                     clk = 2.56
                     gbx_cfg = None
             else:
                 if ch.ch_inst.CFG_LOW_LATENCY.value:
-                    clk = 3.102
+                    clk = 3.103102
                     gbx_cfg = (66, [64, 65])
                 else:
                     clk = 3.2
@@ -399,7 +398,7 @@ async def run_test_tx(dut, port=0, payload_lengths=None, payload_data=None, ifg=
         assert rx_frame.get_payload() == test_data
         assert rx_frame.check_fcs()
         assert rx_frame.ctrl is None
-        if not tb.serdes_sinks[port].gbx_seq_len:
+        if not tb.serdes_sinks[port].gbx_seq_len or dut.COMBINED_MAC_PCS.value:
             if dut.PTP_TD_EN.value:
                 assert abs(rx_frame_sfd_ns - ptp_ts_ns - tb.clk_period[port]*pipe_delay) < tb.clk_period[port]*3
             else:
@@ -485,7 +484,7 @@ async def run_test_tx_alignment(dut, port=0, payload_data=None, ifg=12):
             assert rx_frame.get_payload() == test_data
             assert rx_frame.check_fcs()
             assert rx_frame.ctrl is None
-            if not tb.serdes_sinks[port].gbx_seq_len:
+            if not tb.serdes_sinks[port].gbx_seq_len or dut.COMBINED_MAC_PCS.value:
                 if dut.PTP_TD_EN.value:
                     assert abs(rx_frame_sfd_ns - ptp_ts_ns - tb.clk_period[port]*pipe_delay) < tb.clk_period[port]*3
                 else:
@@ -1200,12 +1199,12 @@ def test_taxi_eth_mac_25g_us(request, data_w, combined_mac_pcs, low_latency, dic
     module = os.path.splitext(os.path.basename(__file__))[0]
     toplevel = module
 
-    verilog_sources = [
+    sources = [
         os.path.join(tests_dir, f"{toplevel}.sv"),
         os.path.join(rtl_dir, "us", f"{dut}.f"),
     ]
 
-    verilog_sources = process_f_files(verilog_sources)
+    sources = process_f_files(sources)
 
     parameters = {}
 
@@ -1228,6 +1227,7 @@ def test_taxi_eth_mac_25g_us(request, data_w, combined_mac_pcs, low_latency, dic
     parameters['PTP_TS_FMT_TOD'] = 1
     parameters['PTP_TS_FNS_W'] = 16
     parameters['PTP_TS_W'] = 96 if parameters['PTP_TS_FMT_TOD'] else 64
+    parameters['PTP_TS_COR_EN'] = 1
     parameters['PTP_TD_SDI_PIPELINE'] = 2
     parameters['TX_TAG_W'] = 16
     parameters['PRBS31_EN'] = 1
@@ -1250,13 +1250,28 @@ def test_taxi_eth_mac_25g_us(request, data_w, combined_mac_pcs, low_latency, dic
     sim_build = os.path.join(tests_dir, "sim_build",
         request.node.name.replace('[', '-').replace(']', ''))
 
-    cocotb_test.simulator.run(
-        simulator="verilator",
-        python_search=[tests_dir],
-        verilog_sources=verilog_sources,
-        toplevel=toplevel,
-        module=module,
+    timescale = ("1ns", "1fs")
+    sim = os.getenv("SIM", "verilator")
+    waves = bool(int(os.getenv("WAVES", 0)))
+
+    sys.path.append(tests_dir)
+
+    runner = get_runner(sim)
+    runner.build(
+        sources=sources,
+        hdl_toplevel=toplevel,
         parameters=parameters,
-        sim_build=sim_build,
+        always=True,
+        build_dir=sim_build,
+        timescale=timescale,
+        waves=waves,
+    )
+    runner.test(
+        hdl_toplevel=toplevel,
+        test_module=module,
+        parameters=parameters,
         extra_env=extra_env,
+        build_dir=sim_build,
+        timescale=timescale,
+        waves=waves,
     )

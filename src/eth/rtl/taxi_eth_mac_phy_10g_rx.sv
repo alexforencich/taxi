@@ -24,6 +24,8 @@ module taxi_eth_mac_phy_10g_rx #
     parameter logic PTP_TS_EN = 1'b0,
     parameter logic PTP_TS_FMT_TOD = 1'b1,
     parameter PTP_TS_W = PTP_TS_FMT_TOD ? 96 : 64,
+    parameter logic PTP_TS_COR_EN = PTP_TS_EN && GBX_IF_EN,
+    parameter PTP_TS_COR_W = 16+4,
     parameter logic BIT_REVERSE = 1'b0,
     parameter logic SCRAMBLER_DISABLE = 1'b0,
     parameter logic PRBS31_EN = 1'b0,
@@ -33,71 +35,73 @@ module taxi_eth_mac_phy_10g_rx #
     parameter COUNT_125US = 125000/6.4
 )
 (
-    input  wire logic                 clk,
-    input  wire logic                 rst,
+    input  wire logic                     clk,
+    input  wire logic                     rst,
 
     /*
      * Receive interface (AXI stream)
      */
-    taxi_axis_if.src                  m_axis_rx,
+    taxi_axis_if.src                      m_axis_rx,
 
     /*
      * SERDES interface
      */
-    input  wire logic [DATA_W-1:0]    serdes_rx_data,
-    input  wire logic                 serdes_rx_data_valid = 1'b1,
-    input  wire logic [HDR_W-1:0]     serdes_rx_hdr,
-    input  wire logic                 serdes_rx_hdr_valid = 1'b1,
-    output wire logic                 serdes_rx_bitslip,
-    output wire logic                 serdes_rx_reset_req,
+    input  wire logic [DATA_W-1:0]        serdes_rx_data,
+    input  wire logic                     serdes_rx_data_valid = 1'b1,
+    input  wire logic [HDR_W-1:0]         serdes_rx_hdr,
+    input  wire logic                     serdes_rx_hdr_valid = 1'b1,
+    output wire logic                     serdes_rx_bitslip,
+    output wire logic                     serdes_rx_reset_req,
 
     /*
      * Ordered sets
      */
-    output wire logic [23:0]          rx_os,
-    output wire logic                 rx_os_sig,
-    output wire logic                 rx_os_valid,
-    output wire logic                 rx_os_match,
-    output wire logic                 rx_idle_match,
+    output wire logic [23:0]              rx_os,
+    output wire logic                     rx_os_sig,
+    output wire logic                     rx_os_valid,
+    output wire logic                     rx_os_match,
+    output wire logic                     rx_idle_match,
 
     /*
      * PTP
      */
-    input  wire logic [PTP_TS_W-1:0]  ptp_ts,
+    input  wire logic [PTP_TS_W-1:0]      ptp_ts,
+    output wire logic                     ptp_ts_cor_sync,
+    input  wire logic [PTP_TS_COR_W-1:0]  ptp_ts_cor_val = '0,
 
     /*
      * Status
      */
-    output wire logic [1:0]           rx_start_packet,
-    output wire logic [6:0]           rx_error_count,
-    output wire logic                 rx_block_lock,
-    output wire logic                 rx_high_ber,
-    output wire logic                 rx_status,
-    output wire logic [3:0]           stat_rx_byte,
-    output wire logic [15:0]          stat_rx_pkt_len,
-    output wire logic                 stat_rx_pkt_fragment,
-    output wire logic                 stat_rx_pkt_jabber,
-    output wire logic                 stat_rx_pkt_ucast,
-    output wire logic                 stat_rx_pkt_mcast,
-    output wire logic                 stat_rx_pkt_bcast,
-    output wire logic                 stat_rx_pkt_vlan,
-    output wire logic                 stat_rx_pkt_good,
-    output wire logic                 stat_rx_pkt_bad,
-    output wire logic                 stat_rx_err_oversize,
-    output wire logic                 stat_rx_err_bad_fcs,
-    output wire logic                 stat_rx_err_bad_block,
-    output wire logic                 stat_rx_err_framing,
-    output wire logic                 stat_rx_err_preamble,
+    output wire logic [1:0]               rx_start_packet,
+    output wire logic [6:0]               rx_error_count,
+    output wire logic                     rx_block_lock,
+    output wire logic                     rx_high_ber,
+    output wire logic                     rx_status,
+    output wire logic [3:0]               stat_rx_byte,
+    output wire logic [15:0]              stat_rx_pkt_len,
+    output wire logic                     stat_rx_pkt_fragment,
+    output wire logic                     stat_rx_pkt_jabber,
+    output wire logic                     stat_rx_pkt_ucast,
+    output wire logic                     stat_rx_pkt_mcast,
+    output wire logic                     stat_rx_pkt_bcast,
+    output wire logic                     stat_rx_pkt_vlan,
+    output wire logic                     stat_rx_pkt_good,
+    output wire logic                     stat_rx_pkt_bad,
+    output wire logic                     stat_rx_err_oversize,
+    output wire logic                     stat_rx_err_bad_fcs,
+    output wire logic                     stat_rx_err_bad_block,
+    output wire logic                     stat_rx_err_framing,
+    output wire logic                     stat_rx_err_preamble,
 
     /*
      * Configuration
      */
-    input  wire logic [15:0]          cfg_rx_max_pkt_len = 16'd1518-1,
-    input  wire logic                 cfg_rx_enable,
-    input  wire logic                 cfg_rx_usxgmii_en = 1'b1,
-    input  wire logic                 cfg_rx_usxgmii_5g = 1'b0,
-    input  wire logic [2:0]           cfg_rx_usxgmii_speed = 3'b011,
-    input  wire logic                 cfg_rx_prbs31_enable
+    input  wire logic [15:0]              cfg_rx_max_pkt_len = 16'd1518-1,
+    input  wire logic                     cfg_rx_enable,
+    input  wire logic                     cfg_rx_usxgmii_en = 1'b1,
+    input  wire logic                     cfg_rx_usxgmii_5g = 1'b0,
+    input  wire logic [2:0]               cfg_rx_usxgmii_speed = 3'b011,
+    input  wire logic                     cfg_rx_prbs31_enable
 );
 
 wire [DATA_W-1:0] encoded_rx_data;

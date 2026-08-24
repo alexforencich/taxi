@@ -60,6 +60,7 @@ module taxi_eth_mac_25g_us_ch #
     parameter logic PTP_TS_FMT_TOD = 1'b1,
     parameter PTP_TS_FNS_W = 16,
     parameter PTP_TS_W = PTP_TS_FMT_TOD ? 96 : 64,
+    parameter logic PTP_TS_COR_EN = PTP_TS_EN && CFG_LOW_LATENCY,
     parameter PTP_TD_SDI_PIPELINE = 2,
     parameter logic PRBS31_EN = 1'b0,
     parameter TX_SERDES_PIPELINE = 1,
@@ -322,6 +323,8 @@ localparam GBX_EN = CFG_LOW_LATENCY || GT_7;
 
 localparam HDR_W = 2;
 
+localparam PTP_TS_COR_W = PTP_TS_FNS_W+4;
+
 wire rx_reset_req;
 
 wire [DATA_W-1:0]  serdes_tx_data;
@@ -336,6 +339,11 @@ wire               serdes_rx_data_valid;
 wire [HDR_W-1:0]   serdes_rx_hdr;
 wire               serdes_rx_hdr_valid;
 wire               serdes_rx_bitslip;
+
+wire                     tx_ptp_ts_cor_sync;
+wire [PTP_TS_COR_W-1:0]  tx_ptp_ts_cor_val;
+wire                     rx_ptp_ts_cor_sync;
+wire [PTP_TS_COR_W-1:0]  rx_ptp_ts_cor_val;
 
 if (GT_7) begin : gt
 
@@ -438,6 +446,9 @@ if (GT_7) begin : gt
     assign xcvr_qpll1clk_out = 1'b0;
     assign xcvr_qpll1refclk_out = 1'b0;
 
+    assign tx_ptp_ts_cor_val = '0;
+    assign rx_ptp_ts_cor_val = '0;
+
 end else if (DATA_W == 64 && CFG_LOW_LATENCY) begin : gt
 
     taxi_eth_phy_25g_us_gt_ll #(
@@ -473,7 +484,9 @@ end else if (DATA_W == 64 && CFG_LOW_LATENCY) begin : gt
 
         // MAC/PHY parameters
         .DATA_W(DATA_W),
-        .HDR_W(HDR_W)
+        .HDR_W(HDR_W),
+        .TS_FNS_W(PTP_TS_FNS_W),
+        .TS_COR_W(PTP_TS_COR_W)
     )
     gt_inst (
         .xcvr_ctrl_clk(xcvr_ctrl_clk),
@@ -549,7 +562,17 @@ end else if (DATA_W == 64 && CFG_LOW_LATENCY) begin : gt
         .serdes_rx_data_valid(serdes_rx_data_valid),
         .serdes_rx_hdr(serdes_rx_hdr),
         .serdes_rx_hdr_valid(serdes_rx_hdr_valid),
-        .serdes_rx_bitslip(serdes_rx_bitslip)
+        .serdes_rx_bitslip(serdes_rx_bitslip),
+
+        /*
+         * Timestamp correction
+         */
+        .tx_ts_cor_sync(tx_ptp_ts_cor_sync),
+        .tx_ts_inc(20'h27b80), // TODO
+        .tx_ts_cor_val(tx_ptp_ts_cor_val),
+        .rx_ts_cor_sync(rx_ptp_ts_cor_sync),
+        .rx_ts_inc(20'h27b80), // TODO
+        .rx_ts_cor_val(rx_ptp_ts_cor_val)
     );
 
 end else if (DATA_W == 64 && !CFG_LOW_LATENCY) begin : gt
@@ -666,6 +689,9 @@ end else if (DATA_W == 64 && !CFG_LOW_LATENCY) begin : gt
         .serdes_rx_bitslip(serdes_rx_bitslip)
     );
 
+    assign tx_ptp_ts_cor_val = '0;
+    assign rx_ptp_ts_cor_val = '0;
+
 end else if (DATA_W == 32 && CFG_LOW_LATENCY) begin : gt
 
     taxi_eth_phy_10g_us_gt_ll #(
@@ -701,7 +727,9 @@ end else if (DATA_W == 32 && CFG_LOW_LATENCY) begin : gt
 
         // MAC/PHY parameters
         .DATA_W(DATA_W),
-        .HDR_W(HDR_W)
+        .HDR_W(HDR_W),
+        .TS_FNS_W(PTP_TS_FNS_W),
+        .TS_COR_W(PTP_TS_COR_W)
     )
     gt_inst (
         .xcvr_ctrl_clk(xcvr_ctrl_clk),
@@ -777,7 +805,17 @@ end else if (DATA_W == 32 && CFG_LOW_LATENCY) begin : gt
         .serdes_rx_data_valid(serdes_rx_data_valid),
         .serdes_rx_hdr(serdes_rx_hdr),
         .serdes_rx_hdr_valid(serdes_rx_hdr_valid),
-        .serdes_rx_bitslip(serdes_rx_bitslip)
+        .serdes_rx_bitslip(serdes_rx_bitslip),
+
+        /*
+         * Timestamp correction
+         */
+        .tx_ts_cor_sync(tx_ptp_ts_cor_sync),
+        .tx_ts_inc(20'h31a60), // TODO
+        .tx_ts_cor_val(tx_ptp_ts_cor_val),
+        .rx_ts_cor_sync(rx_ptp_ts_cor_sync),
+        .rx_ts_inc(20'h31a60), // TODO
+        .rx_ts_cor_val(rx_ptp_ts_cor_val)
     );
 
 end else if (DATA_W == 32 && !CFG_LOW_LATENCY) begin : gt
@@ -894,6 +932,9 @@ end else if (DATA_W == 32 && !CFG_LOW_LATENCY) begin : gt
         .serdes_rx_bitslip(serdes_rx_bitslip)
     );
 
+    assign tx_ptp_ts_cor_val = '0;
+    assign rx_ptp_ts_cor_val = '0;
+
 end else begin
 
     $fatal(0, "Error: invalid configuration (%m)");
@@ -914,6 +955,8 @@ if (COMBINED_MAC_PCS) begin : mac
         .PTP_TS_FMT_TOD(PTP_TS_FMT_TOD),
         .PTP_TS_FNS_W(PTP_TS_FNS_W),
         .PTP_TS_W(PTP_TS_W),
+        .PTP_TS_COR_EN(PTP_TS_COR_EN),
+        .PTP_TS_COR_W(PTP_TS_COR_W),
         .PTP_TD_SDI_PIPELINE(PTP_TD_SDI_PIPELINE),
         .BIT_REVERSE(1'b1),
         .SCRAMBLER_DISABLE(1'b0),
@@ -999,10 +1042,14 @@ if (COMBINED_MAC_PCS) begin : mac
         .tx_ptp_ts_out(tx_ptp_ts_out),
         .tx_ptp_ts_step_out(tx_ptp_ts_step_out),
         .tx_ptp_locked(tx_ptp_locked),
+        .tx_ptp_ts_cor_sync(tx_ptp_ts_cor_sync),
+        .tx_ptp_ts_cor_val(tx_ptp_ts_cor_val),
         .rx_ptp_ts_in(rx_ptp_ts_in),
         .rx_ptp_ts_out(rx_ptp_ts_out),
         .rx_ptp_ts_step_out(rx_ptp_ts_step_out),
         .rx_ptp_locked(rx_ptp_locked),
+        .rx_ptp_ts_cor_sync(rx_ptp_ts_cor_sync),
+        .rx_ptp_ts_cor_val(rx_ptp_ts_cor_val),
 
         /*
          * Link-level Flow Control (LFC) (IEEE 802.3 annex 31B PAUSE)

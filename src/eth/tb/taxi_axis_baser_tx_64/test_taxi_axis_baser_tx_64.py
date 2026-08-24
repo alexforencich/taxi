@@ -14,13 +14,12 @@ import logging
 import os
 import sys
 
-import cocotb_test.simulator
 import pytest
-
 import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge
 from cocotb.utils import get_time_from_sim_steps
+from cocotb_tools.runner import get_runner
 
 from cocotbext.eth import PtpClockSimTime
 from cocotbext.axi import AxiStreamBus, AxiStreamSource, AxiStreamSink, AxiStreamFrame
@@ -44,7 +43,7 @@ class TB:
         self.log.setLevel(logging.DEBUG)
 
         if gbx_cfg:
-            self.clk_period = 6.206
+            self.clk_period = 6.206206
         else:
             self.clk_period = 6.4
 
@@ -70,6 +69,8 @@ class TB:
         dut.tx_os.setimmediatevalue(0)
         dut.tx_os_sig.setimmediatevalue(0)
         dut.tx_os_valid.setimmediatevalue(0)
+
+        dut.ptp_ts_cor_val.setimmediatevalue(0)
 
         dut.cfg_tx_max_pkt_len.setimmediatevalue(0)
         dut.cfg_tx_ifg.setimmediatevalue(0)
@@ -124,6 +125,8 @@ class TB:
         self.stats["stat_tx_err_underflow"] = 0
 
         cocotb.start_soon(self._run_stats_counters())
+        if gbx_cfg:
+            cocotb.start_soon(self._run_ts_cor())
 
     async def reset(self):
         self.dut.rst.setimmediatevalue(0)
@@ -147,6 +150,23 @@ class TB:
             await RisingEdge(self.dut.clk)
             for stat in self.stats:
                 self.stats[stat] += int(getattr(self.dut, stat).value)
+
+    async def _run_ts_cor(self):
+        seq_len = self.sink.gbx_seq_len
+        seq = 0
+        val = 0
+        ui = self.clk_period / self.sink.width
+        step = int(ui*2*65536+0.5)
+        while True:
+            await RisingEdge(self.dut.clk)
+            seq += 1
+            val += step
+            if seq >= seq_len:
+                seq = 0
+                val = 0
+            self.dut.ptp_ts_cor_val.value = val
+            if int(self.dut.ptp_ts_cor_sync.value):
+                seq = 1
 
 
 def size_list():
@@ -214,8 +234,7 @@ async def run_test(dut, gbx_cfg=None, usxgmii_speed=None, payload_lengths=None, 
         assert rx_frame.get_payload() == test_data
         assert rx_frame.check_fcs()
         assert rx_frame.ctrl is None
-        if gbx_cfg is None:
-            assert abs(rx_frame_sfd_ns - ptp_ts_ns - tb.clk_period*1) < 0.01
+        assert abs(rx_frame_sfd_ns - ptp_ts_ns - tb.clk_period*1) < 0.001
 
     assert tb.sink.empty()
 
@@ -294,8 +313,7 @@ async def run_test_alignment(dut, gbx_cfg=None, usxgmii_speed=None, payload_data
             assert rx_frame.get_payload() == test_data
             assert rx_frame.check_fcs()
             assert rx_frame.ctrl is None
-            if gbx_cfg is None:
-                assert abs(rx_frame_sfd_ns - ptp_ts_ns - tb.clk_period*1) < 0.01
+            assert abs(rx_frame_sfd_ns - ptp_ts_ns - tb.clk_period*1) < 0.001
 
             start_lane.append(rx_frame.start_lane)
 
@@ -638,14 +656,14 @@ def test_taxi_axis_baser_tx_64(request, gbx_en, dic_en):
     module = os.path.splitext(os.path.basename(__file__))[0]
     toplevel = module
 
-    verilog_sources = [
+    sources = [
         os.path.join(tests_dir, f"{toplevel}.sv"),
         os.path.join(rtl_dir, f"{dut}.sv"),
         os.path.join(taxi_src_dir, "lfsr", "rtl", "taxi_lfsr.sv"),
         os.path.join(taxi_src_dir, "axis", "rtl", "taxi_axis_if.sv"),
     ]
 
-    verilog_sources = process_f_files(verilog_sources)
+    sources = process_f_files(sources)
 
     parameters = {}
 
@@ -658,6 +676,8 @@ def test_taxi_axis_baser_tx_64(request, gbx_en, dic_en):
     parameters['PTP_TS_EN'] = 1
     parameters['PTP_TS_FMT_TOD'] = 1
     parameters['PTP_TS_W'] = 96 if parameters['PTP_TS_FMT_TOD'] else 64
+    parameters['PTP_TS_COR_EN'] = 1
+    parameters['PTP_TS_COR_W'] = 16+4
     parameters['TX_TAG_W'] = 16
     parameters['TX_CPL_CTRL_IN_TUSER'] = 1
 
@@ -666,13 +686,28 @@ def test_taxi_axis_baser_tx_64(request, gbx_en, dic_en):
     sim_build = os.path.join(tests_dir, "sim_build",
         request.node.name.replace('[', '-').replace(']', ''))
 
-    cocotb_test.simulator.run(
-        simulator="verilator",
-        python_search=[tests_dir],
-        verilog_sources=verilog_sources,
-        toplevel=toplevel,
-        module=module,
+    timescale = ("1ns", "1fs")
+    sim = os.getenv("SIM", "verilator")
+    waves = bool(int(os.getenv("WAVES", 0)))
+
+    sys.path.append(tests_dir)
+
+    runner = get_runner(sim)
+    runner.build(
+        sources=sources,
+        hdl_toplevel=toplevel,
         parameters=parameters,
-        sim_build=sim_build,
+        always=True,
+        build_dir=sim_build,
+        timescale=timescale,
+        waves=waves,
+    )
+    runner.test(
+        hdl_toplevel=toplevel,
+        test_module=module,
+        parameters=parameters,
         extra_env=extra_env,
+        build_dir=sim_build,
+        timescale=timescale,
+        waves=waves,
     )

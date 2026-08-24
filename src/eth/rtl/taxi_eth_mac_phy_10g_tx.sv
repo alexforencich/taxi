@@ -25,6 +25,8 @@ module taxi_eth_mac_phy_10g_tx #
     parameter logic PTP_TS_EN = 1'b0,
     parameter logic PTP_TS_FMT_TOD = 1'b1,
     parameter PTP_TS_W = PTP_TS_FMT_TOD ? 96 : 64,
+    parameter logic PTP_TS_COR_EN = PTP_TS_EN && GBX_IF_EN,
+    parameter PTP_TS_COR_W = 16+4,
     parameter logic TX_CPL_CTRL_IN_TUSER = 1'b0,
     parameter logic BIT_REVERSE = 1'b0,
     parameter logic SCRAMBLER_DISABLE = 1'b0,
@@ -32,68 +34,70 @@ module taxi_eth_mac_phy_10g_tx #
     parameter SERDES_PIPELINE = 0
 )
 (
-    input  wire logic                 clk,
-    input  wire logic                 rst,
+    input  wire logic                     clk,
+    input  wire logic                     rst,
 
     /*
      * Transmit interface (AXI stream)
      */
-    taxi_axis_if.snk                  s_axis_tx,
-    taxi_axis_if.src                  m_axis_tx_cpl,
+    taxi_axis_if.snk                      s_axis_tx,
+    taxi_axis_if.src                      m_axis_tx_cpl,
 
     /*
      * SERDES interface
      */
-    output wire logic [DATA_W-1:0]    serdes_tx_data,
-    output wire logic                 serdes_tx_data_valid,
-    output wire logic [HDR_W-1:0]     serdes_tx_hdr,
-    output wire logic                 serdes_tx_hdr_valid,
-    input  wire logic                 serdes_tx_gbx_req_sync = 1'b0,
-    input  wire logic                 serdes_tx_gbx_req_stall = 1'b0,
-    output wire logic                 serdes_tx_gbx_sync,
+    output wire logic [DATA_W-1:0]        serdes_tx_data,
+    output wire logic                     serdes_tx_data_valid,
+    output wire logic [HDR_W-1:0]         serdes_tx_hdr,
+    output wire logic                     serdes_tx_hdr_valid,
+    input  wire logic                     serdes_tx_gbx_req_sync = 1'b0,
+    input  wire logic                     serdes_tx_gbx_req_stall = 1'b0,
+    output wire logic                     serdes_tx_gbx_sync,
 
     /*
      * Ordered sets
      */
-    input  wire logic [23:0]          tx_os = '0,
-    input  wire logic                 tx_os_sig = 1'b0,
-    input  wire logic                 tx_os_valid = 1'b0,
-    output wire logic                 tx_os_ready,
+    input  wire logic [23:0]              tx_os = '0,
+    input  wire logic                     tx_os_sig = 1'b0,
+    input  wire logic                     tx_os_valid = 1'b0,
+    output wire logic                     tx_os_ready,
 
     /*
      * PTP
      */
-    input  wire logic [PTP_TS_W-1:0]  ptp_ts,
+    input  wire logic [PTP_TS_W-1:0]      ptp_ts,
+    output wire logic                     ptp_ts_cor_sync,
+    input  wire logic [PTP_TS_COR_W-1:0]  ptp_ts_cor_val = '0,
 
     /*
      * Status
      */
-    output wire logic [1:0]           tx_start_packet,
-    output wire logic [3:0]           stat_tx_byte,
-    output wire logic [15:0]          stat_tx_pkt_len,
-    output wire logic                 stat_tx_pkt_ucast,
-    output wire logic                 stat_tx_pkt_mcast,
-    output wire logic                 stat_tx_pkt_bcast,
-    output wire logic                 stat_tx_pkt_vlan,
-    output wire logic                 stat_tx_pkt_good,
-    output wire logic                 stat_tx_pkt_bad,
-    output wire logic                 stat_tx_pad_frame,
-    output wire logic                 stat_tx_err_oversize,
-    output wire logic                 stat_tx_err_user,
-    output wire logic                 stat_tx_err_underflow,
+    output wire logic [1:0]               tx_start_packet,
+    output wire logic [3:0]               stat_tx_byte,
+    output wire logic [15:0]              stat_tx_pkt_len,
+    output wire logic                     stat_tx_pkt_ucast,
+    output wire logic                     stat_tx_pkt_mcast,
+    output wire logic                     stat_tx_pkt_bcast,
+    output wire logic                     stat_tx_pkt_vlan,
+    output wire logic                     stat_tx_pkt_good,
+    output wire logic                     stat_tx_pkt_bad,
+    output wire logic                     stat_tx_pad_frame,
+    output wire logic                     stat_tx_err_oversize,
+    output wire logic                     stat_tx_err_user,
+    output wire logic                     stat_tx_err_underflow,
 
     /*
      * Configuration
      */
-    input  wire logic                 cfg_tx_pad_en = 1'b1,
-    input  wire logic [7:0]           cfg_tx_min_pkt_len = 8'd60-1,
-    input  wire logic [15:0]          cfg_tx_max_pkt_len = 16'd1518-1,
-    input  wire logic [7:0]           cfg_tx_ifg = 8'd12,
-    input  wire logic                 cfg_tx_enable,
-    input  wire logic                 cfg_tx_usxgmii_en = 1'b1,
-    input  wire logic                 cfg_tx_usxgmii_5g = 1'b0,
-    input  wire logic [2:0]           cfg_tx_usxgmii_speed = 3'b011,
-    input  wire logic                 cfg_tx_prbs31_enable
+    input  wire logic                     cfg_tx_pad_en = 1'b1,
+    input  wire logic [7:0]               cfg_tx_min_pkt_len = 8'd60-1,
+    input  wire logic [15:0]              cfg_tx_max_pkt_len = 16'd1518-1,
+    input  wire logic [7:0]               cfg_tx_ifg = 8'd12,
+    input  wire logic                     cfg_tx_enable,
+    input  wire logic                     cfg_tx_usxgmii_en = 1'b1,
+    input  wire logic                     cfg_tx_usxgmii_5g = 1'b0,
+    input  wire logic [2:0]               cfg_tx_usxgmii_speed = 3'b011,
+    input  wire logic                     cfg_tx_prbs31_enable
 );
 
 localparam TX_USER_W = s_axis_tx.USER_W;
@@ -157,6 +161,8 @@ if (DATA_W == 64) begin
         .PTP_TS_EN(PTP_TS_EN),
         .PTP_TS_FMT_TOD(PTP_TS_FMT_TOD),
         .PTP_TS_W(PTP_TS_W),
+        .PTP_TS_COR_EN(PTP_TS_COR_EN),
+        .PTP_TS_COR_W(PTP_TS_COR_W),
         .TX_CPL_CTRL_IN_TUSER(TX_CPL_CTRL_IN_TUSER)
     )
     axis_baser_tx_inst (
@@ -192,6 +198,8 @@ if (DATA_W == 64) begin
          * PTP
          */
         .ptp_ts(ptp_ts),
+        .ptp_ts_cor_sync(ptp_ts_cor_sync),
+        .ptp_ts_cor_val(ptp_ts_cor_val),
 
         /*
          * Configuration
@@ -231,6 +239,8 @@ end else begin
         .DIC_EN(DIC_EN),
         .PTP_TS_EN(PTP_TS_EN),
         .PTP_TS_W(PTP_TS_W),
+        .PTP_TS_COR_EN(PTP_TS_COR_EN),
+        .PTP_TS_COR_W(PTP_TS_COR_W),
         .TX_CPL_CTRL_IN_TUSER(TX_CPL_CTRL_IN_TUSER)
     )
     axis_baser_tx_inst (
@@ -266,6 +276,8 @@ end else begin
          * PTP
          */
         .ptp_ts(ptp_ts),
+        .ptp_ts_cor_sync(ptp_ts_cor_sync),
+        .ptp_ts_cor_val(ptp_ts_cor_val),
 
         /*
          * Configuration

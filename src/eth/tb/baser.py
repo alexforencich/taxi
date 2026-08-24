@@ -631,16 +631,16 @@ class BaseRSerdesSink:
         self.log.info("  Sequence length: %d cycles", seq_len)
         self.log.info("  Stall cycles: %s", seq_stall)
 
-        in_bits = 66
+        in_bits = self.width
         out_cycles = seq_len
         in_cycles = out_cycles - len(seq_stall)
-        out_bits = (in_bits * in_cycles) // out_cycles
+        out_bits = int(((in_bits + 2/self.pack_cnt) * in_cycles) / out_cycles)
 
-        self.log.info("  Input: %d bits (%d cycles)", in_bits, in_cycles)
+        self.log.info("  Input: %d+2 bits (%d cycles)", in_bits, in_cycles)
         self.log.info("  Output: %d bits (%d cycles)", out_bits, out_cycles)
-        self.log.info("  Gearbox ratio: %d:%d", in_bits, out_bits)
+        self.log.info("  Gearbox ratio: %d+2:%d", in_bits, out_bits)
 
-        assert in_cycles*in_bits == out_cycles*out_bits
+        assert in_cycles*(in_bits + 2/self.pack_cnt) == out_cycles*out_bits
 
         self.gbx_seq = 0
         self.gbx_seq_gen = 0
@@ -723,6 +723,8 @@ class BaseRSerdesSink:
         clock_edge_event = RisingEdge(self.clock)
 
         clk_period = 0
+        symb_period = 0
+        symb_start = 0
         last_clk = 0
         gbx_delay = 0
         sync_bad = True
@@ -746,6 +748,8 @@ class BaseRSerdesSink:
 
             # gearbox sequence
             if self.gbx_seq_len:
+                symb_period = (clk_period * (self.pack_cnt*self.gbx_in_bits + 2)) // self.gbx_out_bits
+
                 # generation
                 self.gbx_seq_gen = (self.gbx_seq_gen + 1) % self.gbx_seq_len
 
@@ -763,14 +767,23 @@ class BaseRSerdesSink:
                     if int(self.gbx_sync.value):
                         self.gbx_seq = 0
 
+                if self.gbx_seq == 0:
+                    self.gbx_bit_cnt = 0
+
+                gbx_delay = (self.gbx_bit_cnt * clk_period) // self.gbx_out_bits
+
+                stall = self.gbx_seq in self.gbx_seq_stall
+
+                if not stall:
+                    self.gbx_bit_cnt += self.gbx_in_bits
+                    if self.pack_cnt == 1 or self.pack_seq == 0:
+                        self.gbx_bit_cnt += 2
                 self.gbx_bit_cnt = max(self.gbx_bit_cnt - self.gbx_out_bits, 0)
 
-                if self.gbx_seq in self.gbx_seq_stall:
+                if stall:
                     continue
-
-                self.gbx_bit_cnt += self.gbx_in_bits
-                gbx_delay = (self.gbx_bit_cnt * clk_period) // self.gbx_out_bits
             else:
+                symb_period = clk_period * self.pack_cnt
                 self.gbx_seq = 0
                 self.gbx_seq_gen = 0
                 self.gbx_bit_cnt = 0
@@ -799,6 +812,9 @@ class BaseRSerdesSink:
 
             if self.pack_cnt > 1:
                 # pack input data
+                if self.pack_seq == 0:
+                    symb_start = sim_time + gbx_delay
+
                 if self.hdr_valid is not None:
                     if self.hdr_valid.value:
                         data = data_in
@@ -807,13 +823,14 @@ class BaseRSerdesSink:
                         continue
 
                 data |= data_in << (self.width*self.pack_seq)
-                self.pack_seq = self.pack_seq+1
+                self.pack_seq += 1
 
                 if self.pack_seq < self.pack_cnt:
                     continue
 
                 self.pack_seq = 0
             else:
+                symb_start = sim_time + gbx_delay
                 data = data_in
                 hdr = hdr_in
 
@@ -1004,7 +1021,7 @@ class BaseRSerdesSink:
                     if c_val and d_val == XgmiiCtrl.START:
                         # start
                         frame = XgmiiFrame(bytearray([EthPre.PRE]), [0])
-                        frame.sim_time_start = sim_time + (clk_period // self.byte_lanes * k) + gbx_delay
+                        frame.sim_time_start = symb_start + ((symb_period * k) // 8)
                         frame.start_lane = k
                         in_pre = True
                 else:
@@ -1016,7 +1033,7 @@ class BaseRSerdesSink:
                             frame.ctrl.append(c_val)
 
                         frame.compact()
-                        frame.sim_time_end = sim_time + (clk_period // self.byte_lanes * k) + gbx_delay
+                        frame.sim_time_end = symb_start + ((symb_period * k) // 8)
                         self.log.info("RX frame: %s", frame)
 
                         self.queue_occupancy_bytes += len(frame)
@@ -1028,7 +1045,7 @@ class BaseRSerdesSink:
                         frame = None
                     else:
                         if frame.sim_time_sfd is None and not in_pre:
-                            frame.sim_time_sfd = sim_time + (clk_period // self.byte_lanes * k) + gbx_delay
+                            frame.sim_time_sfd = symb_start + ((symb_period * k) // 8)
                         if d_val == EthPre.SFD:
                             in_pre = False
 

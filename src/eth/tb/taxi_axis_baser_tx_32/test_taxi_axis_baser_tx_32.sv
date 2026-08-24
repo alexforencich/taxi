@@ -9,7 +9,7 @@ Authors:
 */
 
 `resetall
-`timescale 1ns / 1ps
+`timescale 1ns / 1fs
 `default_nettype none
 
 /*
@@ -27,6 +27,8 @@ module test_taxi_axis_baser_tx_32 #
     parameter logic PTP_TS_EN = 1'b0,
     parameter logic PTP_TS_FMT_TOD = 1'b1,
     parameter PTP_TS_W = PTP_TS_FMT_TOD ? 96 : 64,
+    parameter logic PTP_TS_COR_EN = PTP_TS_EN && GBX_IF_EN,
+    parameter PTP_TS_COR_W = 16+4,
     parameter TX_TAG_W = 16,
     parameter logic TX_CPL_CTRL_IN_TUSER = 1'b0
     /* verilator lint_on WIDTHTRUNC */
@@ -55,6 +57,8 @@ logic tx_os_valid;
 logic tx_os_ready;
 
 logic [PTP_TS_W-1:0] ptp_ts;
+logic ptp_ts_cor_sync;
+logic [PTP_TS_COR_W-1:0] ptp_ts_cor_val;
 
 logic [15:0] cfg_tx_max_pkt_len;
 logic [7:0] cfg_tx_ifg;
@@ -85,6 +89,8 @@ taxi_axis_baser_tx_32 #(
     .DIC_EN(DIC_EN),
     .PTP_TS_EN(PTP_TS_EN),
     .PTP_TS_W(PTP_TS_W),
+    .PTP_TS_COR_EN(PTP_TS_COR_EN),
+    .PTP_TS_COR_W(PTP_TS_COR_W),
     .TX_CPL_CTRL_IN_TUSER(TX_CPL_CTRL_IN_TUSER)
 )
 uut (
@@ -120,6 +126,8 @@ uut (
      * PTP
      */
     .ptp_ts(ptp_ts),
+    .ptp_ts_cor_sync(ptp_ts_cor_sync),
+    .ptp_ts_cor_val(ptp_ts_cor_val),
 
     /*
      * Configuration

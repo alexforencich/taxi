@@ -11,7 +11,7 @@ SIM ?= verilator
 WAVES ?= 0
 
 COCOTB_HDL_TIMEUNIT = 1ns
-COCOTB_HDL_TIMEPRECISION = 1ps
+COCOTB_HDL_TIMEPRECISION = 1fs
 
 RTL_DIR = ../../rtl
 LIB_DIR = ../../lib
@@ -51,6 +51,7 @@ export PARAM_PTP_TD_EN := $(PARAM_PTP_TS_EN)
 export PARAM_PTP_TS_FMT_TOD := 1
 export PARAM_PTP_TS_FNS_W := 16
 export PARAM_PTP_TS_W := $(if $(filter-out 1,$(PARAM_PTP_TS_FMT_TOD)),64,96)
+export PARAM_PTP_TS_COR_EN := 1
 export PARAM_PTP_TD_SDI_PIPELINE := 2
 export PARAM_TX_TAG_W := 16
 export PARAM_PRBS31_EN := 1

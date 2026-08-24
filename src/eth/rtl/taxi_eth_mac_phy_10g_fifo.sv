@@ -28,6 +28,8 @@ module taxi_eth_mac_phy_10g_fifo #
     parameter logic PTP_TS_FMT_TOD = 1'b1,
     parameter PTP_TS_FNS_W = 16,
     parameter PTP_TS_W = PTP_TS_FMT_TOD ? 96 : 64,
+    parameter logic PTP_TS_COR_EN = PTP_TS_EN && (TX_GBX_IF_EN || RX_GBX_IF_EN),
+    parameter PTP_TS_COR_W = PTP_TS_FNS_W+4,
     parameter PTP_TD_SDI_PIPELINE = 2,
     parameter logic BIT_REVERSE = 1'b0,
     parameter logic SCRAMBLER_DISABLE = 1'b0,
@@ -59,115 +61,119 @@ module taxi_eth_mac_phy_10g_fifo #
     parameter logic RX_DROP_WHEN_FULL = RX_DROP_OVERSIZE_FRAME
 )
 (
-    input  wire logic                 rx_clk,
-    input  wire logic                 rx_rst,
-    input  wire logic                 tx_clk,
-    input  wire logic                 tx_rst,
-    input  wire logic                 logic_clk,
-    input  wire logic                 logic_rst,
+    input  wire logic                     rx_clk,
+    input  wire logic                     rx_rst,
+    input  wire logic                     tx_clk,
+    input  wire logic                     tx_rst,
+    input  wire logic                     logic_clk,
+    input  wire logic                     logic_rst,
 
     /*
      * Transmit interface (AXI stream)
      */
-    taxi_axis_if.snk                  s_axis_tx,
-    taxi_axis_if.src                  m_axis_tx_cpl,
+    taxi_axis_if.snk                      s_axis_tx,
+    taxi_axis_if.src                      m_axis_tx_cpl,
 
     /*
      * Receive interface (AXI stream)
      */
-    taxi_axis_if.src                  m_axis_rx,
+    taxi_axis_if.src                      m_axis_rx,
 
     /*
      * SERDES interface
      */
-    output wire logic [DATA_W-1:0]    serdes_tx_data,
-    output wire logic                 serdes_tx_data_valid,
-    output wire logic [HDR_W-1:0]     serdes_tx_hdr,
-    output wire logic                 serdes_tx_hdr_valid,
-    input  wire logic                 serdes_tx_gbx_req_sync = 1'b0,
-    input  wire logic                 serdes_tx_gbx_req_stall = 1'b0,
-    output wire logic                 serdes_tx_gbx_sync,
-    input  wire logic [DATA_W-1:0]    serdes_rx_data,
-    input  wire logic                 serdes_rx_data_valid = 1'b1,
-    input  wire logic [HDR_W-1:0]     serdes_rx_hdr,
-    input  wire logic                 serdes_rx_hdr_valid = 1'b1,
-    output wire logic                 serdes_rx_bitslip,
-    output wire logic                 serdes_rx_reset_req,
+    output wire logic [DATA_W-1:0]        serdes_tx_data,
+    output wire logic                     serdes_tx_data_valid,
+    output wire logic [HDR_W-1:0]         serdes_tx_hdr,
+    output wire logic                     serdes_tx_hdr_valid,
+    input  wire logic                     serdes_tx_gbx_req_sync = 1'b0,
+    input  wire logic                     serdes_tx_gbx_req_stall = 1'b0,
+    output wire logic                     serdes_tx_gbx_sync,
+    input  wire logic [DATA_W-1:0]        serdes_rx_data,
+    input  wire logic                     serdes_rx_data_valid = 1'b1,
+    input  wire logic [HDR_W-1:0]         serdes_rx_hdr,
+    input  wire logic                     serdes_rx_hdr_valid = 1'b1,
+    output wire logic                     serdes_rx_bitslip,
+    output wire logic                     serdes_rx_reset_req,
 
     /*
      * USXGMII autonegotiation
      */
-    input  wire logic                 an_en = 1'b1,
-    input  wire logic                 an_restart = 1'b0,
-    input  wire logic                 an_speedup = 1'b0,
-    input  wire logic                 an_timeout_en = 1'b1,
-    input  wire logic                 an_usxgmii_en = 1'b0,
-    input  wire logic                 an_usxgmii_auto = 1'b1,
-    input  wire logic                 an_usxgmii_5g = 1'b0,
-    output wire logic                 an_intr,
-    output wire logic                 an_running,
-    output wire logic                 an_complete,
-    output wire logic                 an_timeout,
-    output wire logic                 an_usxgmii_mode,
-    input  wire logic [15:0]          an_adv_ability_usxgmii = 16'h1601,
-    output wire logic [15:0]          an_lp_adv_ability,
-    output wire logic                 an_lp_usxgmii_link,
-    output wire logic [2:0]           an_lp_usxgmii_speed,
-    output wire logic                 an_res_full_duplex,
+    input  wire logic                     an_en = 1'b1,
+    input  wire logic                     an_restart = 1'b0,
+    input  wire logic                     an_speedup = 1'b0,
+    input  wire logic                     an_timeout_en = 1'b1,
+    input  wire logic                     an_usxgmii_en = 1'b0,
+    input  wire logic                     an_usxgmii_auto = 1'b1,
+    input  wire logic                     an_usxgmii_5g = 1'b0,
+    output wire logic                     an_intr,
+    output wire logic                     an_running,
+    output wire logic                     an_complete,
+    output wire logic                     an_timeout,
+    output wire logic                     an_usxgmii_mode,
+    input  wire logic [15:0]              an_adv_ability_usxgmii = 16'h1601,
+    output wire logic [15:0]              an_lp_adv_ability,
+    output wire logic                     an_lp_usxgmii_link,
+    output wire logic [2:0]               an_lp_usxgmii_speed,
+    output wire logic                     an_res_full_duplex,
 
     /*
      * PTP clock
      */
-    input  wire logic                 ptp_clk = 1'b0,
-    input  wire logic                 ptp_rst = 1'b0,
-    input  wire logic                 ptp_sample_clk = 1'b0,
-    input  wire logic                 ptp_td_sdi = 1'b0,
-    input  wire logic [PTP_TS_W-1:0]  ptp_ts_in = '0,
-    input  wire logic                 ptp_ts_step_in = 1'b0,
-    output wire logic [PTP_TS_W-1:0]  tx_ptp_ts_out,
-    output wire logic                 tx_ptp_ts_step_out,
-    output wire logic                 tx_ptp_locked,
-    output wire logic [PTP_TS_W-1:0]  rx_ptp_ts_out,
-    output wire logic                 rx_ptp_ts_step_out,
-    output wire logic                 rx_ptp_locked,
+    input  wire logic                     ptp_clk = 1'b0,
+    input  wire logic                     ptp_rst = 1'b0,
+    input  wire logic                     ptp_sample_clk = 1'b0,
+    input  wire logic                     ptp_td_sdi = 1'b0,
+    input  wire logic [PTP_TS_W-1:0]      ptp_ts_in = '0,
+    input  wire logic                     ptp_ts_step_in = 1'b0,
+    output wire logic [PTP_TS_W-1:0]      tx_ptp_ts_out,
+    output wire logic                     tx_ptp_ts_step_out,
+    output wire logic                     tx_ptp_locked,
+    output wire logic                     tx_ptp_ts_cor_sync,
+    input  wire logic [PTP_TS_COR_W-1:0]  tx_ptp_ts_cor_val = '0,
+    output wire logic [PTP_TS_W-1:0]      rx_ptp_ts_out,
+    output wire logic                     rx_ptp_ts_step_out,
+    output wire logic                     rx_ptp_locked,
+    output wire logic                     rx_ptp_ts_cor_sync,
+    input  wire logic [PTP_TS_COR_W-1:0]  rx_ptp_ts_cor_val = '0,
 
     /*
      * Statistics
      */
-    input  wire logic                 stat_clk,
-    input  wire logic                 stat_rst,
-    taxi_axis_if.src                  m_axis_stat,
+    input  wire logic                     stat_clk,
+    input  wire logic                     stat_rst,
+    taxi_axis_if.src                      m_axis_stat,
 
     /*
      * Status
      */
-    output wire logic                 tx_error_underflow,
-    output wire logic                 tx_fifo_overflow,
-    output wire logic                 tx_fifo_bad_frame,
-    output wire logic                 tx_fifo_good_frame,
-    output wire logic                 rx_error_bad_frame,
-    output wire logic                 rx_error_bad_fcs,
-    output wire logic                 rx_bad_block,
-    output wire logic                 rx_sequence_error,
-    output wire logic                 rx_block_lock,
-    output wire logic                 rx_high_ber,
-    output wire logic                 rx_status,
-    output wire logic                 rx_fifo_overflow,
-    output wire logic                 rx_fifo_bad_frame,
-    output wire logic                 rx_fifo_good_frame,
+    output wire logic                     tx_error_underflow,
+    output wire logic                     tx_fifo_overflow,
+    output wire logic                     tx_fifo_bad_frame,
+    output wire logic                     tx_fifo_good_frame,
+    output wire logic                     rx_error_bad_frame,
+    output wire logic                     rx_error_bad_fcs,
+    output wire logic                     rx_bad_block,
+    output wire logic                     rx_sequence_error,
+    output wire logic                     rx_block_lock,
+    output wire logic                     rx_high_ber,
+    output wire logic                     rx_status,
+    output wire logic                     rx_fifo_overflow,
+    output wire logic                     rx_fifo_bad_frame,
+    output wire logic                     rx_fifo_good_frame,
 
     /*
      * Configuration
      */
-    input  wire logic                 cfg_tx_pad_en = 1'b1,
-    input  wire logic [7:0]           cfg_tx_min_pkt_len = 8'd60-1,
-    input  wire logic [15:0]          cfg_tx_max_pkt_len = 16'd1518-1,
-    input  wire logic [7:0]           cfg_tx_ifg = 8'd12,
-    input  wire logic                 cfg_tx_enable = 1'b1,
-    input  wire logic [15:0]          cfg_rx_max_pkt_len = 16'd1518-1,
-    input  wire logic                 cfg_rx_enable = 1'b1,
-    input  wire logic                 cfg_tx_prbs31_enable = 1'b0,
-    input  wire logic                 cfg_rx_prbs31_enable = 1'b0
+    input  wire logic                     cfg_tx_pad_en = 1'b1,
+    input  wire logic [7:0]               cfg_tx_min_pkt_len = 8'd60-1,
+    input  wire logic [15:0]              cfg_tx_max_pkt_len = 16'd1518-1,
+    input  wire logic [7:0]               cfg_tx_ifg = 8'd12,
+    input  wire logic                     cfg_tx_enable = 1'b1,
+    input  wire logic [15:0]              cfg_rx_max_pkt_len = 16'd1518-1,
+    input  wire logic                     cfg_rx_enable = 1'b1,
+    input  wire logic                     cfg_tx_prbs31_enable = 1'b0,
+    input  wire logic                     cfg_rx_prbs31_enable = 1'b0
 );
 
 localparam KEEP_W = DATA_W/8;
@@ -330,6 +336,8 @@ taxi_eth_mac_phy_10g #(
     .PTP_TS_FMT_TOD(PTP_TS_FMT_TOD),
     .PTP_TS_FNS_W(PTP_TS_FNS_W),
     .PTP_TS_W(PTP_TS_W),
+    .PTP_TS_COR_EN(PTP_TS_COR_EN),
+    .PTP_TS_COR_W(PTP_TS_COR_W),
     .PTP_TD_SDI_PIPELINE(PTP_TD_SDI_PIPELINE),
     .BIT_REVERSE(BIT_REVERSE),
     .SCRAMBLER_DISABLE(SCRAMBLER_DISABLE),
@@ -413,10 +421,14 @@ eth_mac_phy_10g_inst (
     .tx_ptp_ts_out(tx_ptp_ts_out),
     .tx_ptp_ts_step_out(tx_ptp_ts_step_int),
     .tx_ptp_locked(tx_ptp_locked_int),
+    .tx_ptp_ts_cor_sync(tx_ptp_ts_cor_sync),
+    .tx_ptp_ts_cor_val(tx_ptp_ts_cor_val),
     .rx_ptp_ts_in(rx_ptp_ts_int),
     .rx_ptp_ts_out(rx_ptp_ts_out),
     .rx_ptp_ts_step_out(rx_ptp_ts_step_int),
     .rx_ptp_locked(rx_ptp_locked_int),
+    .rx_ptp_ts_cor_sync(rx_ptp_ts_cor_sync),
+    .rx_ptp_ts_cor_val(rx_ptp_ts_cor_val),
 
     /*
      * Link-level Flow Control (LFC) (IEEE 802.3 annex 31B PAUSE)

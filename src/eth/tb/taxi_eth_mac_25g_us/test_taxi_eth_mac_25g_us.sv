@@ -9,7 +9,7 @@ Authors:
 */
 
 `resetall
-`timescale 1ns / 1ps
+`timescale 1ns / 1fs
 `default_nettype none
 
 /*
@@ -50,6 +50,7 @@ module test_taxi_eth_mac_25g_us #
     parameter logic PTP_TS_FMT_TOD = 1'b1,
     parameter PTP_TS_FNS_W = 16,
     parameter PTP_TS_W = PTP_TS_FMT_TOD ? 96 : 64,
+    parameter logic PTP_TS_COR_EN = PTP_TS_EN && CFG_LOW_LATENCY,
     parameter PTP_TD_SDI_PIPELINE = 2,
     parameter TX_TAG_W = 16,
     parameter logic PRBS31_EN = 1'b0,
@@ -292,6 +293,7 @@ taxi_eth_mac_25g_us #(
     .PTP_TS_FMT_TOD(PTP_TS_FMT_TOD),
     .PTP_TS_FNS_W(PTP_TS_FNS_W),
     .PTP_TS_W(PTP_TS_W),
+    .PTP_TS_COR_EN(PTP_TS_COR_EN),
     .PTP_TD_SDI_PIPELINE(PTP_TD_SDI_PIPELINE),
     .PRBS31_EN(PRBS31_EN),
     .TX_SERDES_PIPELINE(TX_SERDES_PIPELINE),

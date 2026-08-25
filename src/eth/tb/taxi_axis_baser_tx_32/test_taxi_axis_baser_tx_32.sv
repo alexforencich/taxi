@@ -57,7 +57,7 @@ logic tx_os_valid;
 logic tx_os_ready;
 
 logic [PTP_TS_W-1:0] ptp_ts;
-logic ptp_ts_cor_sync;
+logic [GBX_CNT-1:0] ptp_ts_cor_sync;
 logic [PTP_TS_COR_W-1:0] ptp_ts_cor_val;
 
 logic [15:0] cfg_tx_max_pkt_len;

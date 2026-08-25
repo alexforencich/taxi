@@ -63,7 +63,7 @@ module taxi_axis_baser_tx_64 #
      * PTP
      */
     input  wire logic [PTP_TS_W-1:0]      ptp_ts,
-    output wire logic                     ptp_ts_cor_sync,
+    output wire logic [GBX_CNT-1:0]       ptp_ts_cor_sync,
     input  wire logic [PTP_TS_COR_W-1:0]  ptp_ts_cor_val = '0,
 
     /*
@@ -286,7 +286,7 @@ assign m_axis_tx_cpl.tuser = '0;
 
 assign tx_os_ready = tx_os_ready_reg;
 
-assign ptp_ts_cor_sync = (GBX_IF_EN && PTP_TS_COR_EN) ? tx_gbx_req_sync : 1'b0;
+assign ptp_ts_cor_sync = (GBX_IF_EN && PTP_TS_COR_EN) ? tx_gbx_req_sync : '0;
 
 assign tx_start_packet = start_packet_reg;
 

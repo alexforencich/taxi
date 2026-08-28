@@ -227,15 +227,18 @@ async def run_test(dut, gbx_cfg=None, usxgmii_speed=None, payload_lengths=None, 
         ptp_ts_ns = int(tx_cpl.tdata[0]) / 2**16
 
         rx_frame_sfd_ns = get_time_from_sim_steps(rx_frame.sim_time_sfd, "ns")
+        diff = rx_frame_sfd_ns - ptp_ts_ns
+        error = diff - tb.clk_period*1
 
         tb.log.info("TX frame PTP TS: %f ns", ptp_ts_ns)
         tb.log.info("RX frame SFD sim time: %f ns", rx_frame_sfd_ns)
-        tb.log.info("Difference: %f ns", abs(rx_frame_sfd_ns - ptp_ts_ns))
+        tb.log.info("Difference: %f ns", diff)
+        tb.log.info("Error: %f ns", error)
 
         assert rx_frame.get_payload() == test_data
         assert rx_frame.check_fcs()
         assert rx_frame.ctrl is None
-        assert abs(rx_frame_sfd_ns - ptp_ts_ns - tb.clk_period*1) < 0.001
+        assert abs(error) < 0.001
 
     assert tb.sink.empty()
 

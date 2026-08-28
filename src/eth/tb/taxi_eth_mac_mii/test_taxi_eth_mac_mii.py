@@ -169,17 +169,20 @@ async def run_test_rx(dut, payload_lengths=None, payload_data=None, ifg=12, spee
         ptp_ts_ns = ptp_ts / 2**16
 
         tx_frame_sfd_ns = get_time_from_sim_steps(tx_frame.sim_time_sfd, "ns")
+        diff = ptp_ts_ns - tx_frame_sfd_ns
+        if speed == 10e6:
+            error = diff - 800
+        else:
+            error = diff - 80
 
         tb.log.info("RX frame PTP TS: %f ns", ptp_ts_ns)
         tb.log.info("TX frame SFD sim time: %f ns", tx_frame_sfd_ns)
-        tb.log.info("Difference: %f ns", abs(ptp_ts_ns - tx_frame_sfd_ns))
+        tb.log.info("Difference: %f ns", diff)
+        tb.log.info("Error: %f ns", error)
 
         assert rx_frame.tdata == test_data
         assert frame_error == 0
-        if speed == 10e6:
-            assert abs(ptp_ts_ns - tx_frame_sfd_ns - 800) < 0.01
-        elif speed == 100e6:
-            assert abs(ptp_ts_ns - tx_frame_sfd_ns - 80) < 0.01
+        assert abs(error) < 0.01
 
     assert tb.axis_sink.empty()
 
@@ -217,10 +220,26 @@ async def run_test_tx(dut, payload_lengths=None, payload_data=None, ifg=12, spee
 
     for test_data in test_frames:
         rx_frame = await tb.mii_phy.tx.recv()
+        tx_cpl = await tb.tx_cpl_sink.recv()
+
+        ptp_ts_ns = int(tx_cpl.tdata[0]) / 2**16
+
+        rx_frame_sfd_ns = get_time_from_sim_steps(rx_frame.sim_time_sfd, "ns")
+        diff = rx_frame_sfd_ns - ptp_ts_ns
+        if speed == 10e6:
+            error = diff - 400
+        else:
+            error = diff - 40
+
+        tb.log.info("TX frame PTP TS: %f ns", ptp_ts_ns)
+        tb.log.info("RX frame SFD sim time: %f ns", rx_frame_sfd_ns)
+        tb.log.info("Difference: %f ns", diff)
+        tb.log.info("Error: %f ns", error)
 
         assert rx_frame.get_payload() == test_data
         assert rx_frame.check_fcs()
         assert rx_frame.error is None
+        assert abs(error) < 0.01
 
     assert tb.mii_phy.tx.empty()
 

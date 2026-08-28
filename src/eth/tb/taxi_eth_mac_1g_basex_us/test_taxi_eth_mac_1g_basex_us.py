@@ -292,19 +292,21 @@ async def run_test_rx(dut, port=0, payload_lengths=None, payload_data=None, ifg=
         print(tx_frame)
 
         tx_frame_sfd_ns = get_time_from_sim_steps(tx_frame.sim_time_sfd, "ns")
+        diff = ptp_ts_ns - tx_frame_sfd_ns
+        error = diff - tb.clk_period[port]*pipe_delay
 
         tb.log.info("RX frame PTP TS: %f ns", ptp_ts_ns)
         tb.log.info("TX frame SFD sim time: %f ns", tx_frame_sfd_ns)
-        tb.log.info("Difference: %f ns", abs(ptp_ts_ns - tx_frame_sfd_ns))
-        tb.log.info("Error: %f ns", abs(ptp_ts_ns - tx_frame_sfd_ns - tb.clk_period[port]*pipe_delay))
+        tb.log.info("Difference: %f ns", diff)
+        tb.log.info("Error: %f ns", error)
 
         assert rx_frame.tdata == test_data
         assert frame_error == 0
         if not tb.serdes_sources[port].gbx_seq_len:
             if dut.PTP_TD_EN.value:
-                assert abs(ptp_ts_ns - tx_frame_sfd_ns - tb.clk_period[port]*pipe_delay) < tb.clk_period[port]*5
+                assert abs(error) < tb.clk_period[port]*5
             else:
-                assert abs(ptp_ts_ns - tx_frame_sfd_ns - tb.clk_period[port]*pipe_delay) < 0.01
+                assert abs(error) < 0.01
 
     assert tb.axis_sinks[port].empty()
 
@@ -362,20 +364,22 @@ async def run_test_tx(dut, port=0, payload_lengths=None, payload_data=None, ifg=
         ptp_ts_ns = int(tx_cpl.tdata[0]) / 2**16
 
         rx_frame_sfd_ns = get_time_from_sim_steps(rx_frame.sim_time_sfd, "ns")
+        diff = rx_frame_sfd_ns - ptp_ts_ns
+        error = diff - tb.clk_period[port]*pipe_delay
 
         tb.log.info("TX frame PTP TS: %f ns", ptp_ts_ns)
         tb.log.info("RX frame SFD sim time: %f ns", rx_frame_sfd_ns)
-        tb.log.info("Difference: %f ns", abs(rx_frame_sfd_ns - ptp_ts_ns))
-        tb.log.info("Error: %f ns", abs(rx_frame_sfd_ns - ptp_ts_ns - tb.clk_period[port]*pipe_delay))
+        tb.log.info("Difference: %f ns", diff)
+        tb.log.info("Error: %f ns", error)
 
         assert rx_frame.get_payload() == test_data
         assert rx_frame.check_fcs()
         assert rx_frame.error is None
         if not tb.serdes_sinks[port].gbx_seq_len:
             if dut.PTP_TD_EN.value:
-                assert abs(rx_frame_sfd_ns - ptp_ts_ns - tb.clk_period[port]*pipe_delay) < tb.clk_period[port]*5
+                assert abs(error) < tb.clk_period[port]*5
             else:
-                assert abs(rx_frame_sfd_ns - ptp_ts_ns - tb.clk_period[port]*pipe_delay) < 0.01
+                assert abs(error) < 0.01
 
     assert tb.serdes_sinks[port].empty()
 

@@ -210,17 +210,20 @@ async def run_test_rx(dut, payload_lengths=None, payload_data=None, ifg=12):
         ptp_ts_ns = ptp_ts / 2**16
 
         tx_frame_sfd_ns = get_time_from_sim_steps(tx_frame.sim_time_sfd, "ns")
+        diff = ptp_ts_ns - tx_frame_sfd_ns
+        error = diff - tb.clk_period*1
 
         tb.log.info("RX frame PTP TS: %f ns", ptp_ts_ns)
         tb.log.info("TX frame SFD sim time: %f ns", tx_frame_sfd_ns)
-        tb.log.info("Difference: %f ns", abs(ptp_ts_ns - tx_frame_sfd_ns))
+        tb.log.info("Difference: %f ns", diff)
+        tb.log.info("Error: %f ns", error)
 
         assert rx_frame.tdata == test_data
         assert frame_error == 0
         if dut.PTP_TD_EN.value:
-            assert abs(ptp_ts_ns - tx_frame_sfd_ns - tb.clk_period) < tb.clk_period*5
+            assert abs(error) < tb.clk_period*5
         else:
-            assert abs(ptp_ts_ns - tx_frame_sfd_ns - tb.clk_period) < 0.01
+            assert abs(error) < 0.01
 
     assert tb.axis_sink.empty()
 
@@ -266,18 +269,21 @@ async def run_test_tx(dut, payload_lengths=None, payload_data=None, ifg=12):
         ptp_ts_ns = int(tx_cpl.tdata[0]) / 2**16
 
         rx_frame_sfd_ns = get_time_from_sim_steps(rx_frame.sim_time_sfd, "ns")
+        diff = rx_frame_sfd_ns - ptp_ts_ns
+        error = diff - tb.clk_period*1
 
         tb.log.info("TX frame PTP TS: %f ns", ptp_ts_ns)
         tb.log.info("RX frame SFD sim time: %f ns", rx_frame_sfd_ns)
-        tb.log.info("Difference: %f ns", abs(rx_frame_sfd_ns - ptp_ts_ns))
+        tb.log.info("Difference: %f ns", diff)
+        tb.log.info("Error: %f ns", error)
 
         assert rx_frame.get_payload() == test_data
         assert rx_frame.check_fcs()
         assert rx_frame.ctrl is None
         if dut.PTP_TD_EN.value:
-            assert abs(rx_frame_sfd_ns - ptp_ts_ns - tb.clk_period) < tb.clk_period*5
+            assert abs(error) < tb.clk_period*5
         else:
-            assert abs(rx_frame_sfd_ns - ptp_ts_ns - tb.clk_period) < 0.01
+            assert abs(error) < 0.01
 
     assert tb.xgmii_sink.empty()
 
@@ -332,18 +338,21 @@ async def run_test_tx_alignment(dut, payload_data=None, ifg=12):
             ptp_ts_ns = int(tx_cpl.tdata[0]) / 2**16
 
             rx_frame_sfd_ns = get_time_from_sim_steps(rx_frame.sim_time_sfd, "ns")
+            diff = rx_frame_sfd_ns - ptp_ts_ns
+            error = diff - tb.clk_period*1
 
             tb.log.info("TX frame PTP TS: %f ns", ptp_ts_ns)
             tb.log.info("RX frame SFD sim time: %f ns", rx_frame_sfd_ns)
-            tb.log.info("Difference: %f ns", abs(rx_frame_sfd_ns - ptp_ts_ns))
+            tb.log.info("Difference: %f ns", diff)
+            tb.log.info("Error: %f ns", error)
 
             assert rx_frame.get_payload() == test_data
             assert rx_frame.check_fcs()
             assert rx_frame.ctrl is None
             if dut.PTP_TD_EN.value:
-                assert abs(rx_frame_sfd_ns - ptp_ts_ns - tb.clk_period) < tb.clk_period*5
+                assert abs(error) < tb.clk_period*5
             else:
-                assert abs(rx_frame_sfd_ns - ptp_ts_ns - tb.clk_period) < 0.01
+                assert abs(error) < 0.01
 
             start_lane.append(rx_frame.start_lane)
 

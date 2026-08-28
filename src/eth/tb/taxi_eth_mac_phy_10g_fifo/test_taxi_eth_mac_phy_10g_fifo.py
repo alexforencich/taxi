@@ -65,6 +65,7 @@ class TB:
             data_valid=dut.serdes_rx_data_valid,
             hdr=dut.serdes_rx_hdr,
             hdr_valid=dut.serdes_rx_hdr_valid,
+            gbx_sync=dut.serdes_rx_gbx_sync,
             clock=dut.rx_clk,
             slip=dut.serdes_rx_bitslip,
             gbx_cfg=gbx_cfg
@@ -125,6 +126,7 @@ class TB:
         dut.cfg_rx_prbs31_enable.setimmediatevalue(0)
 
         if gbx_cfg:
+            cocotb.start_soon(self._run_rx_ts_cor())
             cocotb.start_soon(self._run_tx_ts_cor())
 
     async def reset(self):
@@ -152,6 +154,24 @@ class TB:
 
         self.ptp_td_source.set_ts_tod_sim_time()
         self.ptp_td_source.set_ts_rel_sim_time()
+
+    async def _run_rx_ts_cor(self):
+        seq_len = self.serdes_source.gbx_seq_len
+        seq = 0
+        val = 0
+        ui = self.clk_period / self.serdes_source.width
+        step = int(ui*2*65536+0.5)
+        while True:
+            await RisingEdge(self.dut.rx_clk)
+            seq += 1
+            if self.serdes_sink.width == 64 or seq % 2 == 0:
+                val += step
+            if seq >= seq_len:
+                seq = 0
+                val = 0
+            self.dut.rx_ptp_ts_cor_val.value = val
+            if int(self.dut.rx_ptp_ts_cor_sync.value):
+                seq = 1
 
     async def _run_tx_ts_cor(self):
         seq_len = self.serdes_sink.gbx_seq_len
@@ -201,12 +221,17 @@ if getattr(cocotb, 'top', None) is not None:
 async def run_test_rx(dut, gbx_cfg=None, payload_lengths=None, payload_data=None, ifg=12):
 
     if len(dut.serdes_rx_data) == 64:
-        pipe_delay = 0 + 1
+        pipe_delay = 1 + 1
         if dut.USXGMII_EN.value:
             pipe_delay += 1
     else:
         pipe_delay = 2 + 1
+
     pipe_delay += int(dut.RX_SERDES_PIPELINE.value)
+
+    if gbx_cfg:
+        # baseline gearbox delay
+        pipe_delay += len(gbx_cfg[1])
 
     tb = TB(dut, gbx_cfg)
 
@@ -225,6 +250,9 @@ async def run_test_rx(dut, gbx_cfg=None, payload_lengths=None, payload_data=None
     while not int(dut.rx_ptp_locked.value):
         await RisingEdge(dut.rx_clk)
     for k in range(2000):
+        await RisingEdge(dut.rx_clk)
+
+    for k in range(100):
         await RisingEdge(dut.rx_clk)
 
     # clear out sink buffer
@@ -253,11 +281,10 @@ async def run_test_rx(dut, gbx_cfg=None, payload_lengths=None, payload_data=None
 
         assert rx_frame.tdata == test_data
         assert frame_error == 0
-        if gbx_cfg is None:
-            if dut.PTP_TD_EN.value:
-                assert abs(ptp_ts_ns - tx_frame_sfd_ns - tb.clk_period*pipe_delay) < tb.clk_period*5
-            else:
-                assert abs(ptp_ts_ns - tx_frame_sfd_ns - tb.clk_period*pipe_delay) < tb.clk_period*2
+        if dut.PTP_TD_EN.value:
+            assert abs(ptp_ts_ns - tx_frame_sfd_ns - tb.clk_period*pipe_delay) < tb.clk_period*5
+        else:
+            assert abs(ptp_ts_ns - tx_frame_sfd_ns - tb.clk_period*pipe_delay) < tb.clk_period*2
 
     assert tb.axis_sink.empty()
 

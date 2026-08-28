@@ -11,7 +11,7 @@ SIM ?= verilator
 WAVES ?= 0
 
 COCOTB_HDL_TIMEUNIT = 1ns
-COCOTB_HDL_TIMEPRECISION = 1ps
+COCOTB_HDL_TIMEPRECISION = 1fs
 
 RTL_DIR = ../../rtl
 LIB_DIR = ../../lib
@@ -37,9 +37,13 @@ VERILOG_SOURCES := $(call uniq_base,$(call process_f_files,$(VERILOG_SOURCES)))
 export PARAM_DATA_W := 32
 export PARAM_HDR_W := 2
 export PARAM_GBX_IF_EN := 1
+export PARAM_GBX_CNT := 1
 export PARAM_USXGMII_EN := 1
 export PARAM_PTP_TS_EN := 1
 export PARAM_PTP_TS_FMT_TOD := 1
+export PARAM_PTP_TS_W := $(if $(filter-out 1,$(PARAM_PTP_TS_FMT_TOD)),64,96)
+export PARAM_PTP_TS_COR_EN := 1
+export PARAM_PTP_TS_COR_W := 20
 
 ifeq ($(SIM), icarus)
 	PLUSARGS += -fst

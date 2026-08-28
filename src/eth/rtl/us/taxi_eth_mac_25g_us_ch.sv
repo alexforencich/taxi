@@ -338,6 +338,7 @@ wire [DATA_W-1:0]  serdes_rx_data;
 wire               serdes_rx_data_valid;
 wire [HDR_W-1:0]   serdes_rx_hdr;
 wire               serdes_rx_hdr_valid;
+wire               serdes_rx_gbx_sync;
 wire               serdes_rx_bitslip;
 
 wire                     tx_ptp_ts_cor_sync;
@@ -376,7 +377,9 @@ if (GT_7) begin : gt
 
         // MAC/PHY parameters
         .DATA_W(DATA_W),
-        .HDR_W(HDR_W)
+        .HDR_W(HDR_W),
+        .TS_FNS_W(PTP_TS_FNS_W),
+        .TS_COR_W(PTP_TS_COR_W)
     )
     gt_inst (
         .xcvr_ctrl_clk(xcvr_ctrl_clk),
@@ -437,7 +440,18 @@ if (GT_7) begin : gt
         .serdes_rx_data_valid(serdes_rx_data_valid),
         .serdes_rx_hdr(serdes_rx_hdr),
         .serdes_rx_hdr_valid(serdes_rx_hdr_valid),
-        .serdes_rx_bitslip(serdes_rx_bitslip)
+        .serdes_rx_gbx_sync(serdes_rx_gbx_sync),
+        .serdes_rx_bitslip(serdes_rx_bitslip),
+
+        /*
+         * Timestamp correction
+         */
+        .tx_ts_cor_sync(tx_ptp_ts_cor_sync),
+        .tx_ts_inc(20'h31a60), // TODO
+        .tx_ts_cor_val(tx_ptp_ts_cor_val),
+        .rx_ts_cor_sync(rx_ptp_ts_cor_sync),
+        .rx_ts_inc(20'h31a60), // TODO
+        .rx_ts_cor_val(rx_ptp_ts_cor_val)
     );
 
     assign xcvr_gtpowergood_out = 1'b1;
@@ -445,9 +459,6 @@ if (GT_7) begin : gt
     assign xcvr_qpll1lock_out = 1'b0;
     assign xcvr_qpll1clk_out = 1'b0;
     assign xcvr_qpll1refclk_out = 1'b0;
-
-    assign tx_ptp_ts_cor_val = '0;
-    assign rx_ptp_ts_cor_val = '0;
 
 end else if (DATA_W == 64 && CFG_LOW_LATENCY) begin : gt
 
@@ -562,6 +573,7 @@ end else if (DATA_W == 64 && CFG_LOW_LATENCY) begin : gt
         .serdes_rx_data_valid(serdes_rx_data_valid),
         .serdes_rx_hdr(serdes_rx_hdr),
         .serdes_rx_hdr_valid(serdes_rx_hdr_valid),
+        .serdes_rx_gbx_sync(serdes_rx_gbx_sync),
         .serdes_rx_bitslip(serdes_rx_bitslip),
 
         /*
@@ -689,6 +701,7 @@ end else if (DATA_W == 64 && !CFG_LOW_LATENCY) begin : gt
         .serdes_rx_bitslip(serdes_rx_bitslip)
     );
 
+    assign serdes_rx_gbx_sync = '0;
     assign tx_ptp_ts_cor_val = '0;
     assign rx_ptp_ts_cor_val = '0;
 
@@ -805,6 +818,7 @@ end else if (DATA_W == 32 && CFG_LOW_LATENCY) begin : gt
         .serdes_rx_data_valid(serdes_rx_data_valid),
         .serdes_rx_hdr(serdes_rx_hdr),
         .serdes_rx_hdr_valid(serdes_rx_hdr_valid),
+        .serdes_rx_gbx_sync(serdes_rx_gbx_sync),
         .serdes_rx_bitslip(serdes_rx_bitslip),
 
         /*
@@ -932,6 +946,7 @@ end else if (DATA_W == 32 && !CFG_LOW_LATENCY) begin : gt
         .serdes_rx_bitslip(serdes_rx_bitslip)
     );
 
+    assign serdes_rx_gbx_sync = '0;
     assign tx_ptp_ts_cor_val = '0;
     assign rx_ptp_ts_cor_val = '0;
 
@@ -1007,6 +1022,7 @@ if (COMBINED_MAC_PCS) begin : mac
         .serdes_rx_data_valid(serdes_rx_data_valid),
         .serdes_rx_hdr(serdes_rx_hdr),
         .serdes_rx_hdr_valid(serdes_rx_hdr_valid),
+        .serdes_rx_gbx_sync(serdes_rx_gbx_sync),
         .serdes_rx_bitslip(serdes_rx_bitslip),
         .serdes_rx_reset_req(rx_reset_req),
 
@@ -1200,6 +1216,7 @@ end else begin : mac
     wire               tx_gbx_req_sync;
     wire               tx_gbx_req_stall;
     wire               tx_gbx_sync;
+    wire               rx_gbx_sync;
 
     taxi_eth_phy_10g #(
         .DATA_W(DATA_W),
@@ -1234,6 +1251,7 @@ end else begin : mac
         .tx_gbx_req_sync(tx_gbx_req_sync),
         .tx_gbx_req_stall(tx_gbx_req_stall),
         .tx_gbx_sync(tx_gbx_sync),
+        .rx_gbx_sync(rx_gbx_sync),
 
         /*
          * SERDES interface
@@ -1249,6 +1267,7 @@ end else begin : mac
         .serdes_rx_data_valid(serdes_rx_data_valid),
         .serdes_rx_hdr(serdes_rx_hdr),
         .serdes_rx_hdr_valid(serdes_rx_hdr_valid),
+        .serdes_rx_gbx_sync(serdes_rx_gbx_sync),
         .serdes_rx_bitslip(serdes_rx_bitslip),
         .serdes_rx_reset_req(rx_reset_req),
 

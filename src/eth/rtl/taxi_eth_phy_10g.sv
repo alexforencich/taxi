@@ -49,6 +49,7 @@ module taxi_eth_phy_10g #
     output wire logic               tx_gbx_req_sync,
     output wire logic               tx_gbx_req_stall,
     input  wire logic               tx_gbx_sync = 1'b0,
+    output wire logic               rx_gbx_sync,
 
     /*
      * SERDES interface
@@ -64,6 +65,7 @@ module taxi_eth_phy_10g #
     input  wire logic               serdes_rx_data_valid = 1'b1,
     input  wire logic [HDR_W-1:0]   serdes_rx_hdr,
     input  wire logic               serdes_rx_hdr_valid = 1'b1,
+    input  wire logic               serdes_rx_gbx_sync = 1'b0,
     output wire logic               serdes_rx_bitslip,
     output wire logic               serdes_rx_reset_req,
 
@@ -108,6 +110,7 @@ eth_phy_10g_rx_inst (
     .xgmii_rxd(xgmii_rxd),
     .xgmii_rxc(xgmii_rxc),
     .xgmii_rx_valid(xgmii_rx_valid),
+    .rx_gbx_sync(rx_gbx_sync),
 
     /*
      * SERDES interface
@@ -116,6 +119,7 @@ eth_phy_10g_rx_inst (
     .serdes_rx_data_valid(serdes_rx_data_valid),
     .serdes_rx_hdr(serdes_rx_hdr),
     .serdes_rx_hdr_valid(serdes_rx_hdr_valid),
+    .serdes_rx_gbx_sync(serdes_rx_gbx_sync),
     .serdes_rx_bitslip(serdes_rx_bitslip),
     .serdes_rx_reset_req(serdes_rx_reset_req),
 

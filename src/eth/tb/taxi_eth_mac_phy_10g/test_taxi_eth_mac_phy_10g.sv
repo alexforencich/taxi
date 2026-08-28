@@ -77,6 +77,7 @@ logic [DATA_W-1:0] serdes_rx_data;
 logic serdes_rx_data_valid;
 logic [HDR_W-1:0] serdes_rx_hdr;
 logic serdes_rx_hdr_valid;
+logic serdes_rx_gbx_sync;
 logic serdes_rx_bitslip;
 logic serdes_rx_reset_req;
 
@@ -293,6 +294,7 @@ uut (
     .serdes_rx_data_valid(serdes_rx_data_valid),
     .serdes_rx_hdr(serdes_rx_hdr),
     .serdes_rx_hdr_valid(serdes_rx_hdr_valid),
+    .serdes_rx_gbx_sync(serdes_rx_gbx_sync),
     .serdes_rx_bitslip(serdes_rx_bitslip),
     .serdes_rx_reset_req(serdes_rx_reset_req),
 

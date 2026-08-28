@@ -45,68 +45,81 @@ module taxi_eth_phy_10g_7_gt #
 
     // MAC/PHY parameters
     parameter DATA_W = 32,
-    parameter HDR_W = 2
+    parameter HDR_W = 2,
+    parameter TS_FNS_W = 16,
+    parameter TS_COR_W = TS_FNS_W+4
 )
 (
-    input  wire logic               xcvr_ctrl_clk,
-    input  wire logic               xcvr_ctrl_rst,
+    input  wire logic                 xcvr_ctrl_clk,
+    input  wire logic                 xcvr_ctrl_rst,
 
     /*
      * Transceiver control
      */
-    taxi_apb_if.slv                 s_apb_ctrl,
+    taxi_apb_if.slv                   s_apb_ctrl,
 
     /*
      * PLL out
      */
-    input  wire logic               xcvr_gtrefclk0_in = 1'b0,
-    input  wire logic               xcvr_qpllpd_in = 1'b0,
-    input  wire logic               xcvr_qpllreset_in = 1'b0,
-    input  wire logic [2:0]         xcvr_qpllpcierate_in = 3'd0,
-    output wire logic               xcvr_qplllock_out,
-    output wire logic               xcvr_qpllclk_out,
-    output wire logic               xcvr_qpllrefclk_out,
+    input  wire logic                 xcvr_gtrefclk0_in = 1'b0,
+    input  wire logic                 xcvr_qpllpd_in = 1'b0,
+    input  wire logic                 xcvr_qpllreset_in = 1'b0,
+    input  wire logic [2:0]           xcvr_qpllpcierate_in = 3'd0,
+    output wire logic                 xcvr_qplllock_out,
+    output wire logic                 xcvr_qpllclk_out,
+    output wire logic                 xcvr_qpllrefclk_out,
 
     /*
      * PLL in
      */
-    input  wire logic               xcvr_qplllock_in = 1'b0,
-    input  wire logic               xcvr_qpllclk_in = 1'b0,
-    input  wire logic               xcvr_qpllrefclk_in = 1'b0,
+    input  wire logic                 xcvr_qplllock_in = 1'b0,
+    input  wire logic                 xcvr_qpllclk_in = 1'b0,
+    input  wire logic                 xcvr_qpllrefclk_in = 1'b0,
 
     /*
      * Serial data
      */
-    output wire logic               xcvr_txp,
-    output wire logic               xcvr_txn,
-    input  wire logic               xcvr_rxp,
-    input  wire logic               xcvr_rxn,
+    output wire logic                 xcvr_txp,
+    output wire logic                 xcvr_txn,
+    input  wire logic                 xcvr_rxp,
+    input  wire logic                 xcvr_rxn,
 
     /*
      * GT user clocks
      */
-    output wire logic               rx_clk,
-    input  wire logic               rx_rst_in = 1'b0,
-    output wire logic               rx_rst_out,
-    output wire logic               tx_clk,
-    input  wire logic               tx_rst_in = 1'b0,
-    output wire logic               tx_rst_out,
+    output wire logic                 rx_clk,
+    input  wire logic                 rx_rst_in = 1'b0,
+    output wire logic                 rx_rst_out,
+    output wire logic                 tx_clk,
+    input  wire logic                 tx_rst_in = 1'b0,
+    output wire logic                 tx_rst_out,
 
     /*
      * Serdes interface
      */
-    input  wire logic [DATA_W-1:0]  serdes_tx_data,
-    input  wire logic               serdes_tx_data_valid,
-    input  wire logic [HDR_W-1:0]   serdes_tx_hdr,
-    input  wire logic               serdes_tx_hdr_valid,
-    output wire logic               serdes_tx_gbx_req_sync,
-    output wire logic               serdes_tx_gbx_req_stall,
-    input  wire logic               serdes_tx_gbx_sync,
-    output wire logic [DATA_W-1:0]  serdes_rx_data,
-    output wire logic               serdes_rx_data_valid,
-    output wire logic [HDR_W-1:0]   serdes_rx_hdr,
-    output wire logic               serdes_rx_hdr_valid,
-    input  wire logic               serdes_rx_bitslip
+    input  wire logic [DATA_W-1:0]    serdes_tx_data,
+    input  wire logic                 serdes_tx_data_valid,
+    input  wire logic [HDR_W-1:0]     serdes_tx_hdr,
+    input  wire logic                 serdes_tx_hdr_valid,
+    output wire logic                 serdes_tx_gbx_req_sync,
+    output wire logic                 serdes_tx_gbx_req_stall,
+    input  wire logic                 serdes_tx_gbx_sync,
+    output wire logic [DATA_W-1:0]    serdes_rx_data,
+    output wire logic                 serdes_rx_data_valid,
+    output wire logic [HDR_W-1:0]     serdes_rx_hdr,
+    output wire logic                 serdes_rx_hdr_valid,
+    output wire logic                 serdes_rx_gbx_sync,
+    input  wire logic                 serdes_rx_bitslip,
+
+    /*
+     * Timestamp correction
+     */
+    input  wire logic                 tx_ts_cor_sync = 1'b0,
+    input  wire logic [TS_COR_W-1:0]  tx_ts_inc = 20'h31a60,
+    output wire logic [TS_COR_W-1:0]  tx_ts_cor_val,
+    input  wire logic                 rx_ts_cor_sync = 1'b0,
+    input  wire logic [TS_COR_W-1:0]  rx_ts_inc = 20'h31a60,
+    output wire logic [TS_COR_W-1:0]  rx_ts_cor_val
 );
 
 // check configuration
@@ -519,6 +532,14 @@ if (!SIM) begin
     assign serdes_rx_hdr_valid = gt_rxheadervalid[0];
 end
 
+logic serdes_rx_data_valid_last_reg = 1'b0;
+
+assign serdes_rx_gbx_sync = serdes_rx_data_valid && !serdes_rx_data_valid_last_reg;
+
+always_ff @(posedge rx_clk) begin
+    serdes_rx_data_valid_last_reg <= serdes_rx_data_valid;
+end
+
 // 66 clock cycle sequence, with two stalls on cycles 64 and 65
 // 32-bit internal, 32-bit external datapath width
 
@@ -556,6 +577,46 @@ always_ff @(posedge tx_clk) begin
     end
     if (serdes_tx_gbx_sync) begin
         tx_seq_reg <= 1;
+    end
+end
+
+// Generate TX timestamp correction
+logic [6:0] tx_ts_cor_seq_reg = '0;
+logic [TS_COR_W-1:0] tx_ts_cor_val_reg = '0;
+
+assign tx_ts_cor_val = tx_ts_cor_val_reg;
+
+always_ff @(posedge tx_clk) begin
+    tx_ts_cor_seq_reg <= tx_ts_cor_seq_reg + 1;
+    if (tx_ts_cor_seq_reg[0]) begin
+        tx_ts_cor_val_reg <= tx_ts_cor_val_reg + (tx_ts_inc >> 4);
+    end
+    if (tx_ts_cor_seq_reg == 65) begin
+        tx_ts_cor_seq_reg <= '0;
+        tx_ts_cor_val_reg <= '0;
+    end
+    if (tx_ts_cor_sync) begin
+        tx_ts_cor_seq_reg <= 1;
+    end
+end
+
+// Generate RX timestamp correction
+logic [6:0] rx_ts_cor_seq_reg = '0;
+logic [TS_COR_W-1:0] rx_ts_cor_val_reg = '0;
+
+assign rx_ts_cor_val = rx_ts_cor_val_reg;
+
+always_ff @(posedge rx_clk) begin
+    rx_ts_cor_seq_reg <= rx_ts_cor_seq_reg + 1;
+    if (rx_ts_cor_seq_reg[0]) begin
+        rx_ts_cor_val_reg <= rx_ts_cor_val_reg + (tx_ts_inc >> 4);
+    end
+    if (rx_ts_cor_seq_reg == 65) begin
+        rx_ts_cor_seq_reg <= '0;
+        rx_ts_cor_val_reg <= '0; // TODO odd offset
+    end
+    if (rx_ts_cor_sync) begin
+        rx_ts_cor_seq_reg <= 1;
     end
 end
 

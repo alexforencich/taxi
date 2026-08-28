@@ -20,7 +20,8 @@ module taxi_xgmii_baser_dec #
     parameter DATA_W = 64,
     parameter CTRL_W = (DATA_W/8),
     parameter HDR_W = 2,
-    parameter logic GBX_IF_EN = 1'b0
+    parameter logic GBX_IF_EN = 1'b0,
+    parameter GBX_CNT = 1
 )
 (
     input  wire logic              clk,
@@ -29,32 +30,34 @@ module taxi_xgmii_baser_dec #
     /*
      * 10GBASE-R encoded input
      */
-    input  wire logic [DATA_W-1:0] encoded_rx_data,
-    input  wire logic              encoded_rx_data_valid = 1'b1,
-    input  wire logic [HDR_W-1:0]  encoded_rx_hdr,
-    input  wire logic              encoded_rx_hdr_valid = 1'b1,
+    input  wire logic [DATA_W-1:0]   encoded_rx_data,
+    input  wire logic                encoded_rx_data_valid = 1'b1,
+    input  wire logic [HDR_W-1:0]    encoded_rx_hdr,
+    input  wire logic                encoded_rx_hdr_valid = 1'b1,
+    input  wire logic [GBX_CNT-1:0]  rx_gbx_sync_in = '0,
 
     /*
      * XGMII interface
      */
-    output wire logic [DATA_W-1:0] xgmii_rxd,
-    output wire logic [CTRL_W-1:0] xgmii_rxc,
-    output wire logic              xgmii_rx_valid,
+    output wire logic [DATA_W-1:0]   xgmii_rxd,
+    output wire logic [CTRL_W-1:0]   xgmii_rxc,
+    output wire logic                xgmii_rx_valid,
+    output wire logic                rx_gbx_sync_out,
 
     /*
      * Ordered sets
      */
-    output wire logic [23:0]       rx_os,
-    output wire logic              rx_os_sig,
-    output wire logic              rx_os_valid,
-    output wire logic              rx_os_match,
-    output wire logic              rx_idle_match,
+    output wire logic [23:0]         rx_os,
+    output wire logic                rx_os_sig,
+    output wire logic                rx_os_valid,
+    output wire logic                rx_os_match,
+    output wire logic                rx_idle_match,
 
     /*
      * Status
      */
-    output wire logic              rx_bad_block,
-    output wire logic              rx_sequence_error
+    output wire logic                rx_bad_block,
+    output wire logic                rx_sequence_error
 );
 
 localparam DATA_W_INT = 64;
@@ -138,6 +141,7 @@ logic [CTRL_W_INT-1:0] decode_err;
 logic [DATA_W_INT-1:0] xgmii_rxd_reg = '0, xgmii_rxd_next;
 logic [CTRL_W_INT-1:0] xgmii_rxc_reg = '0, xgmii_rxc_next;
 logic [SEG_CNT-1:0] xgmii_rx_valid_reg = '0, xgmii_rx_valid_next;
+logic [GBX_CNT-1:0] rx_gbx_sync_reg = '0, rx_gbx_sync_next;
 
 logic [23:0] rx_os_reg = '0, rx_os_next;
 logic rx_os_sig_reg = 1'b0, rx_os_sig_next;
@@ -557,12 +561,15 @@ always_comb begin
         xgmii_rxc_next = '1;
         rx_bad_block_next = 1'b1;
     end
+
+    rx_gbx_sync_next = rx_gbx_sync_in;
 end
 
 always_ff @(posedge clk) begin
     xgmii_rxd_reg <= xgmii_rxd_next;
     xgmii_rxc_reg <= xgmii_rxc_next;
     xgmii_rx_valid_reg <= xgmii_rx_valid_next;
+    rx_gbx_sync_reg <= rx_gbx_sync_next;
 
     rx_os_reg <= rx_os_next;
     rx_os_sig_reg <= rx_os_sig_next;
@@ -576,6 +583,7 @@ always_ff @(posedge clk) begin
 
     if (rst) begin
         xgmii_rx_valid_reg <= '0;
+        rx_gbx_sync_reg <= '0;
         rx_os_valid_reg <= 1'b0;
         rx_os_match_reg <= '0;
         rx_idle_match_reg <= '0;

@@ -127,6 +127,7 @@ module taxi_eth_phy_25g_us_gt_ll #
     output wire logic                 serdes_rx_data_valid,
     output wire logic [HDR_W-1:0]     serdes_rx_hdr,
     output wire logic                 serdes_rx_hdr_valid,
+    output wire logic                 serdes_rx_gbx_sync,
     input  wire logic                 serdes_rx_bitslip,
 
     /*
@@ -558,6 +559,14 @@ if (!SIM) begin
     assign serdes_rx_hdr_valid = gt_rxheadervalid[0];
 end
 
+logic serdes_rx_data_valid_last_reg = 1'b0;
+
+assign serdes_rx_gbx_sync = serdes_rx_data_valid && !serdes_rx_data_valid_last_reg;
+
+always_ff @(posedge rx_clk) begin
+    serdes_rx_data_valid_last_reg <= serdes_rx_data_valid;
+end
+
 if (GT_TYPE == "GTY") begin : tx_seq
     // 66 clock cycle sequence for GTY, with two stalls on cycles 64 and 65
     // 64-bit internal, 64-bit external datapath width (required for operation at 25G)
@@ -625,10 +634,10 @@ if (GT_TYPE == "GTY") begin : tx_seq
 
     always_ff @(posedge rx_clk) begin
         rx_ts_cor_seq_reg <= rx_ts_cor_seq_reg + 1;
-        rx_ts_cor_val_reg <= rx_ts_cor_val_reg - (tx_ts_inc >> 5);
+        rx_ts_cor_val_reg <= rx_ts_cor_val_reg + (tx_ts_inc >> 5);
         if (rx_ts_cor_seq_reg == 65) begin
             rx_ts_cor_seq_reg <= '0;
-            rx_ts_cor_val_reg <= rx_ts_inc << 1; // TODO odd offset
+            rx_ts_cor_val_reg <= '0; // TODO odd offset
         end
         if (rx_ts_cor_sync) begin
             rx_ts_cor_seq_reg <= 1;
@@ -702,10 +711,10 @@ end else begin : tx_seq
 
     always_ff @(posedge rx_clk) begin
         rx_ts_cor_seq_reg <= rx_ts_cor_seq_reg + 1;
-        rx_ts_cor_val_reg <= rx_ts_cor_val_reg - (rx_ts_inc >> 5);
+        rx_ts_cor_val_reg <= rx_ts_cor_val_reg + (rx_ts_inc >> 5);
         if (rx_ts_cor_seq_reg == 32) begin
             rx_ts_cor_seq_reg <= '0;
-            rx_ts_cor_val_reg <= rx_ts_inc; // TODO odd offset
+            rx_ts_cor_val_reg <= '0; // TODO odd offset
         end
         if (rx_ts_cor_sync) begin
             rx_ts_cor_seq_reg <= 1;

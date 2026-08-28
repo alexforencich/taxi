@@ -60,6 +60,7 @@ class TB:
 
         dut.encoded_rx_data_valid.setimmediatevalue(1)
         dut.encoded_rx_hdr_valid.setimmediatevalue(1)
+        dut.rx_gbx_sync_in.setimmediatevalue(0)
 
     async def reset(self):
         self.dut.rst.setimmediatevalue(0)
@@ -269,6 +270,7 @@ def test_taxi_xgmii_baser_dec(request, data_w):
     parameters['CTRL_W'] = parameters['DATA_W'] // 8
     parameters['HDR_W'] = 2
     parameters['GBX_IF_EN'] = 0
+    parameters['GBX_CNT'] = 1
 
     extra_env = {f'PARAM_{k}': str(v) for k, v in parameters.items()}
 

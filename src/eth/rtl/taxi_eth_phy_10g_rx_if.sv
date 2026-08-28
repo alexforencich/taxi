@@ -39,6 +39,7 @@ module taxi_eth_phy_10g_rx_if #
     output wire logic               encoded_rx_data_valid,
     output wire logic [HDR_W-1:0]   encoded_rx_hdr,
     output wire logic               encoded_rx_hdr_valid,
+    output wire logic               rx_gbx_sync,
 
     /*
      * SERDES interface
@@ -47,6 +48,7 @@ module taxi_eth_phy_10g_rx_if #
     input  wire logic               serdes_rx_data_valid,
     input  wire logic [HDR_W-1:0]   serdes_rx_hdr,
     input  wire logic               serdes_rx_hdr_valid,
+    input  wire logic               serdes_rx_gbx_sync = 1'b0,
     output wire logic               serdes_rx_bitslip,
     output wire logic               serdes_rx_reset_req,
 
@@ -79,6 +81,7 @@ wire [DATA_W-1:0] serdes_rx_data_rev, serdes_rx_data_int;
 wire serdes_rx_data_valid_int;
 wire [HDR_W-1:0] serdes_rx_hdr_rev, serdes_rx_hdr_int;
 wire serdes_rx_hdr_valid_int;
+wire serdes_rx_gbx_sync_int;
 
 if (BIT_REVERSE) begin
     for (genvar n = 0; n < DATA_W; n = n + 1) begin
@@ -102,6 +105,8 @@ if (SERDES_PIPELINE > 0) begin
     logic [HDR_W-1:0] serdes_rx_hdr_pipe_reg[SERDES_PIPELINE-1:0] = '{default: '0};
     (* srl_style = "register" *)
     logic serdes_rx_hdr_valid_pipe_reg[SERDES_PIPELINE-1:0] = '{default: '0};
+    (* srl_style = "register" *)
+    logic serdes_rx_gbx_sync_pipe_reg[SERDES_PIPELINE-1:0] = '{default: '0};
 
     for (genvar n = 0; n < SERDES_PIPELINE; n = n + 1) begin
         always_ff @(posedge clk) begin
@@ -109,6 +114,7 @@ if (SERDES_PIPELINE > 0) begin
             serdes_rx_data_valid_pipe_reg[n] <= n == 0 ? serdes_rx_data_valid : serdes_rx_data_valid_pipe_reg[n-1];
             serdes_rx_hdr_pipe_reg[n] <= n == 0 ? serdes_rx_hdr_rev : serdes_rx_hdr_pipe_reg[n-1];
             serdes_rx_hdr_valid_pipe_reg[n] <= n == 0 ? serdes_rx_hdr_valid : serdes_rx_hdr_valid_pipe_reg[n-1];
+            serdes_rx_gbx_sync_pipe_reg[n] <= n == 0 ? serdes_rx_gbx_sync : serdes_rx_gbx_sync_pipe_reg[n-1];
         end
     end
 
@@ -116,11 +122,13 @@ if (SERDES_PIPELINE > 0) begin
     assign serdes_rx_data_valid_int = GBX_IF_EN ? serdes_rx_data_valid_pipe_reg[SERDES_PIPELINE-1] : 1'b1;
     assign serdes_rx_hdr_int = serdes_rx_hdr_pipe_reg[SERDES_PIPELINE-1];
     assign serdes_rx_hdr_valid_int = USE_HDR_VLD ? serdes_rx_hdr_valid_pipe_reg[SERDES_PIPELINE-1] : 1'b1;
+    assign serdes_rx_gbx_sync_int = GBX_IF_EN ? serdes_rx_gbx_sync_pipe_reg[SERDES_PIPELINE-1] : 1'b0;
 end else begin
     assign serdes_rx_data_int = serdes_rx_data_rev;
     assign serdes_rx_data_valid_int = GBX_IF_EN ? serdes_rx_data_valid : 1'b1;
     assign serdes_rx_hdr_int = serdes_rx_hdr_rev;
     assign serdes_rx_hdr_valid_int = USE_HDR_VLD ? serdes_rx_hdr_valid : 1'b1;
+    assign serdes_rx_gbx_sync_int = GBX_IF_EN ? serdes_rx_gbx_sync : 1'b0;
 end
 
 wire [DATA_W-1:0] descrambled_rx_data;
@@ -129,6 +137,7 @@ logic [DATA_W-1:0] encoded_rx_data_reg = '0;
 logic encoded_rx_data_valid_reg = 1'b0;
 logic [HDR_W-1:0] encoded_rx_hdr_reg = '0;
 logic encoded_rx_hdr_valid_reg = 1'b0;
+logic rx_gbx_sync_reg = 1'b0;
 
 logic [57:0] scrambler_state_reg = '1;
 wire [57:0] scrambler_state;
@@ -201,6 +210,7 @@ always_ff @(posedge clk) begin
     encoded_rx_data_valid_reg <= serdes_rx_data_valid_int;
     encoded_rx_hdr_reg <= serdes_rx_hdr_int;
     encoded_rx_hdr_valid_reg <= serdes_rx_hdr_valid_int;
+    rx_gbx_sync_reg <= serdes_rx_gbx_sync_int;
 
     if (PRBS31_EN) begin
         if (cfg_rx_prbs31_enable && (!GBX_IF_EN || serdes_rx_data_valid_int)) begin
@@ -222,6 +232,7 @@ assign encoded_rx_data = encoded_rx_data_reg;
 assign encoded_rx_data_valid = GBX_IF_EN ? encoded_rx_data_valid_reg : 1'b1;
 assign encoded_rx_hdr = encoded_rx_hdr_reg;
 assign encoded_rx_hdr_valid = USE_HDR_VLD ? encoded_rx_hdr_valid_reg : 1'b1;
+assign rx_gbx_sync = GBX_IF_EN ? rx_gbx_sync_reg : 1'b1;
 
 assign rx_error_count = rx_error_count_reg;
 

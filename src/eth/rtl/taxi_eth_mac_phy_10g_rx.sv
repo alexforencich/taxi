@@ -50,6 +50,7 @@ module taxi_eth_mac_phy_10g_rx #
     input  wire logic                     serdes_rx_data_valid = 1'b1,
     input  wire logic [HDR_W-1:0]         serdes_rx_hdr,
     input  wire logic                     serdes_rx_hdr_valid = 1'b1,
+    input  wire logic                     serdes_rx_gbx_sync = 1'b0,
     output wire logic                     serdes_rx_bitslip,
     output wire logic                     serdes_rx_reset_req,
 
@@ -109,6 +110,8 @@ wire encoded_rx_data_valid;
 wire [HDR_W-1:0]  encoded_rx_hdr;
 wire encoded_rx_hdr_valid;
 
+wire rx_gbx_sync;
+
 taxi_eth_phy_10g_rx_if #(
     .DATA_W(DATA_W),
     .HDR_W(HDR_W),
@@ -132,6 +135,7 @@ eth_phy_10g_rx_if_inst (
     .encoded_rx_data_valid(encoded_rx_data_valid),
     .encoded_rx_hdr(encoded_rx_hdr),
     .encoded_rx_hdr_valid(encoded_rx_hdr_valid),
+    .rx_gbx_sync(rx_gbx_sync),
 
     /*
      * SERDES interface
@@ -140,6 +144,7 @@ eth_phy_10g_rx_if_inst (
     .serdes_rx_data_valid(serdes_rx_data_valid),
     .serdes_rx_hdr(serdes_rx_hdr),
     .serdes_rx_hdr_valid(serdes_rx_hdr_valid),
+    .serdes_rx_gbx_sync(serdes_rx_gbx_sync),
     .serdes_rx_bitslip(serdes_rx_bitslip),
     .serdes_rx_reset_req(serdes_rx_reset_req),
 
@@ -165,10 +170,13 @@ if (DATA_W == 64) begin
         .DATA_W(DATA_W),
         .HDR_W(HDR_W),
         .GBX_IF_EN(GBX_IF_EN),
+        .GBX_CNT(1),
         .USXGMII_EN(USXGMII_EN),
         .PTP_TS_EN(PTP_TS_EN),
         .PTP_TS_FMT_TOD(PTP_TS_FMT_TOD),
-        .PTP_TS_W(PTP_TS_W)
+        .PTP_TS_W(PTP_TS_W),
+        .PTP_TS_COR_EN(PTP_TS_COR_EN),
+        .PTP_TS_COR_W(PTP_TS_COR_W)
     )
     axis_baser_rx_inst (
         .clk(clk),
@@ -181,6 +189,7 @@ if (DATA_W == 64) begin
         .encoded_rx_data_valid(encoded_rx_data_valid),
         .encoded_rx_hdr(encoded_rx_hdr),
         .encoded_rx_hdr_valid(encoded_rx_hdr_valid),
+        .rx_gbx_sync(rx_gbx_sync),
 
         /*
          * Receive interface (AXI stream)
@@ -200,6 +209,8 @@ if (DATA_W == 64) begin
          * PTP
          */
         .ptp_ts(ptp_ts),
+        .ptp_ts_cor_sync(ptp_ts_cor_sync),
+        .ptp_ts_cor_val(ptp_ts_cor_val),
 
         /*
          * Configuration
@@ -237,9 +248,12 @@ end else begin
         .DATA_W(DATA_W),
         .HDR_W(HDR_W),
         .GBX_IF_EN(GBX_IF_EN),
+        .GBX_CNT(1),
         .USXGMII_EN(USXGMII_EN),
         .PTP_TS_EN(PTP_TS_EN),
-        .PTP_TS_W(PTP_TS_W)
+        .PTP_TS_W(PTP_TS_W),
+        .PTP_TS_COR_EN(PTP_TS_COR_EN),
+        .PTP_TS_COR_W(PTP_TS_COR_W)
     )
     axis_baser_rx_inst (
         .clk(clk),
@@ -252,6 +266,7 @@ end else begin
         .encoded_rx_data_valid(encoded_rx_data_valid),
         .encoded_rx_hdr(encoded_rx_hdr),
         .encoded_rx_hdr_valid(encoded_rx_hdr_valid),
+        .rx_gbx_sync(rx_gbx_sync),
 
         /*
          * Receive interface (AXI stream)
@@ -271,6 +286,8 @@ end else begin
          * PTP
          */
         .ptp_ts(ptp_ts),
+        .ptp_ts_cor_sync(ptp_ts_cor_sync),
+        .ptp_ts_cor_val(ptp_ts_cor_val),
 
         /*
          * Configuration

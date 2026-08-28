@@ -21,10 +21,13 @@ module test_taxi_axis_baser_rx_64 #
     parameter DATA_W = 64,
     parameter HDR_W = 2,
     parameter logic GBX_IF_EN = 1'b0,
+    parameter GBX_CNT = 1,
     parameter logic USXGMII_EN = 1'b1,
     parameter logic PTP_TS_EN = 1'b0,
     parameter logic PTP_TS_FMT_TOD = 1'b1,
-    parameter PTP_TS_W = PTP_TS_FMT_TOD ? 96 : 64
+    parameter PTP_TS_W = PTP_TS_FMT_TOD ? 96 : 64,
+    parameter logic PTP_TS_COR_EN = PTP_TS_EN && GBX_IF_EN,
+    parameter PTP_TS_COR_W = 16+4
     /* verilator lint_on WIDTHTRUNC */
 )
 ();
@@ -38,6 +41,7 @@ logic [DATA_W-1:0] encoded_rx_data;
 logic encoded_rx_data_valid;
 logic [HDR_W-1:0] encoded_rx_hdr;
 logic encoded_rx_hdr_valid;
+logic [GBX_CNT-1:0] rx_gbx_sync;
 
 taxi_axis_if #(.DATA_W(DATA_W), .USER_EN(1), .USER_W(USER_W)) m_axis_rx();
 
@@ -48,6 +52,8 @@ logic rx_os_match;
 logic rx_idle_match;
 
 logic [PTP_TS_W-1:0] ptp_ts;
+logic [GBX_CNT-1:0] ptp_ts_cor_sync;
+logic [PTP_TS_COR_W-1:0] ptp_ts_cor_val;
 
 logic [15:0] cfg_rx_max_pkt_len;
 logic cfg_rx_enable;
@@ -79,7 +85,9 @@ taxi_axis_baser_rx_64 #(
     .USXGMII_EN(USXGMII_EN),
     .PTP_TS_EN(PTP_TS_EN),
     .PTP_TS_FMT_TOD(PTP_TS_FMT_TOD),
-    .PTP_TS_W(PTP_TS_W)
+    .PTP_TS_W(PTP_TS_W),
+    .PTP_TS_COR_EN(PTP_TS_COR_EN),
+    .PTP_TS_COR_W(PTP_TS_COR_W)
 )
 uut (
     .clk(clk),
@@ -92,6 +100,7 @@ uut (
     .encoded_rx_data_valid(encoded_rx_data_valid),
     .encoded_rx_hdr(encoded_rx_hdr),
     .encoded_rx_hdr_valid(encoded_rx_hdr_valid),
+    .rx_gbx_sync(rx_gbx_sync),
 
     /*
      * AXI4-Stream output (source)
@@ -111,6 +120,8 @@ uut (
      * PTP
      */
     .ptp_ts(ptp_ts),
+    .ptp_ts_cor_sync(ptp_ts_cor_sync),
+    .ptp_ts_cor_val(ptp_ts_cor_val),
 
     /*
      * Configuration

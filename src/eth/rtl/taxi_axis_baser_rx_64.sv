@@ -20,70 +20,76 @@ module taxi_axis_baser_rx_64 #
     parameter DATA_W = 64,
     parameter HDR_W = 2,
     parameter logic GBX_IF_EN = 1'b0,
+    parameter GBX_CNT = 1,
     parameter logic USXGMII_EN = 1'b0,
     parameter logic PTP_TS_EN = 1'b0,
     parameter logic PTP_TS_FMT_TOD = 1'b1,
-    parameter PTP_TS_W = PTP_TS_FMT_TOD ? 96 : 64
+    parameter PTP_TS_W = PTP_TS_FMT_TOD ? 96 : 64,
+    parameter logic PTP_TS_COR_EN = PTP_TS_EN && GBX_IF_EN,
+    parameter PTP_TS_COR_W = 16+4
 )
 (
-    input  wire logic                 clk,
-    input  wire logic                 rst,
+    input  wire logic                     clk,
+    input  wire logic                     rst,
 
     /*
      * 10GBASE-R encoded input
      */
-    input  wire logic [DATA_W-1:0]    encoded_rx_data,
-    input  wire logic                 encoded_rx_data_valid,
-    input  wire logic [HDR_W-1:0]     encoded_rx_hdr,
-    input  wire logic                 encoded_rx_hdr_valid,
+    input  wire logic [DATA_W-1:0]        encoded_rx_data,
+    input  wire logic                     encoded_rx_data_valid,
+    input  wire logic [HDR_W-1:0]         encoded_rx_hdr,
+    input  wire logic                     encoded_rx_hdr_valid,
+    input  wire logic [GBX_CNT-1:0]       rx_gbx_sync = '0,
 
     /*
      * Receive interface (AXI stream)
      */
-    taxi_axis_if.src                  m_axis_rx,
+    taxi_axis_if.src                      m_axis_rx,
 
     /*
      * Ordered sets
      */
-    output wire logic [23:0]          rx_os,
-    output wire logic                 rx_os_sig,
-    output wire logic                 rx_os_valid,
-    output wire logic                 rx_os_match,
-    output wire logic                 rx_idle_match,
+    output wire logic [23:0]              rx_os,
+    output wire logic                     rx_os_sig,
+    output wire logic                     rx_os_valid,
+    output wire logic                     rx_os_match,
+    output wire logic                     rx_idle_match,
 
     /*
      * PTP
      */
-    input  wire logic [PTP_TS_W-1:0]  ptp_ts,
+    input  wire logic [PTP_TS_W-1:0]      ptp_ts,
+    output wire logic [GBX_CNT-1:0]       ptp_ts_cor_sync,
+    input  wire logic [PTP_TS_COR_W-1:0]  ptp_ts_cor_val = '0,
 
     /*
      * Configuration
      */
-    input  wire logic [15:0]          cfg_rx_max_pkt_len = 16'd1518-1,
-    input  wire logic                 cfg_rx_enable,
-    input  wire logic                 cfg_rx_usxgmii_en = 1'b1,
-    input  wire logic                 cfg_rx_usxgmii_5g = 1'b0,
-    input  wire logic [2:0]           cfg_rx_usxgmii_speed = 3'b011,
+    input  wire logic [15:0]              cfg_rx_max_pkt_len = 16'd1518-1,
+    input  wire logic                     cfg_rx_enable,
+    input  wire logic                     cfg_rx_usxgmii_en = 1'b1,
+    input  wire logic                     cfg_rx_usxgmii_5g = 1'b0,
+    input  wire logic [2:0]               cfg_rx_usxgmii_speed = 3'b011,
 
     /*
      * Status
      */
-    output wire logic [1:0]           rx_start_packet,
-    output wire logic [3:0]           stat_rx_byte,
-    output wire logic [15:0]          stat_rx_pkt_len,
-    output wire logic                 stat_rx_pkt_fragment,
-    output wire logic                 stat_rx_pkt_jabber,
-    output wire logic                 stat_rx_pkt_ucast,
-    output wire logic                 stat_rx_pkt_mcast,
-    output wire logic                 stat_rx_pkt_bcast,
-    output wire logic                 stat_rx_pkt_vlan,
-    output wire logic                 stat_rx_pkt_good,
-    output wire logic                 stat_rx_pkt_bad,
-    output wire logic                 stat_rx_err_oversize,
-    output wire logic                 stat_rx_err_bad_fcs,
-    output wire logic                 stat_rx_err_bad_block,
-    output wire logic                 stat_rx_err_framing,
-    output wire logic                 stat_rx_err_preamble
+    output wire logic [1:0]               rx_start_packet,
+    output wire logic [3:0]               stat_rx_byte,
+    output wire logic [15:0]              stat_rx_pkt_len,
+    output wire logic                     stat_rx_pkt_fragment,
+    output wire logic                     stat_rx_pkt_jabber,
+    output wire logic                     stat_rx_pkt_ucast,
+    output wire logic                     stat_rx_pkt_mcast,
+    output wire logic                     stat_rx_pkt_bcast,
+    output wire logic                     stat_rx_pkt_vlan,
+    output wire logic                     stat_rx_pkt_good,
+    output wire logic                     stat_rx_pkt_bad,
+    output wire logic                     stat_rx_err_oversize,
+    output wire logic                     stat_rx_err_bad_fcs,
+    output wire logic                     stat_rx_err_bad_block,
+    output wire logic                     stat_rx_err_framing,
+    output wire logic                     stat_rx_err_preamble
 );
 
 // extract parameters
@@ -179,6 +185,9 @@ logic input_start_swap_reg = 1'b0;
 logic input_start_d0_reg = 1'b0;
 logic input_start_d1_reg = 1'b0;
 
+logic encoded_rx_data_valid_d0_reg = 1'b0;
+logic [1:0] encoded_rx_start_remap_d0_reg = 2'b00;
+
 logic frame_oversize_reg = 1'b0, frame_oversize_next;
 logic pre_ok_reg = 1'b0, pre_ok_next;
 logic [1:0] hdr_ptr_reg = '0, hdr_ptr_next;
@@ -244,6 +253,8 @@ assign crc_valid[0] = crc_state_reg == ~32'h6b87b1ec;
 
 logic [4+16-1:0] last_ts_reg = '0;
 logic [4+16-1:0] ts_inc_reg = '0;
+logic [4+16-1:0] ts_offs_reg = '0;
+logic gbx_en_reg = 1'b0;
 
 assign m_axis_rx.tdata = m_axis_rx_tdata_reg;
 assign m_axis_rx.tkeep = m_axis_rx_tkeep_reg;
@@ -320,6 +331,7 @@ if (USXGMII_EN) begin : usxgmii
     logic [3:0] encoded_rx_type_remap_reg = '0;
     logic encoded_rx_data_remap_valid_reg = 1'b0;
     logic [1:0] encoded_rx_start_remap_reg = '0;
+    logic [GBX_CNT-1:0] rx_gbx_sync_reg = '0;
 
     logic [8:0] rep_cnt_reg = '0;
     logic rep_stall_reg = 1'b0;
@@ -333,8 +345,11 @@ if (USXGMII_EN) begin : usxgmii
     assign encoded_rx_data_remap_valid = encoded_rx_data_remap_valid_reg;
     assign encoded_rx_start_remap = encoded_rx_start_remap_reg;
 
+    assign ptp_ts_cor_sync = (GBX_IF_EN && PTP_TS_COR_EN) ? rx_gbx_sync_reg : '0;
+
     always_ff @(posedge clk) begin
         encoded_rx_data_remap_valid_reg <= 1'b0;
+        rx_gbx_sync_reg <= rx_gbx_sync;
 
         if (!GBX_IF_EN || encoded_rx_data_valid) begin
 
@@ -543,6 +558,8 @@ if (USXGMII_EN) begin : usxgmii
             encoded_rx_data_remap_valid_reg <= 1'b0;
             encoded_rx_start_remap_reg <= '0;
 
+            rx_gbx_sync_reg <= '0;
+
             rep_cnt_reg <= '0;
             rep_stall_reg <= 1'b0;
             rep_en_reg <= 1'b0;
@@ -558,6 +575,8 @@ end else begin
     assign encoded_rx_data_remap_valid = !GBX_IF_EN || encoded_rx_data_valid;
     assign encoded_rx_start_remap[0] = encoded_rx_hdr[0] == SYNC_CTRL[0] && encoded_rx_data[7:4] == BLOCK_TYPE_START_0[7:4];
     assign encoded_rx_start_remap[1] = encoded_rx_hdr[0] == SYNC_CTRL[0] && (encoded_rx_data[7:4] == BLOCK_TYPE_START_4[7:4] || encoded_rx_data[7:4] == BLOCK_TYPE_OS_START[7:4]);
+
+    assign ptp_ts_cor_sync = (GBX_IF_EN && PTP_TS_COR_EN) ? rx_gbx_sync : '0;
 
 end
 
@@ -866,24 +885,27 @@ always_ff @(posedge clk) begin
     stat_rx_err_framing_reg <= stat_rx_err_framing_next;
     stat_rx_err_preamble_reg <= stat_rx_err_preamble_next;
 
-    if (!GBX_IF_EN || encoded_rx_data_valid) begin
+    encoded_rx_data_valid_d0_reg <= encoded_rx_data_valid;
+    encoded_rx_start_remap_d0_reg <= encoded_rx_start_remap;
+
+    if (!GBX_IF_EN || encoded_rx_data_valid_d0_reg) begin
         // capture timestamps
-        if (encoded_rx_start_remap[1]) begin
+        if (encoded_rx_start_remap_d0_reg[1]) begin
             start_packet_reg <= 2'b10;
             if (PTP_TS_FMT_TOD) begin
                 // workaround for verilator lint bug: unreachable by parameter value
                 /* verilator lint_off SELRANGE */
-                ptp_ts_reg[45:0] <= ptp_ts[45:0] + 46'(ts_inc_reg >> 1);
+                ptp_ts_reg[45:0] <= ptp_ts[45:0] + (GBX_IF_EN ? 46'(ts_offs_reg) : 46'(ts_inc_reg >> 1)) + (PTP_TS_COR_EN ? 46'(ptp_ts_cor_val) : '0);
                 ptp_ts_reg[95:48] <= ptp_ts[95:48];
                 /* verilator lint_on SELRANGE */
             end else begin
-                ptp_ts_reg <= ptp_ts + PTP_TS_W'(ts_inc_reg >> 1);
+                ptp_ts_reg <= ptp_ts + (GBX_IF_EN ? PTP_TS_W'(ts_offs_reg) : PTP_TS_W'(ts_inc_reg >> 1)) + (PTP_TS_COR_EN ? PTP_TS_W'(ptp_ts_cor_val) : '0);
             end
         end
 
-        if (encoded_rx_start_remap[0]) begin
+        if (encoded_rx_start_remap_d0_reg[0]) begin
             start_packet_reg <= 2'b01;
-            ptp_ts_reg <= ptp_ts;
+            ptp_ts_reg <= ptp_ts + (PTP_TS_COR_EN ? PTP_TS_W'(ptp_ts_cor_val) : '0);
         end
     end
 
@@ -1168,6 +1190,11 @@ always_ff @(posedge clk) begin
 
     last_ts_reg <= (4+16)'(ptp_ts);
     ts_inc_reg <= (4+16)'(ptp_ts) - last_ts_reg;
+    ts_offs_reg <= (ts_inc_reg >> 1) + (gbx_en_reg ? ts_inc_reg >> 6 : '0);
+
+    if (rx_gbx_sync || !encoded_rx_data_valid) begin
+        gbx_en_reg <= 1'b1;
+    end
 
     if (rst) begin
         state_reg <= STATE_IDLE;
@@ -1180,6 +1207,8 @@ always_ff @(posedge clk) begin
 
         start_packet_reg <= 2'b00;
         frame_reg <= 1'b0;
+
+        gbx_en_reg <= 1'b0;
 
         stat_rx_byte_reg <= '0;
         stat_rx_pkt_len_reg <= '0;
@@ -1200,6 +1229,9 @@ always_ff @(posedge clk) begin
         input_start_swap_reg <= 1'b0;
         input_start_d0_reg <= 1'b0;
         input_start_d1_reg <= 1'b0;
+
+        encoded_rx_data_valid_d0_reg <= 1'b0;
+        encoded_rx_start_remap_d0_reg <= 2'b00;
 
         lanes_swapped_reg <= 1'b0;
         lanes_swapped_d1_reg <= 1'b0;

@@ -127,16 +127,16 @@ class BaseRSerdesSource():
         self.log.info("  Sequence length: %d cycles", seq_len)
         self.log.info("  Stall cycles: %s", seq_stall)
 
-        out_bits = 66
+        out_bits = self.width
         in_cycles = seq_len
         out_cycles = in_cycles - len(seq_stall)
-        in_bits = (out_bits * out_cycles) // in_cycles
+        in_bits = int(((out_bits + 2/self.pack_cnt) * out_cycles) / in_cycles)
 
-        self.log.info("  Input: %d bits (%d cycles)", in_bits, in_cycles)
+        self.log.info("  Input: %d+2 bits (%d cycles)", in_bits, in_cycles)
         self.log.info("  Output: %d bits (%d cycles)", out_bits, out_cycles)
-        self.log.info("  Gearbox ratio: %d:%d", in_bits, out_bits)
+        self.log.info("  Gearbox ratio: %d+2:%d", in_bits, out_bits)
 
-        assert in_cycles*in_bits == out_cycles*out_bits
+        assert in_cycles*in_bits == out_cycles*(out_bits + 2/self.pack_cnt)
 
         self.gbx_seq = 0
         self.gbx_seq_len = seq_len
@@ -150,6 +150,9 @@ class BaseRSerdesSource():
             if k in self.gbx_seq_stall:
                 continue
             self.gbx_bit_cnt = max(self.gbx_bit_cnt - out_bits, 0)
+
+        # sync packing with gearbox
+        self.pack_seq = max(self.pack_cnt-1, 0)
 
     async def send(self, frame):
         while self.full():
@@ -234,6 +237,8 @@ class BaseRSerdesSource():
 
         clk_period = 0
         last_clk = 0
+        symb_period = 0
+        symb_start = 0
         gbx_delay = 0
 
         data = 0
@@ -255,15 +260,32 @@ class BaseRSerdesSource():
 
             # gearbox sequence
             if self.gbx_seq_len:
+                symb_period = (clk_period * (self.pack_cnt*self.gbx_out_bits + 2)) // self.gbx_in_bits
+
                 self.gbx_seq = (self.gbx_seq + 1) % self.gbx_seq_len
 
                 if self.gbx_sync is not None:
                     self.gbx_sync.value = (self.gbx_seq == 0)
 
+                if self.gbx_seq == 0:
+                    self.gbx_bit_cnt = 2*(self.gbx_seq_len-len(self.gbx_seq_stall))//self.pack_cnt
+                    self.pack_seq = max(self.pack_cnt-2, 0)
+
+                gbx_delay = (self.gbx_bit_cnt * clk_period) // self.gbx_in_bits
+
+                stall = self.gbx_seq in self.gbx_seq_stall
+
                 self.gbx_bit_cnt += self.gbx_in_bits
 
+                if not stall:
+                    self.gbx_bit_cnt -= self.gbx_out_bits
+                    if self.pack_cnt == 1 or self.pack_seq == 0:
+                        self.gbx_bit_cnt -= 2
+                    if self.gbx_bit_cnt < 0:
+                        self.gbx_bit_cnt = 0
+
                 # stall cycle
-                if self.gbx_seq in self.gbx_seq_stall:
+                if stall:
                     self.data.value = 0
                     if self.data_valid is not None:
                         self.data_valid.value = 0
@@ -271,10 +293,9 @@ class BaseRSerdesSource():
                     if self.hdr_valid is not None:
                         self.hdr_valid.value = 0
                     continue
-
-                self.gbx_bit_cnt = max(self.gbx_bit_cnt - self.gbx_out_bits, 0)
-                gbx_delay = (self.gbx_bit_cnt * clk_period) // self.gbx_in_bits
             else:
+                symb_period = clk_period * self.pack_cnt
+
                 self.gbx_seq = 0
                 self.gbx_bit_cnt = 0
                 gbx_delay = 0
@@ -284,6 +305,9 @@ class BaseRSerdesSource():
 
             if self.pack_seq:
                 # output data
+                if self.pack_seq == 0:
+                    symb_start = sim_time - gbx_delay
+
                 data_out = data >> (self.width*(self.pack_cnt-self.pack_seq))
                 self.pack_seq = self.pack_seq-1
 
@@ -299,6 +323,8 @@ class BaseRSerdesSource():
                     self.hdr_valid.value = 0
 
                 continue
+            else:
+                symb_start = sim_time - gbx_delay
 
             dl = bytearray()
             cl = []
@@ -353,13 +379,13 @@ class BaseRSerdesSource():
                         d = XgmiiCtrl.START
                         c = 1
                         frame.start_lane = k
-                        frame.sim_time_start = sim_time + (clk_period // self.byte_lanes * k) - gbx_delay
+                        frame.sim_time_start = symb_start + ((symb_period * k) // 8)
                     elif frame_offset >= len(frame.data):
                         d = XgmiiCtrl.TERM
                         c = 1
                         in_term = True
                         ifg_cnt = max(self.ifg - (8-k), 0)
-                        frame.sim_time_end = sim_time + (clk_period // self.byte_lanes * k) - gbx_delay
+                        frame.sim_time_end = symb_start + ((symb_period * k) // 8)
                         frame.handle_tx_complete()
                         frame = None
                         self.current_frame = None
@@ -367,7 +393,7 @@ class BaseRSerdesSource():
                         d = frame.data[frame_offset]
                         c = frame.ctrl[frame_offset]
                         if frame.sim_time_sfd is None and not in_pre:
-                            frame.sim_time_sfd = sim_time + (clk_period // self.byte_lanes * k) - gbx_delay
+                            frame.sim_time_sfd = symb_start + ((symb_period * k) // 8)
                         if d == EthPre.SFD and (not self.xgmii_rep_count or rep_cnt == 1):
                             in_pre = False
                         if frame_offset == 0:

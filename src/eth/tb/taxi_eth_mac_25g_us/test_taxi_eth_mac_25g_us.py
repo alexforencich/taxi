@@ -256,7 +256,7 @@ async def run_test_rx(dut, port=0, payload_lengths=None, payload_data=None, ifg=
 
     if dut.DATA_W.value == 64:
         if dut.COMBINED_MAC_PCS.value:
-            pipe_delay = 0 + 1
+            pipe_delay = 1 + 1
         else:
             pipe_delay = 2 + 1
         if dut.USXGMII_EN.value:
@@ -267,6 +267,10 @@ async def run_test_rx(dut, port=0, payload_lengths=None, payload_data=None, ifg=
         else:
             pipe_delay = 3 + 1
     pipe_delay += int(dut.RX_SERDES_PIPELINE.value)
+
+    if dut.CFG_LOW_LATENCY.value:
+        # baseline gearbox delay
+        pipe_delay += 2 # TODO this is too simplistic
 
     tb = TB(dut)
 
@@ -320,7 +324,7 @@ async def run_test_rx(dut, port=0, payload_lengths=None, payload_data=None, ifg=
 
         assert rx_frame.tdata == test_data
         assert frame_error == 0
-        if not tb.serdes_sources[port].gbx_seq_len:
+        if not tb.serdes_sources[port].gbx_seq_len or dut.COMBINED_MAC_PCS.value:
             if dut.PTP_TD_EN.value:
                 assert abs(ptp_ts_ns - tx_frame_sfd_ns - tb.clk_period[port]*pipe_delay) < tb.clk_period[port]*3
             else:

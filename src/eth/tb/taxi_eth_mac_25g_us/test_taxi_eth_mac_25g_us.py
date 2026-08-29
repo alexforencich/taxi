@@ -330,7 +330,7 @@ async def run_test_rx(dut, port=0, payload_lengths=None, payload_data=None, ifg=
             if dut.PTP_TD_EN.value:
                 assert abs(error) < tb.clk_period[port]*3
             else:
-                assert abs(error) < 0.01
+                assert abs(error) < 0.0001
 
     assert tb.axis_sinks[port].empty()
 
@@ -410,7 +410,7 @@ async def run_test_tx(dut, port=0, payload_lengths=None, payload_data=None, ifg=
             if dut.PTP_TD_EN.value:
                 assert abs(error) < tb.clk_period[port]*3
             else:
-                assert abs(error) < 0.01
+                assert abs(error) < 0.0001
 
     assert tb.serdes_sinks[port].empty()
 
@@ -499,7 +499,7 @@ async def run_test_tx_alignment(dut, port=0, payload_data=None, ifg=12):
                 if dut.PTP_TD_EN.value:
                     assert abs(error) < tb.clk_period[port]*3
                 else:
-                    assert abs(error) < 0.01
+                    assert abs(error) < 0.0001
 
             start_lane.append(rx_frame.start_lane)
 

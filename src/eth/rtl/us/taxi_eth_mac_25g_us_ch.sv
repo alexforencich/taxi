@@ -447,10 +447,10 @@ if (GT_7) begin : gt
          * Timestamp correction
          */
         .tx_ts_cor_sync(tx_ptp_ts_cor_sync),
-        .tx_ts_inc(20'h31a60), // TODO
+        .tx_ts_inc(20'h31a65), // TODO
         .tx_ts_cor_val(tx_ptp_ts_cor_val),
         .rx_ts_cor_sync(rx_ptp_ts_cor_sync),
-        .rx_ts_inc(20'h31a60), // TODO
+        .rx_ts_inc(20'h31a65), // TODO
         .rx_ts_cor_val(rx_ptp_ts_cor_val)
     );
 
@@ -580,10 +580,10 @@ end else if (DATA_W == 64 && CFG_LOW_LATENCY) begin : gt
          * Timestamp correction
          */
         .tx_ts_cor_sync(tx_ptp_ts_cor_sync),
-        .tx_ts_inc(20'h27b80), // TODO
+        .tx_ts_inc(20'h27b84), // TODO
         .tx_ts_cor_val(tx_ptp_ts_cor_val),
         .rx_ts_cor_sync(rx_ptp_ts_cor_sync),
-        .rx_ts_inc(20'h27b80), // TODO
+        .rx_ts_inc(20'h27b84), // TODO
         .rx_ts_cor_val(rx_ptp_ts_cor_val)
     );
 
@@ -825,10 +825,10 @@ end else if (DATA_W == 32 && CFG_LOW_LATENCY) begin : gt
          * Timestamp correction
          */
         .tx_ts_cor_sync(tx_ptp_ts_cor_sync),
-        .tx_ts_inc(20'h31a60), // TODO
+        .tx_ts_inc(20'h31a65), // TODO
         .tx_ts_cor_val(tx_ptp_ts_cor_val),
         .rx_ts_cor_sync(rx_ptp_ts_cor_sync),
-        .rx_ts_inc(20'h31a60), // TODO
+        .rx_ts_inc(20'h31a65), // TODO
         .rx_ts_cor_val(rx_ptp_ts_cor_val)
     );
 

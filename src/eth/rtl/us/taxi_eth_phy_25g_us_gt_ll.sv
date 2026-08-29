@@ -610,13 +610,15 @@ if (GT_TYPE == "GTY") begin : tx_seq
 
     // Generate TX timestamp correction
     logic [6:0] tx_ts_cor_seq_reg = '0;
-    logic [TS_COR_W-1:0] tx_ts_cor_val_reg = '0;
+    logic [TS_COR_W+5-1:0] tx_ts_cor_val_reg = '0;
 
-    assign tx_ts_cor_val = tx_ts_cor_val_reg;
+    assign tx_ts_cor_val = tx_ts_cor_val_reg[5 +: TS_COR_W];
 
     always_ff @(posedge tx_clk) begin
         tx_ts_cor_seq_reg <= tx_ts_cor_seq_reg + 1;
-        tx_ts_cor_val_reg <= tx_ts_cor_val_reg + (tx_ts_inc >> 5);
+        if (tx_ts_cor_seq_reg[0]) begin
+            tx_ts_cor_val_reg <= tx_ts_cor_val_reg + (TS_COR_W+5)'(tx_ts_inc);
+        end
         if (tx_ts_cor_seq_reg == 65) begin
             tx_ts_cor_seq_reg <= '0;
             tx_ts_cor_val_reg <= '0;
@@ -628,13 +630,15 @@ if (GT_TYPE == "GTY") begin : tx_seq
 
     // Generate RX timestamp correction
     logic [6:0] rx_ts_cor_seq_reg = '0;
-    logic [TS_COR_W-1:0] rx_ts_cor_val_reg = '0;
+    logic [TS_COR_W+5-1:0] rx_ts_cor_val_reg = '0;
 
-    assign rx_ts_cor_val = rx_ts_cor_val_reg;
+    assign rx_ts_cor_val = rx_ts_cor_val_reg[5 +: TS_COR_W];
 
     always_ff @(posedge rx_clk) begin
         rx_ts_cor_seq_reg <= rx_ts_cor_seq_reg + 1;
-        rx_ts_cor_val_reg <= rx_ts_cor_val_reg + (tx_ts_inc >> 5);
+        if (rx_ts_cor_seq_reg[0]) begin
+            rx_ts_cor_val_reg <= rx_ts_cor_val_reg + (TS_COR_W+5)'(rx_ts_inc);
+        end
         if (rx_ts_cor_seq_reg == 65) begin
             rx_ts_cor_seq_reg <= '0;
             rx_ts_cor_val_reg <= '0; // TODO odd offset
@@ -687,13 +691,13 @@ end else begin : tx_seq
 
     // Generate TX timestamp correction
     logic [5:0] tx_ts_cor_seq_reg = '0;
-    logic [TS_COR_W-1:0] tx_ts_cor_val_reg = '0;
+    logic [TS_COR_W+5-1:0] tx_ts_cor_val_reg = '0;
 
-    assign tx_ts_cor_val = tx_ts_cor_val_reg;
+    assign tx_ts_cor_val = tx_ts_cor_val_reg[5 +: TS_COR_W];
 
     always_ff @(posedge tx_clk) begin
         tx_ts_cor_seq_reg <= tx_ts_cor_seq_reg + 1;
-        tx_ts_cor_val_reg <= tx_ts_cor_val_reg + (tx_ts_inc >> 5);
+        tx_ts_cor_val_reg <= tx_ts_cor_val_reg + (TS_COR_W+5)'(tx_ts_inc);
         if (tx_ts_cor_seq_reg == 32) begin
             tx_ts_cor_seq_reg <= '0;
             tx_ts_cor_val_reg <= '0;
@@ -705,13 +709,13 @@ end else begin : tx_seq
 
     // Generate RX timestamp correction
     logic [5:0] rx_ts_cor_seq_reg = '0;
-    logic [TS_COR_W-1:0] rx_ts_cor_val_reg = '0;
+    logic [TS_COR_W+5-1:0] rx_ts_cor_val_reg = '0;
 
-    assign rx_ts_cor_val = rx_ts_cor_val_reg;
+    assign rx_ts_cor_val = rx_ts_cor_val_reg[5 +: TS_COR_W];
 
     always_ff @(posedge rx_clk) begin
         rx_ts_cor_seq_reg <= rx_ts_cor_seq_reg + 1;
-        rx_ts_cor_val_reg <= rx_ts_cor_val_reg + (rx_ts_inc >> 5);
+        rx_ts_cor_val_reg <= rx_ts_cor_val_reg + (TS_COR_W+5)'(rx_ts_inc);
         if (rx_ts_cor_seq_reg == 32) begin
             rx_ts_cor_seq_reg <= '0;
             rx_ts_cor_val_reg <= '0; // TODO odd offset

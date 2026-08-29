@@ -609,14 +609,14 @@ end
 
 // Generate TX timestamp correction
 logic [6:0] tx_ts_cor_seq_reg = '0;
-logic [TS_COR_W-1:0] tx_ts_cor_val_reg = '0;
+logic [TS_COR_W+4-1:0] tx_ts_cor_val_reg = '0;
 
-assign tx_ts_cor_val = tx_ts_cor_val_reg;
+assign tx_ts_cor_val = tx_ts_cor_val_reg[4 +: TS_COR_W];
 
 always_ff @(posedge tx_clk) begin
     tx_ts_cor_seq_reg <= tx_ts_cor_seq_reg + 1;
     if (tx_ts_cor_seq_reg[0]) begin
-        tx_ts_cor_val_reg <= tx_ts_cor_val_reg + (tx_ts_inc >> 4);
+        tx_ts_cor_val_reg <= tx_ts_cor_val_reg + (TS_COR_W+4)'(tx_ts_inc);
     end
     if (tx_ts_cor_seq_reg == 65) begin
         tx_ts_cor_seq_reg <= '0;
@@ -629,14 +629,14 @@ end
 
 // Generate RX timestamp correction
 logic [6:0] rx_ts_cor_seq_reg = '0;
-logic [TS_COR_W-1:0] rx_ts_cor_val_reg = '0;
+logic [TS_COR_W+4-1:0] rx_ts_cor_val_reg = '0;
 
-assign rx_ts_cor_val = rx_ts_cor_val_reg;
+assign rx_ts_cor_val = rx_ts_cor_val_reg[4 +: TS_COR_W];
 
 always_ff @(posedge rx_clk) begin
     rx_ts_cor_seq_reg <= rx_ts_cor_seq_reg + 1;
     if (rx_ts_cor_seq_reg[0]) begin
-        rx_ts_cor_val_reg <= rx_ts_cor_val_reg + (tx_ts_inc >> 4);
+        rx_ts_cor_val_reg <= rx_ts_cor_val_reg + (TS_COR_W+4)'(rx_ts_inc);
     end
     if (rx_ts_cor_seq_reg == 65) begin
         rx_ts_cor_seq_reg <= '0;

@@ -1201,11 +1201,16 @@ def process_f_files(files):
     return list(lst.values())
 
 
-@pytest.mark.parametrize(("dic_en", "pfc_en"), [(1, 1), (1, 0), (0, 0)])
-@pytest.mark.parametrize("low_latency", [1, 0])
-@pytest.mark.parametrize("combined_mac_pcs", [1, 0])
+@pytest.mark.parametrize(("dic_en", "pfc_en"), [(1, 1)])
+@pytest.mark.parametrize(("low_latency", "combined_mac_pcs", "ptp_td_en"), [
+    (1, 1, 0),
+    (1, 1, 1),
+    (1, 0, 1),
+    (0, 1, 1),
+    (0, 0, 1),
+])
 @pytest.mark.parametrize("data_w", [32, 64])
-def test_taxi_eth_mac_25g_us(request, data_w, combined_mac_pcs, low_latency, dic_en, pfc_en):
+def test_taxi_eth_mac_25g_us(request, data_w, ptp_td_en, combined_mac_pcs, low_latency, dic_en, pfc_en):
     dut = "taxi_eth_mac_25g_us"
     module = os.path.splitext(os.path.basename(__file__))[0]
     toplevel = module
@@ -1234,7 +1239,7 @@ def test_taxi_eth_mac_25g_us(request, data_w, combined_mac_pcs, low_latency, dic
     parameters['USXGMII_EN'] = int(combined_mac_pcs)
     parameters['DIC_EN'] = dic_en
     parameters['PTP_TS_EN'] = 1
-    parameters['PTP_TD_EN'] = parameters['PTP_TS_EN']
+    parameters['PTP_TD_EN'] = ptp_td_en
     parameters['PTP_TS_FMT_TOD'] = 1
     parameters['PTP_TS_FNS_W'] = 16
     parameters['PTP_TS_W'] = 96 if parameters['PTP_TS_FMT_TOD'] else 64

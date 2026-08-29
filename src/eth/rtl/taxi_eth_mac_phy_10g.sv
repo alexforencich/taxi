@@ -381,8 +381,9 @@ end else begin
     assign rx_ptp_ts_out = rx_ptp_ts_in;
     assign rx_ptp_ts_step_out = 1'b0;
 
-    assign tx_ptp_locked = 1'b0;
-    assign rx_ptp_locked = 1'b0;
+    // report PTP TD locked if it's not present
+    assign tx_ptp_locked = 1'b1;
+    assign rx_ptp_locked = 1'b1;
 
 end
 

@@ -616,9 +616,7 @@ if (GT_TYPE == "GTY") begin : tx_seq
 
     always_ff @(posedge tx_clk) begin
         tx_ts_cor_seq_reg <= tx_ts_cor_seq_reg + 1;
-        if (tx_ts_cor_seq_reg[0]) begin
-            tx_ts_cor_val_reg <= tx_ts_cor_val_reg + (TS_COR_W+5)'(tx_ts_inc);
-        end
+        tx_ts_cor_val_reg <= tx_ts_cor_val_reg + (TS_COR_W+5)'(tx_ts_inc);
         if (tx_ts_cor_seq_reg == 65) begin
             tx_ts_cor_seq_reg <= '0;
             tx_ts_cor_val_reg <= '0;
@@ -636,9 +634,7 @@ if (GT_TYPE == "GTY") begin : tx_seq
 
     always_ff @(posedge rx_clk) begin
         rx_ts_cor_seq_reg <= rx_ts_cor_seq_reg + 1;
-        if (rx_ts_cor_seq_reg[0]) begin
-            rx_ts_cor_val_reg <= rx_ts_cor_val_reg + (TS_COR_W+5)'(rx_ts_inc);
-        end
+        rx_ts_cor_val_reg <= rx_ts_cor_val_reg + (TS_COR_W+5)'(rx_ts_inc);
         if (rx_ts_cor_seq_reg == 65) begin
             rx_ts_cor_seq_reg <= '0;
             rx_ts_cor_val_reg <= '0; // TODO odd offset

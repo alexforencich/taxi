@@ -191,8 +191,7 @@ class TB:
         seq_len = self.serdes_source.gbx_seq_len
         seq = 0
         val = 0
-        ui = self.clk_period / self.serdes_source.width
-        step = int(ui*2*65536+0.5)
+        step = self.clk_period*2*65536+0.5
         while True:
             await RisingEdge(self.dut.rx_clk)
             seq += 1
@@ -201,7 +200,7 @@ class TB:
             if seq >= seq_len:
                 seq = 0
                 val = 0
-            self.dut.rx_ptp_ts_cor_val.value = val
+            self.dut.rx_ptp_ts_cor_val.value = int(val / self.serdes_source.width)
             if int(self.dut.rx_ptp_ts_cor_sync.value):
                 seq = 1
 
@@ -209,8 +208,7 @@ class TB:
         seq_len = self.serdes_sink.gbx_seq_len
         seq = 0
         val = 0
-        ui = self.clk_period / self.serdes_sink.width
-        step = int(ui*2*65536+0.5)
+        step = self.clk_period*2*65536+0.5
         while True:
             await RisingEdge(self.dut.tx_clk)
             seq += 1
@@ -219,7 +217,7 @@ class TB:
             if seq >= seq_len:
                 seq = 0
                 val = 0
-            self.dut.tx_ptp_ts_cor_val.value = val
+            self.dut.tx_ptp_ts_cor_val.value = int(val / self.serdes_sink.width)
             if int(self.dut.tx_ptp_ts_cor_sync.value):
                 seq = 1
 
@@ -324,7 +322,7 @@ async def run_test_rx(dut, gbx_cfg=None, payload_lengths=None, payload_data=None
         if dut.PTP_TD_EN.value:
             assert abs(error) < tb.clk_period*5
         else:
-            assert abs(error) < 0.001
+            assert abs(error) < 0.0001
 
     assert tb.axis_sink.empty()
 
@@ -396,7 +394,7 @@ async def run_test_tx(dut, gbx_cfg=None, payload_lengths=None, payload_data=None
         if dut.PTP_TD_EN.value:
             assert abs(error) < tb.clk_period*5
         else:
-            assert abs(error) < 0.001
+            assert abs(error) < 0.0001
 
     assert tb.serdes_sink.empty()
 
@@ -477,7 +475,7 @@ async def run_test_tx_alignment(dut, gbx_cfg=None, payload_data=None, ifg=12):
             if dut.PTP_TD_EN.value:
                 assert abs(error) < tb.clk_period*5
             else:
-                assert abs(error) < 0.001
+                assert abs(error) < 0.0001
 
             start_lane.append(rx_frame.start_lane)
 

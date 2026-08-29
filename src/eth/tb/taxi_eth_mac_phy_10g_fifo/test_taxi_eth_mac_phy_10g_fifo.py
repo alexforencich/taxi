@@ -159,8 +159,7 @@ class TB:
         seq_len = self.serdes_source.gbx_seq_len
         seq = 0
         val = 0
-        ui = self.clk_period / self.serdes_source.width
-        step = int(ui*2*65536+0.5)
+        step = self.clk_period*2*65536+0.5
         while True:
             await RisingEdge(self.dut.rx_clk)
             seq += 1
@@ -169,7 +168,7 @@ class TB:
             if seq >= seq_len:
                 seq = 0
                 val = 0
-            self.dut.rx_ptp_ts_cor_val.value = val
+            self.dut.rx_ptp_ts_cor_val.value = int(val / self.serdes_source.width)
             if int(self.dut.rx_ptp_ts_cor_sync.value):
                 seq = 1
 
@@ -177,8 +176,7 @@ class TB:
         seq_len = self.serdes_sink.gbx_seq_len
         seq = 0
         val = 0
-        ui = self.clk_period / self.serdes_sink.width
-        step = int(ui*2*65536+0.5)
+        step = self.clk_period*2*65536+0.5
         while True:
             await RisingEdge(self.dut.tx_clk)
             seq += 1
@@ -187,7 +185,7 @@ class TB:
             if seq >= seq_len:
                 seq = 0
                 val = 0
-            self.dut.tx_ptp_ts_cor_val.value = val
+            self.dut.tx_ptp_ts_cor_val.value = int(val / self.serdes_sink.width)
             if int(self.dut.tx_ptp_ts_cor_sync.value):
                 seq = 1
 

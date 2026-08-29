@@ -155,8 +155,7 @@ class TB:
         seq_len = self.sink.gbx_seq_len
         seq = 0
         val = 0
-        ui = self.clk_period / self.sink.width
-        step = int(ui*2*65536+0.5)
+        step = self.clk_period*2*65536+0.5
         while True:
             await RisingEdge(self.dut.clk)
             seq += 1
@@ -165,7 +164,7 @@ class TB:
             if seq >= seq_len:
                 seq = 0
                 val = 0
-            self.dut.ptp_ts_cor_val.value = val
+            self.dut.ptp_ts_cor_val.value = int(val / self.source.width)
             if int(self.dut.ptp_ts_cor_sync.value):
                 seq = 1
 
@@ -238,7 +237,7 @@ async def run_test(dut, gbx_cfg=None, usxgmii_speed=None, payload_lengths=None, 
         assert rx_frame.get_payload() == test_data
         assert rx_frame.check_fcs()
         assert rx_frame.ctrl is None
-        assert abs(error) < 0.001
+        assert abs(error) < 0.0001
 
     assert tb.sink.empty()
 
